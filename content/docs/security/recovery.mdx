@@ -1,0 +1,229 @@
+---
+title: Recovery
+description: The recovery key, the emailed code, one-time codes, a recovery passkey and trustee shares, and what each one actually protects.
+order: 4
+group: Model
+---
+
+Nobody can reset your master password for you. There is no APM account and no copy of your keys anywhere else. If you forget the password and have not set up recovery, the vault cannot be opened. Set recovery up while you can still unlock.
+
+## How recovery works
+
+Recovery rests on one secret: the **recovery key**. When you create it, APM stretches it with Argon2id (2 passes, 64 MiB, 2 threads) and uses the result to seal a second copy of the vault's data key into the **recovery slot** in the [header](/docs/security/vault-format#recovery-block). During recovery, the recovery key opens that slot, the data key opens the vault, and you choose a new master password.
+
+Everything else is layered around the recovery key:
+
+| Method | What it is | Role |
+|---|---|---|
+| Recovery email | An address you prove you own with a 6-digit code | Required before you can create a recovery key. During recovery it receives a fresh 6-digit code. |
+| Recovery key | A code like `K7M3-R2P8-WXCT-5947`, shown once | The only thing that can open the recovery slot |
+| One-time recovery codes | Codes like `9F3A1C-07BE`, each usable once | Optional second factor after the recovery key |
+| Recovery passkey | A WebAuthn passkey, checked in your browser | Optional second factor after the recovery key |
+| Trustee shares | Your recovery key split into shares, for example 2 of 3 | Rebuilds the recovery key from enough shares, instead of you typing it |
+
+<Callout type="warning" title="Only the recovery key is cryptographic">
+The emailed code, one-time codes and the recovery passkey are checks that APM's own software runs before it uses the recovery key. They are not part of the encryption. Someone who has a copy of your `vault.dat` and your recovery key can open the vault with modified software and skip them. Guard the recovery key as carefully as your master password, and keep it apart from the vault file.
+</Callout>
+
+The recovery key draws from 24 letters (no `I` or `O`) and the digits 2 to 9, in four groups of four. The first two groups alternate letter and digit, the third is four letters and the fourth four digits, as in `K7M3-R2P8-WXCT-5947`. That is about 60 bits of randomness, each guess slowed by Argon2id. Entry is not case sensitive, but type the dashes: a key entered without them is not accepted.
+
+One-time recovery codes are 10 hexadecimal digits split 6 and 4, like `9F3A1C-07BE`, so 40 bits each. Case and spaces don't matter when you type one, but the dash does.
+
+## What recovery asks for
+
+<Tabs items={["With the recovery key", "With trustee shares"]}>
+<Tab>
+
+1. Your recovery email. It must match the one on the vault.
+2. The 6-digit code APM emails to it. It expires after 15 minutes, and you get 5 tries.
+3. Your recovery key. You get 3 tries.
+4. If you set up one-time codes or a recovery passkey: one of them.
+5. A new master password.
+
+This is the order in the desktop app. `pm auth recover` asks for the recovery key before the emailed code.
+
+</Tab>
+<Tab>
+
+1. Your recovery email, if the vault has one. Only the address is checked. No code is sent.
+2. At least as many trustee shares as the threshold.
+3. A new master password.
+
+Trustee recovery does not ask for one-time codes or the passkey.
+
+</Tab>
+</Tabs>
+
+When recovery finishes, the vault is re-encrypted with the new password, the failed-attempt counter is reset, and Touch ID is updated if you use it.
+
+## Set up recovery
+
+<Steps>
+
+### Verify an email and get your recovery key
+
+```sh title="Terminal"
+pm auth email you@example.com
+```
+
+`pm` emails a 6-digit code to the address. Enter it within 15 minutes. `pm` then creates your recovery key, prints it once, and sends a **SECURITY ALERT: APM Vault Recovery Configured** email that does not contain the key.
+
+```text title="Output"
+Verification code sent to you@example.com.
+Enter 6-digit verification code (attempt 1/5, expires in 14m52s): 
+Recovery registered successfully!
+Registration alert sent to you@example.com
+
+YOUR RECOVERY KEY (STAY SECURE):
+  K7M3-R2P8-WXCT-5947
+
+IMPORTANT: Store this key in a physically secure location.
+It will NEVER be shown again and is NOT stored in plain text.
+```
+
+The last line is not quite true right after setup: see [After you create a recovery key](#after-you-create-a-recovery-key).
+
+| Message | What to do |
+|---|---|
+| `Invalid verification code.` | Check the code in the email. You get 5 tries. |
+| `Too many invalid verification attempts.` or `Verification code expired. Re-run 'pm auth email <address>'.` | Run `pm auth email` again for a new code |
+| `Error sending verification email: …` | `pm` could not reach APM's mail service. Check your connection and try again. |
+| `Error sending alert email: …` | The code was right, but the alert email failed. `pm` stops before it shows the key or saves anything, so recovery is not set up. Run the command again. |
+
+In the desktop app, open **Settings → Recovery → Recovery email and key**. You can also set it up during first-run setup.
+
+Write the key down or store it somewhere offline. It is never shown again.
+
+### Add a second factor (optional)
+
+One-time codes:
+
+```sh title="Terminal"
+pm auth codes generate --count 10
+pm auth codes status
+```
+
+```text title="Output"
+Recovery codes generated (store these securely; they are shown once):
+ 1. 897B90-5113
+ 2. 214709-946B
+ 3. 0E129A-1F31
+```
+
+That was `--count 3`; the default is 10. `pm auth codes status` then prints `Recovery codes: 3 total, 3 remaining, 0 used`, or `No recovery codes configured.`
+
+`pm` prints the codes once and stores only their SHA-256 hashes. Generating again replaces the old set. `pm` makes up to 50 at a time, the desktop app up to 20; more stops with `Failed to generate recovery codes: count too large`. `pm` lets you generate codes before you have a recovery key, but they only matter as a second step after the key.
+
+A recovery passkey:
+
+```sh title="Terminal"
+pm auth passkey register
+```
+
+`pm` prints `Opening browser for passkey registration on localhost...`, opens a page on `http://localhost` in your browser and asks your device to create a passkey with user verification. The ceremony times out after 2 minutes. On success it prints `Recovery passkey registered successfully.` `pm auth passkey verify` checks it (`Passkey verification successful.`, or `Recovery passkey is not configured.`), and `pm auth passkey disable` removes it (`Recovery passkey disabled.`).
+
+In the desktop app, use **Settings → Recovery → One-time codes** and **Recovery passkey**.
+
+### Split the key between trustees (optional)
+
+```sh title="Terminal"
+pm auth quorum-setup --threshold 2 --shares 3
+```
+
+```text title="Output"
+Recovery quorum configured: 2-of-3
+Distribute these shares to distinct trustees. Each share is shown only here:
+Share 1: QSHARE-1-…
+Share 2: QSHARE-2-…
+Share 3: QSHARE-3-…
+```
+
+APM splits the recovery key with Shamir's secret sharing and prints each share once, as `QSHARE-<number>-<hex>`. Any `--threshold` shares rebuild the key. Fewer reveal nothing about it. Give each share to a different person. If `pm` cannot find your recovery key on its own, it asks `Recovery key required for this vault. Enter recovery key:`, or pass `--key`.
+
+The defaults are `--threshold 2` and `--shares 3`. The threshold must be at least 2, and the number of shares at least the threshold and at most 255; otherwise `pm` stops with `Failed to configure recovery quorum:` and the reason. Without a recovery key, it says `Recovery is not configured yet. Run 'pm auth email <address>' first.`
+
+In the desktop app, use **Settings → Recovery → Trustee shares**, with up to 10 shares.
+
+</Steps>
+
+Shares belong to one recovery key. When you create a new recovery key, set up trustee shares again. The desktop app clears the old shares for you.
+
+## Recover a vault
+
+In the desktop app, open the lock screen's **More options → Forgot master password** and follow the steps. See [Lock and unlock](/docs/desktop/lock-and-unlock).
+
+From the terminal:
+
+| Command | Path |
+|---|---|
+| `pm auth recover` | Email, code, recovery key, second factor, new password |
+| `pm auth quorum-recover` | Email address, trustee shares, new password |
+
+`pm auth quorum-recover` asks `Enter recovery email to confirm identity:`, then prints `Enter at least 2 valid shares.` and asks for exactly that many (`Share 1:`, `Share 2:`), then for the new password twice. An empty share stops it with `Share cannot be empty.` It ends with `Vault recovered successfully with trustee quorum.`
+
+| Message | Meaning |
+|---|---|
+| `Recovery is not configured for this vault. Run 'pm auth email [id]' to set it up.` | The header has no recovery email |
+| `Quorum recovery is not configured for this vault.` | No trustee shares were set up |
+| `Identity verification failed.` | The email does not match the one on the vault |
+| `Invalid recovery key. Attempt 1/3.` | The key is wrong. Check the dashes. |
+| `Invalid email code.` or `Too many invalid code attempts. Start recovery again.` | The emailed code is wrong, or you used all 5 tries |
+| `Share verification failed: …` | A share is mistyped, or belongs to an older recovery key |
+| `Passwords do not match.` | Type the new password the same way twice |
+
+<Callout type="note" title="If pm auth recover says the key is missing">
+`pm auth recover` currently stops with `Recovery record found but key is missing. Manual recovery required.` once the vault has been saved again after a fresh unlock, which is almost always. Use **Forgot master password** in the desktop app instead. It checks the same email, code, recovery key and second factor, and does not depend on the missing field. `pm auth quorum-recover` is not affected.
+</Callout>
+
+## After you create a recovery key
+
+The save that follows creating a recovery key also writes the key, XOR-masked with a constant from APM's source code, into the header field `obfuscated_key`. That is not encryption: anyone with that copy of the file can open the vault. The field is dropped the next time the vault is saved after a fresh unlock, but copies made in between keep it.
+
+Close that window right after setup:
+
+<Steps>
+
+### Rewrite the vault without the masked key
+
+Lock the desktop app if it is open, then unlock once from the terminal with your password:
+
+```sh title="Terminal"
+pm lock
+pm unlock
+```
+
+A password unlock in `pm` rewrites the vault. Check that the field is gone:
+
+```sh title="Terminal"
+grep -c obfuscated_key ~/.apm/vault.dat
+```
+
+`0` means the current file is clean. Use your own vault path if it is not in `~/.apm`.
+
+### Drop older snapshots
+
+lgit keeps a copy of the vault after every save, including the one with the masked key. Keep only the latest:
+
+```sh title="Terminal"
+pm lgit squash --keep 1
+```
+
+This also removes your undo history.
+
+### Check other copies
+
+Backups and cloud uploads made in that window still contain the masked key. On GitHub, every sync is a commit, so old versions stay in the repository history.
+
+</Steps>
+
+<Callout type="danger" title="If a copy with the masked key may have leaked">
+The data key never changes for the life of a vault, and the recovery key opens it. Changing your master password, resetting recovery or making a new recovery key does not lock out someone who already has that copy: the data key they recover opens every later version of the file too. Move your items into a new vault instead. Move `vault.dat` aside, create a new vault with `pm setup` or the desktop app, and import the old file with `pm import`. Then change the passwords of the accounts that matter most.
+</Callout>
+
+## Remove recovery
+
+`pm auth reset` removes the recovery email, recovery key, one-time codes, recovery passkey and trustee shares, and prints `Recovery email and records removed successfully.` In the desktop app, use **Settings → Recovery → Remove all recovery data**. After that, a forgotten master password cannot be recovered. Old copies of the vault still carry the recovery slot they had, and the recovery key still opens them.
+
+## What leaves your computer
+
+Recovery emails are sent through APM's own mail account over SMTP. The mail service sees your address and the 6-digit codes. Your recovery key, master password and vault never leave your computer during setup or recovery. The header stores your email only as an unsalted SHA-256 hash plus a hint like `y•••@example.com`, so anyone with the file can confirm a guessed address. See [Sync security](/docs/security/sync-security#what-leaves-your-computer).

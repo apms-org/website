@@ -1,0 +1,208 @@
+---
+title: Sessions
+description: Unlock once, lock when you leave, set auto-lock, open the vault read-only, and give scripts a scoped, short-lived session.
+order: 3
+group: Get started
+---
+
+A session saves you from typing the master password for every command. When you unlock, `pm` stores the password in a session file, encrypted with a key kept in your APM config folder, and later commands reuse it until the session ends. The desktop app, `pm` and the browser extension follow one [auto-lock policy](#auto-lock).
+
+## Unlock
+
+```sh title="Terminal"
+pm unlock
+```
+
+```text
+Master Password (attempt 1/3):
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+```
+
+When there was no session yet, the `Vault unlocked` line appears twice. You get three tries per run. <Kbd>Esc</Kbd> at the prompt cancels the command (`Cancelled.`, exit status 1) and <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> stops it (exit status 130); neither counts as a [failed attempt](#failed-attempts). The password is never shown as you type; see [Keys at prompts](/docs/cli#keys-at-prompts). Any command that needs the vault unlocks it the same way when there is no session, so `pm unlock` is only a way to do it up front.
+
+Some commands never open the vault, so they work with no session and never ask for the password: `pm info`, `pm cinfo`, `pm gen`, `pm lgit log`, `pm loaded`, `pm session list`, `pm extension status`, `pm extension token`, `pm mcp list`, `pm mcp config` and `pm mcp token`. Commands that read or change items, such as `pm get`, `pm totp`, `pm space list`, `pm logs`, `pm health`, `pm trust`, `pm profile list` and `pm autolock`, ask for the master password when there is no session. With stdin closed (`< /dev/null`), that prompt fails with `EOF or empty input`.
+
+Override the policy for this one session:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--timeout` | the policy's maximum session | Lock this long after unlocking, however busy you are. `0` means no limit |
+| `--inactivity` | the policy's idle limit | Lock after this long without a `pm` command. `0` means never |
+
+```sh title="Terminal"
+pm unlock --timeout 2h --inactivity 0
+```
+
+```text
+Vault unlocked. It locks 2 hours at most and on sleep.
+```
+
+Durations use Go syntax: `90s`, `15m`, `1h30m`.
+
+### Touch ID
+
+On a Mac with Touch ID, store your master password in the login Keychain once:
+
+```sh title="Terminal"
+pm auth touchid setup
+```
+
+From then on, unlocking tries Touch ID first and falls back to the password prompt. The desktop app uses the same Keychain item (service `APM Vault`). `pm auth touchid status` shows whether it is set up, `pm auth touchid test` checks the sensor, and `pm auth touchid remove` deletes the Keychain item.
+
+The stored password is only rewritten when you run `pm auth touchid setup`, change the master password with `pm auth change`, or recover the vault, from `pm` or from the desktop app. The app also writes it when you turn on Touch ID or create a vault with it. If it is out of date, `pm` says so, asks for the password and tells you to run `pm auth touchid setup`.
+
+Set `APM_DESKTOP_NO_TOUCHID=1` to make `pm` skip Touch ID.
+
+## Lock
+
+```sh title="Terminal"
+pm lock
+```
+
+This deletes the session file. The next command asks for the password again. Locking the desktop app also ends the `pm` session.
+
+## Auto-lock
+
+The auto-lock policy is saved in the vault, so the desktop app (**Settings → Sessions**), `pm` sessions and the browser extension all follow it. Show it:
+
+```sh title="Terminal"
+pm autolock
+```
+
+```text
+Lock after inactivity:  15 minutes
+Maximum session:        1 hour
+Lock on sleep:          on
+Applies to the desktop app, pm sessions and the browser extension.
+```
+
+Change it with any of three flags:
+
+| Flag | Values | Default policy |
+|---|---|---|
+| `--idle` | a duration (`15m`, `1h`), a number of minutes, or `never` | 15 minutes |
+| `--max` | a duration, a number of minutes, or `never` | 1 hour |
+| `--sleep` | `on` or `off` | on |
+
+```sh title="Terminal"
+pm autolock --idle 30m --max 8h
+pm autolock --sleep off
+```
+
+Durations round up to whole minutes and can be at most 30 days. `never`, `off`, `none` and `0` turn a limit off, and `pm` prints a warning whenever a limit is off. Changing the policy also restarts your current session on the new policy. A read-only session cannot change it.
+
+<Callout type="note" title="Lock on sleep">
+With `--sleep on`, a `pm` session ends once the computer has slept. `pm` sessions can only detect sleep on macOS and Linux, so on Windows they ignore the setting. `pm extension serve` and the native host the browser starts watch for sleep themselves and lock when they notice it. That works on macOS and Linux; on Windows, don't rely on it.
+</Callout>
+
+## Read-only sessions
+
+A read-only session can view and copy but not add, edit, delete, import or change settings:
+
+```sh title="Terminal"
+pm mode readonly 30
+```
+
+```text
+Confirming access for READ-ONLY mode...
+Vault session updated to READ-ONLY mode for 30 minutes.
+```
+
+The number is minutes. The session lasts exactly that long: the auto-lock policy's idle and sleep limits don't apply to it. Most commands that would write stop with a message such as `Vault is in READ-ONLY mode.` Reordering codes in `pm totp` still saves.
+
+<Callout type="tip" title="Back to full access">
+`pm unlock` reuses an existing session, read-only flag included. To leave read-only mode, run `pm lock` and then `pm unlock`.
+</Callout>
+
+`pm mode` also groups `unlock`, `lock` and `compromise`, so `pm mode unlock` is the same as `pm unlock`.
+
+## Per-shell sessions
+
+By default every shell shares one session file. Set `APM_SESSION_ID` to give a shell its own:
+
+```sh title="Terminal"
+# Terminal 1
+export APM_SESSION_ID=work
+pm unlock
+
+# Terminal 2
+export APM_SESSION_ID=personal
+pm unlock --vault ~/personal/vault.dat
+```
+
+Only letters and digits in the value are used. The session file is `pm_session_<id>.json` in your temp folder, or `pm_session_global.json` when the variable is not set. The desktop app and the browser normally start `pm` without this variable, so they use the global session.
+
+## Ephemeral sessions
+
+An ephemeral session is a separate, short-lived unlock for a script, a CI job or an agent. It can be read-only, it expires on its own, it can be bound to this machine, a process or an agent label, and you can revoke it at any time without touching your own session.
+
+<Steps>
+
+### Issue one
+
+```sh title="Terminal"
+pm session issue --ttl 10m --scope read --agent ci --label nightly-build
+```
+
+```text
+Ephemeral session issued.
+ID:         eps_b8cf56d8749aa7d29f0d2ed0
+Scope:      read
+Expires:    2026-10-05T19:55:50+05:30
+Host bind:  enabled
+Agent bind: ci
+
+Export this for consumers:
+  set APM_EPHEMERAL_ID=eps_b8cf56d8749aa7d29f0d2ed0
+  set APM_EPHEMERAL_AGENT=ci
+```
+
+### Use it
+
+```sh title="Terminal"
+export APM_EPHEMERAL_ID=eps_b8cf56d8749aa7d29f0d2ed0
+export APM_EPHEMERAL_AGENT=ci
+pm get openai --show-pass < /dev/null
+```
+
+When `APM_EPHEMERAL_ID` is set and the session is valid, `pm` uses it before any regular session. A `read` session opens the vault read-only.
+
+### Revoke it
+
+```sh title="Terminal"
+pm session list
+pm session revoke eps_b8cf56d8749aa7d29f0d2ed0
+```
+
+</Steps>
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--ttl` | `15m` | Lifetime |
+| `--scope` | `read` | `read` or `write` |
+| `--label` | none | A name for your own reference |
+| `--agent` | none | Only callers that set `APM_EPHEMERAL_AGENT` to this value can use it |
+| `--bind-host` | `true` | Only usable on this machine, by this user |
+| `--bind-pid` | `false` | Binds to the process ID of the `pm session issue` command itself. That process exits right away, so later commands cannot use a PID-bound session |
+
+If a binding doesn't match, the session is expired or revoked, `pm` ignores it and falls back to the normal unlock. Ephemeral sessions are kept in `ephemeral_sessions.json` in your APM config folder; expired ones are dropped automatically.
+
+<Callout type="warning" title="Ephemeral sessions hold your master password">
+The session record stores your master password in plain text in `ephemeral_sessions.json`, protected only by the file's permissions (readable by your account alone). A revoked session keeps it until the session's expiry time passes. Keep `--ttl` short, scope it to `read` when you can, and revoke it when the job is done.
+</Callout>
+
+## Failed attempts
+
+Each wrong master password is counted, but cancelling with <Kbd>Esc</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> is not. The count is kept in a file named `.apm_lock` in pm's state folder: `~/.apm`, the folder of `APM_VAULT_PATH` if you set it to an absolute path, or [`APM_STATE_DIR`](/docs/reference/environment-variables#state-folder) if you set that. `--vault` doesn't change it. The desktop app counts in the folder of the vault it opens, so with the default vault the app and `pm` share one count. If `pm` can't write to the state folder, attempts go uncounted without any warning. Older versions kept the file next to the `pm` executable; unless `APM_STATE_DIR` is set, `pm` still reads it and uses the higher count, so updating doesn't hand out fresh attempts. A correct password resets the count. After six failed attempts in total, the vault no longer opens with the password: `pm` opens a read-only decoy vault instead, and the desktop app shows **This vault is locked after repeated failed attempts. Use recovery to regain access.** After nine, `pm` refuses outright. Recovering the vault with `pm auth recover` or `pm auth quorum-recover` resets the count. See [Recovery](/docs/cli/recovery).
+
+Before asking for the password, `pm` also warns about unusual activity. The only pattern it checks is an unlock between 2:00 and 5:59 in the morning.
+
+## Where sessions are stored
+
+| File | Location | Contents |
+|---|---|---|
+| `pm_session_global.json` or `pm_session_<id>.json` | Temp folder (`$TMPDIR`, `/tmp` or `%TEMP%`) | The encrypted session: password, expiry, idle limit, read-only flag |
+| `session.key` | APM config folder | The random key that encrypts session files |
+| `ephemeral_sessions.json` | APM config folder | Ephemeral sessions |
+
+See [File locations](/docs/reference/file-locations) for the config folder on each platform.

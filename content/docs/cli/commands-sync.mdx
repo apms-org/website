@@ -1,0 +1,265 @@
+---
+title: "Commands: sync, extension and agents"
+description: Reference for pm cloud, pm extension and pm mcp.
+order: 23
+sidebarTitle: Sync, extension, agents
+group: Command reference
+---
+
+Commands that connect the vault to the outside: cloud storage, the browser extension and AI agents. Every command also takes the [global flags](/docs/cli/commands#global-flags). Guides: [Cloud sync](/docs/cli/cloud-sync), [Browser extension](/docs/cli/browser-extension), [AI agents](/docs/agents).
+
+## Cloud sync
+
+<Command name="pm cloud init" summary="Set up Google Drive, GitHub or Dropbox and upload the vault">
+
+```sh
+pm cloud init [gdrive|github|dropbox|all]
+```
+
+Without an argument, asks which provider. Google Drive and Dropbox ask for a mode (`APM_PUBLIC` unless you choose `2` for self-hosted) and whether to store a hash of a retrieval key with the file (no, unless you answer `y`). GitHub asks for a token and an `owner/repo`. Uploads the vault (filtered by `.apmignore`) and saves the settings in it. Refuses if any provider is already set up; run `pm cloud reset` first.
+
+<Callout type="warning" title="GitHub with .apmignore rules">
+When `.apmignore` has rules, the filtered copy that `pm cloud init github` uploads is encrypted with your GitHub token instead of your master password. That copy stays in the repository's history. See [What gets uploaded](/docs/security/sync-security#what-gets-uploaded).
+</Callout>
+
+| Flag | Meaning |
+|---|---|
+| `-k`, `--key` | Accepted but not used. The retrieval key is asked for interactively |
+
+</Command>
+
+<Command name="pm cloud sync" summary="Upload the vault">
+
+```sh
+pm cloud sync [gdrive|github|dropbox]
+```
+
+Uploads to the named provider, or to every configured provider. Applies `.apmignore` to each upload.
+
+</Command>
+
+<Command name="pm cloud auto-sync" summary="Upload whenever the vault changes">
+
+```sh
+pm cloud auto-sync --true
+```
+
+Watches the vault file and uploads to Google Drive and GitHub after each write, until you press <Kbd>Ctrl</Kbd> <Kbd>C</Kbd>. A write within 5 seconds of the last upload, or of starting, is skipped rather than queued. Dropbox isn't included. With `.apmignore` rules, it keeps uploading the vault as it was when the watcher started. Without `--true`, prints its usage.
+
+| Flag | Meaning |
+|---|---|
+| `--true` | Required to start the watcher |
+
+</Command>
+
+<Command name="pm cloud get" summary="Download a vault from the cloud">
+
+```sh
+pm cloud get [gdrive|github|dropbox] [retrieval-key|file-id|path|owner/repo] [flags]
+```
+
+Doesn't need a local vault or session. The provider defaults to `gdrive` when you press <Kbd>↵</Kbd> at the prompt. Google Drive takes a retrieval key or a file ID, Dropbox a retrieval key or a `/v_….bin` path, GitHub an `owner/repo`. Asks for the downloaded vault's master password and saves it only if it decrypts. For GitHub, it also saves the token and repository in the downloaded vault. If a different local vault exists, offers to overwrite it, keep it and save the download as `vault.dat.conflict.<provider>.<timestamp>`, or cancel.
+
+| Flag | Meaning |
+|---|---|
+| `--auth-mode` | `pat` or `oauth2`, and skips the question. For GitHub it names the token type. For Google Drive and Dropbox, `oauth2` means your own account and any other value means `APM_PUBLIC` |
+| `--token` | Token for GitHub or Dropbox; skips the token prompt |
+| `--oauth2-token` | Same as `--token` |
+
+```sh
+pm cloud get gdrive SwiftFalcon
+pm cloud get github alex/apm-vault --auth-mode pat
+```
+
+</Command>
+
+<Command name="pm cloud diff" summary="Compare with the cloud copy and merge changes">
+
+```sh
+pm cloud diff [gdrive|github|dropbox]
+```
+
+Without a provider, it uses the Google Drive or Dropbox setup you made last, or GitHub if that is all you have. Downloads the cloud copy, decrypts it with the current master password and lists `ADDED`, `MODIFIED` and `REMOVED` items without values. Then merge all, pick changes (`1,3-5`, `all`) or cancel. Merging a `REMOVED` change deletes the local item. Items your `.apmignore` keeps out of uploads show up as `REMOVED`, so merging everything deletes them here. A read-only session only shows the diff.
+
+</Command>
+
+<Command name="pm cloud delete" summary="Delete the Google Drive copy">
+
+```sh
+pm cloud delete [gdrive]
+```
+
+Deletes the vault file from Google Drive and clears the Drive file ID and retrieval key from the vault. Needs a configured Google Drive file. If you set up Dropbox after Google Drive, name `gdrive`: without it, `pm` asks Dropbox to delete the Drive file and fails. Dropbox and GitHub copies can't be deleted with this command.
+
+</Command>
+
+<Command name="pm cloud reset" summary="Forget every cloud setting">
+
+```sh
+pm cloud reset
+```
+
+Asks for confirmation, then clears retrieval keys, file IDs, modes and tokens for all providers. Cloud files stay where they are. Needs write access. If Google Drive is the only provider and you declined the retrieval key, it says sync isn't set up and changes nothing. In that case `pm cloud delete` deletes the Drive copy and clears its file ID, after which `pm cloud init` works again.
+
+</Command>
+
+## Browser extension bridge
+
+<Command name="pm extension serve" summary="Serve the browser extension without the desktop app">
+
+```sh
+pm extension serve [--port 41417] [--locked] [--idle <duration>]
+```
+
+Listens on `127.0.0.1` and serves the same API as the desktop app until <Kbd>Ctrl</Kbd> <Kbd>C</Kbd>. Unlocks with your session or asks for the master password, unless `--locked`. Asks you to approve pairing codes on a terminal and denies them otherwise. Exits with status 1 if there is no vault, the port is taken or the vault can't be unlocked.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--port` | `41417` or `APM_BRIDGE_PORT` | Port to listen on |
+| `--locked` | `false` | Start locked; the extension unlocks it |
+| `--idle` | the vault's auto-lock | Lock after this long without browser activity; `0` for never |
+
+</Command>
+
+<Command name="pm extension status" summary="Show linked browsers, the running bridge and the pairing token">
+
+```sh
+pm extension status [--port 41417]
+```
+
+Lists each Chromium browser on this computer as linked, linked to another `pm`, linked to a `pm` that no longer exists, or not linked. Then it shows the linked vault and when it was linked, and **Right now**: whether the extension uses the APM app, `pm extension serve`, or the `pm` the browser starts. When a bridge answers on the port, it adds the address, the version and bridge API version, the vault's state (locked, or unlocked with the item count, and read-only if so) and the first 6 characters of the pairing token as a fingerprint.
+
+```text
+Google Chrome:   linked
+Linked vault:    /Users/alex/.apm/vault.dat
+Linked on:       Oct 5, 2026 14:02
+Right now:       the extension uses the APM app
+Listening:       127.0.0.1:41417
+Version:         12.0.0 (bridge API 2)
+Vault:           unlocked, 42 items
+Token:           3f9a1c (fingerprint)
+```
+
+Exits with status 1 when nothing is listening and no browser is linked, when something other than APM holds the port, when the bridge rejects your pairing token, or when the status request fails. Otherwise exits with `0`.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--port` | `41417` or `APM_BRIDGE_PORT` | Port to probe |
+
+</Command>
+
+<Command name="pm extension token" summary="Print the pairing token">
+
+```sh
+pm extension token [--show]
+```
+
+Creates the token if there is none. Prints it masked, or in full with `--show` for the extension's manual pairing field.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--show` | `false` | Print the full token |
+
+</Command>
+
+<Command name="pm extension rotate" summary="Replace the pairing token">
+
+```sh
+pm extension rotate
+```
+
+Needs the master password or a session. Every paired browser must pair again; a running bridge uses the new token on its next request.
+
+</Command>
+
+## Native messaging
+
+<Command name="pm extension link" summary="Let Chromium browsers start pm for the extension">
+
+```sh
+pm extension link [--browser chrome,edge] [--id <extension-id>] [--no-wait]
+```
+
+Registers `pm` as the native messaging host `dev.apm.bridge` with each installed Chromium browser (Chrome, Chrome Beta, Chrome Canary, Chromium, Edge, Brave, Vivaldi, Arc), allowed only for the APM extension and any `--id` you add. Saves the vault path and binary in `native_host.json` and creates the pairing token if needed. Unless the app or `pm extension serve` is running, `--no-wait` is set or the input isn't a terminal, it then waits up to 5 minutes for the extension and asks you to confirm its code. Exits with status 1 if no vault or browser is found.
+
+| Flag | Meaning |
+|---|---|
+| `--browser` | Only these browser IDs: `chrome`, `chrome-beta`, `chrome-canary`, `chromium`, `edge`, `brave`, `vivaldi`, `arc` (those available on your OS) |
+| `--id` | Also allow this extension ID (32 letters `a`–`p`), for development builds |
+| `--no-wait` | Register and exit |
+
+</Command>
+
+<Command name="pm extension unlink" summary="Stop browsers from starting pm">
+
+```sh
+pm extension unlink
+```
+
+Removes the registration from every linked browser and deletes the link records. The pairing token is kept; use `pm extension rotate` to revoke paired browsers.
+
+</Command>
+
+## AI agents (MCP)
+
+These manage access for AI clients that speak the Model Context Protocol. Setup is covered in [Set up a client](/docs/agents/setup); the tools and permissions in [Tools](/docs/agents/tools).
+
+<Command name="pm mcp token" summary="Create an access token for an AI client">
+
+```sh
+pm mcp token [--auto]
+```
+
+Asks for a token name, an expiry in minutes (`0` for never) and the tools it may use, from a list where <Kbd>Space</Kbd> selects, <Kbd>a</Kbd> selects all and <Kbd>↵</Kbd> confirms. <Kbd>Esc</Kbd> at any of the three prompts prints `Token creation cancelled.` and creates nothing. Then it prints the token and a ready-to-paste `mcpServers` config that runs `mcp serve --token <token>` with this `pm`, by its full path (through `cmd /c` on Windows). Tokens are stored in plain text in `mcp_auth.json` in your APM config folder.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--auto` | `false` | Also add the server to MCP config files that already exist at a few fixed paths: Claude's `mcp_config.json`, Cline's settings, and on Windows Cursor's and VS Code's `mcp.json`. Claude Desktop's `claude_desktop_config.json` isn't among them |
+
+</Command>
+
+<Command name="pm mcp list" summary="List MCP tokens">
+
+```sh
+pm mcp list
+```
+
+```text
+NAME                 CREATED                   USES       EXPIRES
+-------------------------------------------------------------------------------------
+claude-desktop       2026-10-01 09:12          41         Never
+```
+
+`USES` counts how many times a server started with the token, not tool calls. Expired tokens are listed too.
+
+</Command>
+
+<Command name="pm mcp revoke" summary="Revoke an MCP token">
+
+```sh
+pm mcp revoke <name-or-token>
+```
+
+The token is only checked when a server starts, so a server already running with it keeps working until the client restarts it.
+
+</Command>
+
+<Command name="pm mcp config" summary="Show the MCP server entry for your assistant's config">
+
+```sh
+pm mcp config
+```
+
+Prints the `mcpServers` entry for this computer: `command` is the path to `pm` and `args` is `["mcp", "serve"]`. On Windows it runs `pm` through `cmd` instead (`"command": "cmd"`, `"args": ["/c", "<path to pm>", "mcp", "serve"]`). The entry has no token: run `pm mcp token` to create one, then add `--token <token>` to `args`.
+
+</Command>
+
+<Command name="pm mcp serve" summary="Run the MCP server over stdio (hidden)">
+
+```sh
+pm mcp serve --token <token>
+```
+
+Started by your AI client, not by you. It needs an unlocked vault: run `pm unlock` (or unlock the desktop app) before using the agent. It checks the token once, when it starts. Without `--token` it uses one of the stored tokens, picked arbitrarily; with none stored it starts `pm mcp token --auto` in a new window on Windows and exits.
+
+</Command>

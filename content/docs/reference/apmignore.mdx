@@ -1,0 +1,175 @@
+---
+title: .apmignore
+description: The syntax of .apmignore files, which leave spaces and items out of the copies APM uploads to Google Drive, GitHub and Dropbox.
+order: 4
+group: Configuration
+---
+
+An `.apmignore` file lists what to leave out of cloud uploads. Before each upload, APM makes a filtered copy of the vault, encrypts it with your master password and uploads that copy. One bug breaks this: when `pm cloud init github` or `pm setup` sets up GitHub sync, that first copy is encrypted with your GitHub token instead. Run `pm cloud sync github` afterwards to replace it. Your local vault is never changed. The rules apply to every upload: `pm cloud init`, `pm cloud sync`, `pm cloud auto-sync`, the desktop app's sync and uploads made by AI agents.
+
+How to use it is covered in [Cloud sync](/docs/cli/cloud-sync#leave-items-out).
+
+## Where APM looks
+
+1. `.apmignore` in the current folder.
+2. `.apmignore` in the folder that holds the vault.
+
+The first one found is used on its own; the two are never combined. The desktop app's engine switches to the vault's folder when it starts, so the app always uses the file next to the vault. `pm loaded` shows which file is in effect and how many rules of each kind it has:
+
+```text
+[.apmignore]
+path=/Users/alex/.apm/.apmignore
+spaces=1 entries=2 cloud-specific=1 misc=0
+```
+
+## Example
+
+```ini title="~/.apm/.apmignore"
+# Never upload the Personal space
+[spaces]
+personal
+archive-*
+
+[entries]
+# space:type:name
+work:api-key:*test*
+*:note:draft*
+default:ssh-key:*
+
+[cloud-specific-ignore]
+# provider:space:type:name
+github:*:*:*
+dropbox:work:password:"Payroll #2"
+```
+
+With this file, Google Drive gets everything except the `personal` space, spaces starting with `archive-`, test API keys in `work`, notes whose names start with `draft`, and SSH keys in the default space. GitHub gets no items at all. Dropbox gets the same as Google Drive minus one login.
+
+## Syntax
+
+- A section starts with a line like `[spaces]`. Section names are case-insensitive. Lines before the first section, and sections APM doesn't know, are ignored.
+- One rule per line. Leading and trailing spaces are trimmed; blank lines are skipped.
+- `#` starts a comment, anywhere on a line, unless it is inside single or double quotes.
+- A value may be wrapped in `'…'` or `"…"`, for example to include a `#`. The quotes are removed.
+- Everything is matched **case-insensitively**: spaces, types, names and providers.
+
+### Spaces
+
+```ini
+[spaces]
+personal
+temp-*
+```
+
+Each line is a space name or a pattern. Every item in a matching space is left out, the space itself is dropped from the uploaded space list, and if it is the current space, the uploaded copy opens in the default space instead.
+
+### Entries
+
+```ini
+[entries]
+space:type:name
+```
+
+Leaves out items that match all three parts. Separate the parts with `:`. The name is everything after the second colon, so names can contain colons.
+
+| Part | Meaning |
+|---|---|
+| `space` | Space name or pattern. Items not in a space are in `default`. An empty space matches nothing; use `*` for any space |
+| `type` | An item type from the [table below](#item-types), or a pattern. Empty, `*` or `secret` means any type |
+| `name` | The item's name or a pattern. See [what counts as the name](#what-counts-as-the-name). An empty name matches nothing; use `*` |
+
+A line with fewer than three parts makes every upload fail with `.apmignore line 4: entry rule must be 'space:type:name'`.
+
+### Cloud-specific rules
+
+```ini
+[cloud-specific-ignore]
+provider:space:type:name
+```
+
+The same as an entry rule, for one provider only. `provider` is `gdrive`, `github` or `dropbox`, or a pattern such as `*`. Here an empty space means `default`. A line with fewer than four parts makes every upload fail with `cloud-specific rule must be 'provider:space:type:name'`.
+
+### Misc
+
+```ini
+[misc]
+ignore: history
+```
+
+`[misc]` lines are read and counted by `pm loaded`, but no setting in this section has any effect today. They still count as rules, so a file with only `[misc]` lines makes uploads use a filtered copy.
+
+## Patterns
+
+A part containing `*`, `?` or `[` is a pattern:
+
+| Pattern | Matches |
+|---|---|
+| `*` | Any run of characters, except `/` |
+| `?` | Any one character, except `/` |
+| `[abc]`, `[a-z]` | One character from the set or range |
+| `[^a-z]` | One character not in the range |
+
+Anything else must match exactly, ignoring case. A pattern matches the whole value: `test` matches only `test`, while `*test*` matches `my-test-key` and `TEST`.
+
+## Item types
+
+Use these names, or their aliases, in the `type` part. Names with underscores, such as `api_key` or `ssh_key`, are not recognized and match nothing.
+
+| Type | Aliases |
+|---|---|
+| `password` (logins) | `pass` |
+| `totp` | `otp` |
+| `token` | `tokens` |
+| `note` | `notes`, `secure-note`, `secure-notes` |
+| `api-key` | `api`, `apikey`, `api-keys` |
+| `ssh-key` | `ssh`, `ssh-keys` |
+| `wifi` | `wi-fi` |
+| `recovery-codes` | `recovery`, `recovery-code` |
+| `certificate` | `cert`, `certs` |
+| `banking` | `bank` |
+| `document` | `docs` |
+| `audio` | |
+| `video` | |
+| `photo` | `image` |
+| `gov-id` | `government-id`, `id` |
+| `medical` | `medical-record` |
+| `travel` | |
+| `contact` | |
+| `cloud-credentials` | `cloud` |
+| `k8s-secret` | `k8s`, `kubernetes`, `kubernetes-secret` |
+| `docker-registry` | `docker` |
+| `ssh-config` | |
+| `cicd-secret` | `cicd`, `ci/cd`, `ci-cd` |
+| `software-license` | `license` |
+| `legal-contract` | `legal`, `contract` |
+
+## What counts as the name
+
+For most types, the `name` part is matched against the item's name. A few types use another field:
+
+| Type | Matched field |
+|---|---|
+| Logins and authenticator codes | Account name |
+| Wi-Fi | Network name (SSID) |
+| Recovery codes | Service |
+| Certificates, banking, medical, travel, cloud credentials | Label |
+| Government IDs | **ID number**, not the name |
+| SSH config | Host alias |
+| Software licenses | Product name |
+
+## What else is filtered
+
+Along with the items themselves, APM removes their usage records from the uploaded copy. The vault's item history, which records each item's name and type, is filtered only by rules whose space part matches `default`, such as `*:note:draft*`. History entries for items left out by a `[spaces]` rule, or by a rule for another space, are uploaded as they are.
+
+<Callout type="warning" title="Trash and earlier versions are uploaded">
+Items in the desktop app's Trash, the earlier versions the app keeps of edited items, and the site links of authenticator codes (`pm totp link`) are not filtered. An ignored item that is in the Trash, or that has been edited in the app, still reaches the cloud in that form, and an ignored authenticator code's name still appears with its linked site. Empty the Trash before relying on `.apmignore` for something sensitive.
+</Callout>
+
+## Check your rules
+
+- `pm loaded` confirms the file is found and parsed.
+- `pm cloud sync` stops with `Failed to apply .apmignore` and the line number if a rule is malformed.
+- After a sync, `pm cloud diff <provider>` lists every item that is in your vault but not in that provider's copy as `REMOVED`. Ignored items should appear there. Answer `3` (Cancel) at the merge prompt: merging a `REMOVED` change deletes the item from your local vault.
+
+<Callout type="note" title="Coming from older docs">
+Older documentation searched next to the vault first, treated names as case-sensitive, used underscore type names, and described a `[vocab]` section. None of that applies: the current folder wins, matching ignores case, types use hyphens, and `[vocab]` is ignored.
+</Callout>

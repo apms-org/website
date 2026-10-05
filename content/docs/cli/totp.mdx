@@ -1,0 +1,119 @@
+---
+title: One-time codes
+description: Store 2FA setup keys, see live codes, copy them, reorder them and link them to sites for the browser extension.
+order: 6
+sidebarTitle: One-time codes (TOTP)
+group: Guides
+---
+
+APM generates the six-digit codes that sites ask for after your password (TOTP). A code can live in two places: inside the login it belongs to, or as a standalone authenticator item. `pm totp` shows both.
+
+## Codes APM can generate
+
+APM generates standard time-based codes: 6 digits, a new code every 30 seconds, SHA-1. That covers almost every site. It cannot generate Steam Guard codes, counter-based (HOTP) codes, 8-digit codes, codes with another period, or SHA-256 and SHA-512 codes. [Import](/docs/cli/import-export) lists such codes as "can't be imported" with the reason.
+
+## Add a code
+
+### To a login
+
+Edit the login in `pm get` (<Kbd>e</Kbd>) and paste the setup key at this prompt:
+
+```text
+2FA setup key or otpauth:// link [none] (blank to keep, - to remove): otpauth://totp/GitHub:octocat?secret=JBSWY3DPEHPK3PXP&issuer=GitHub
+```
+
+It accepts a bare base32 key or a full `otpauth://` link, which is what a QR code contains. This is the best place for a code: the login and its code stay together, and the browser extension offers the code on the login's websites.
+
+### As an authenticator item
+
+```text
+$ pm add totp
+Account Name: GitHub 2FA
+Secret: JBSW Y3DP EHPK 3PXP
+Link domain for autofill (optional, e.g. github.com): github.com
+Entry saved.
+```
+
+`pm add totp` takes the base32 setup key, not an `otpauth://` link. Spaces are removed and letters uppercased. The key isn't checked, so a mistyped key only shows up later as wrong codes. The optional domain links the code to a site; `https://`, `www.` and any path are stripped.
+
+<Callout type="note" title="Codes move into their logins">
+Each time the vault is opened, `pm` moves a standalone code into a login when exactly one login in the same space matches it, by name or by a linked site that equals the login's website, and that login has no code yet. Anything ambiguous stays a standalone item. An `Authenticator` item called `GitHub` next to a single `GitHub` login therefore becomes that login's 2FA key.
+</Callout>
+
+## See live codes
+
+```sh title="Terminal"
+pm totp
+```
+
+On a terminal this opens a live view of every code in the current space, refreshed every second:
+
+```text
+APM TOTP | Space: default | Refresh: 21s
+Enter: copy selected | 1-9: copy by number | Shift+Up/Down: reorder | Up/Down/Home/End: move | q/Esc: exit
+--------------------------------------------------------------
+> [1] GitHub                     426351 (github.com)
+  [2] AWS root                   908114
+  [3] Proton                     551207 (proton.me)
+```
+
+| Key | Action |
+|---|---|
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd> or <Kbd>j</Kbd> <Kbd>k</Kbd> | Move the selection |
+| <Kbd>Home</Kbd> <Kbd>End</Kbd> | Select the first or last code |
+| <Kbd>↵</Kbd> | Copy the selected code |
+| <Kbd>1</Kbd> to <Kbd>9</Kbd> | Copy that code |
+| <Kbd>⇧</Kbd> <Kbd>↑</Kbd> / <Kbd>⇧</Kbd> <Kbd>↓</Kbd> | Move the selected code up or down. The order is saved in the vault, per space |
+| <Kbd>q</Kbd> or <Kbd>Esc</Kbd> | Quit |
+| <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Quit with exit status 130 |
+
+The site in brackets is the code's linked site or, for a code inside a login, the login's website.
+
+When stdin is not a terminal, `pm totp` prints each code once:
+
+```text
+$ pm totp < /dev/null
+[1] GitHub                   : 426351 (github.com)
+```
+
+## Copy one code
+
+```sh title="Terminal"
+pm totp github
+```
+
+```text
+Copied TOTP for GitHub (github.com) to clipboard.
+```
+
+`pm` looks for an exact name first (not case-sensitive), then for the first name that contains what you typed. Quote names with spaces. The clipboard is not cleared afterwards.
+
+## Link a code to a site
+
+The browser extension offers an authenticator item's code on the sites linked to it. Logins don't need this: their code is offered wherever the login is.
+
+```sh title="Terminal"
+pm totp link "GitHub 2FA" github.com
+```
+
+```text
+Linked GitHub 2FA to github.com. The browser extension offers this code on github.com.
+```
+
+- The entry is a standalone authenticator item, matched by exact name or by a unique part of its name.
+- The site is reduced to its host: `https://www.github.com/login` becomes `github.com`. It must contain a dot, or be `localhost`.
+- A site links to one code. Linking a site that already belongs to another code moves it and tells you which code had it.
+
+Remove links:
+
+```sh title="Terminal"
+pm totp unlink "GitHub 2FA"               # every site linked to it
+pm totp unlink "GitHub 2FA" github.com    # just one
+```
+
+## Other places codes show up
+
+- `pm get` shows a login's current 2FA code behind a copy prompt, and the authenticator item linked to it.
+- [CSV and text exports](/docs/cli/import-export#export) include login codes.
+- The MCP `get_totp` tool returns codes to agents whose token allows it. See [AI agents](/docs/agents/tools).
+- The [browser extension](/docs/extension) fills codes into 2FA fields.

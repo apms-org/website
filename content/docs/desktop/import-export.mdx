@@ -1,0 +1,290 @@
+---
+title: Import and export
+description: Bring items in from other password managers, export them with or without passkeys, compare the vault with an old export, and save encrypted backups.
+order: 10
+group: Using the app
+---
+
+APM can import from other password managers and browsers, export in five formats, compare your vault with an earlier export, and save a byte-for-byte encrypted backup. The engine reads and plans every file, so the app and `pm import` agree on what counts as new, a conflict or a duplicate.
+
+Open these from **Settings → Import and export**, from **File → Import...** and **File → Export...**, or with **Import items** and **Export items** in the command menu. The **Import** card shows when you last imported, such as "Last import 3h" ("Nothing imported yet" before the first), and the **Export** card when you last exported ("Never exported" until you do).
+
+In a read-only session you can export, compare and save a backup, but not import: the **Import** card is disabled and **File → Import...** does nothing.
+
+## Import
+
+An import has three steps: **Source**, **Review** and **Done**. Nothing is written to your vault until you choose **Import** in the review step.
+
+<Steps>
+
+### Source
+
+Optionally pick where the file came from. APM can also work out the format from the file itself.
+
+| Source | What to export there | Passkeys |
+|---|---|---|
+| **Bitwarden** | **Tools → Export vault → .json**. Password-protected files work too. | Yes |
+| **1Password** | `.1pux` from **File → Export** | No, 1Password leaves them out |
+| **KeePass or KeePassXC** | **Database → Export → XML File** | Yes, the ones KeePassXC saved |
+| **Credential Exchange** | A FIDO Credential Exchange (CXF) `.json` file | Yes |
+| **APM export or backup** | An APM `.json` export, or a `vault.dat` backup with its master password | Yes |
+| **Browser or other CSV** | Chrome, Edge, Firefox or Safari passwords `.csv`, or a text file of `otpauth://` links | No |
+
+Picking a tile makes APM read the file only as that source: the hint changes to "APM reads Bitwarden exports. Pick the tile again to detect the format." If the file is something else, you see, for example, "chrome.csv does not look like a 1Password export." Pick the tile again to go back to detecting the format.
+
+Then drop the file onto the drop area, or click it to choose one. The picker shows `.json`, `.1pux`, `.csv`, `.xml`, `.txt`, `.dat` and `.zip` files. For a `.cxf` or `.apm` file, switch the picker to **All files**, or drop the file instead. Files over 512 MB are refused with "The file is larger than 512 MB."
+
+If the file is encrypted, APM asks for its password in a field named after the format, such as **APM export is encrypted**. For a `vault.dat` backup, use that vault's master password. Choose **Unlock file**. A wrong password shows, for example, "That password does not open this export." or "That master password does not open this vault."
+
+### Review
+
+The top of the step names the file and its format, such as "chrome.csv · Chrome, Edge or Brave passwords CSV", with **Choose another file** to go back.
+
+APM compares every row with your vault and labels it:
+
+| Label | Meaning | Default |
+|---|---|---|
+| **New** | Not in your vault | Add |
+| **Already in vault** | Identical to an item you have | Skip |
+| **Conflict** | Same name, different values | See below |
+| **Possible duplicate** | Looks like an item you have, for example the same website | See below |
+| **Can't import** | Something is missing or invalid. The row explains why. | Not imported |
+
+Expand a row to read why APM labelled it. For example:
+
+| Reason | What it means |
+|---|---|
+| "Already in your vault" | The same item, field for field |
+| "Already in your vault as “GitHub” in Work" | The same values under another name or in another space |
+| "Already earlier in this file" | The file holds the same item twice |
+| "Same name in your vault, different password" | A conflict. The reason lists what differs, and what the file adds, such as "adds notes" or "adds 1 passkey" |
+| "Same name in your vault, but a different username. Both are kept" | Two accounts on one site |
+| "Looks like “GitHub” in your vault: the same username on github.com" | A possible duplicate. Other matches are "the same passkey for" a site, or the same secret, such as the same key |
+| "Differs from the 2FA code inside “GitHub”" | An Authenticator item whose setup key differs from the code saved inside that login. Only **Skip** or **Keep both** are offered |
+| "It has no name", "It has no setup key", "It has no username, password, website or passkey", "The file itself is not in this export" | **Can't import**. The last one means a document, photo, audio or video item came without its file |
+
+For conflicts and duplicates, APM picks the safest default:
+
+- **Merge** when the file only adds missing fields or new passkeys. Merge never overwrites a value you have.
+- **Keep both** for two logins with the same name but different usernames, since they are two accounts on the same site.
+- **Skip** otherwise.
+
+The numbers at the top (**New**, **Already in vault**, **Conflicts**, **Possible duplicates**, **Can't import**, **Passkeys**) filter the list when you click them.
+
+For each row:
+
+- Tick or untick it to include or skip it.
+- For conflicts and duplicates, pick what to do: **Skip**, **Merge** (fills gaps and keeps your values), **Replace** (takes the file's values) or **Keep both** (adds it under a new name). See [What Merge, Replace and Keep both do](#what-merge-replace-and-keep-both-do).
+- Expand it to compare **Your vault** and the file side by side, field by field. Secrets stay masked. Passkeys are listed as **New passkey** or **Already in vault**, and any that cannot come along are explained.
+
+Above the list:
+
+- **Into** a space: where new items go. **Use folders as spaces** (or **Keep original spaces** for an APM file, which is the default for APM files) creates spaces from the file. The list says which spaces will be created, for example "Creates 2 spaces: Family, Work."
+- A type filter (shown when the file holds more than one type) and a text filter. When nothing matches you see **Nothing matches**.
+- **Choose for many**: **Merge where possible**, **Replace with the file's values**, **Keep both** or **Skip them** for every conflict and duplicate, and **Import all new items** or **Skip all new items**.
+
+The list shows the first 200 rows. **Show 300 more** (or the number left) adds the rest.
+
+The footer counts what is selected, such as "4 of 6 selected · 2 new passkeys". Choose **Import N items** (and passkeys). With nothing selected, the button reads **Nothing to import**.
+
+### Done
+
+APM shows how many items were **Added**, **Merged**, **Replaced** and **Skipped**, any passkeys added, spaces created and items renamed to keep both, for example "Renamed to keep both: GitHub → GitHub (2)." Items that failed are listed under "1 item failed" with the reason.
+
+When passkeys came in, **Passkeys are ready** says you can sign in with them through the APM browser extension on the same sites as before.
+
+If the file was not encrypted, APM reminds you to delete it, because it holds your passwords in plain text. APM never touches the original file.
+
+</Steps>
+
+<Callout type="tip" title="Undo an import">
+An import is one entry in your vault history, with a note such as "Imported chrome.csv (Chrome, Edge or Brave passwords CSV): 2 added". **Undo import** on the last screen puts the vault back how it was and shows "Import undone". It is disabled when nothing was added, merged or replaced. Later, use **Undo last change** in [History](/docs/desktop/history) or `pm lgit undo`.
+</Callout>
+
+Conflicts and duplicates never overwrite your vault unless you choose **Replace**.
+
+## What Merge, Replace and Keep both do
+
+| Action | What changes in your item |
+|---|---|
+| **Merge** | Empty fields take the file's values. The file's notes are added after yours, unless your notes already contain them. A different website is added to **Other websites**. New passkeys are added. Nothing you have is overwritten. |
+| **Replace** | Every field that differs takes the file's value, including notes and an attached file. Your old website moves to **Other websites**. New passkeys are added. Fields the file does not have are kept. |
+| **Keep both** | The file's item is added as a new item. If the name is taken in that space, it becomes "GitHub (2)", then "GitHub (3)" and so on. |
+
+Merge and Replace save the item's previous values in its [version history](/docs/desktop/items#version-history), so you can bring back one item without undoing the whole import. Password history in the file, as Bitwarden exports it, becomes the new item's version history. Favorites in the file stay favorites.
+
+A value the file has no APM field for is kept as text: in the login's notes, in the note's content, or for other types in a new secure note named after the item, such as "Home-5G notes".
+
+After the import, an Authenticator item moves inside a login when exactly one login in the same space matches it, by name or by a linked website, and that login has no two-factor code yet.
+
+## Formats APM reads
+
+| Format | Files | What comes along |
+|---|---|---|
+| **APM export** | `.json`, `.apm` | Everything, including passkeys, spaces and favorites. Encrypted exports ask for the password chosen when exporting. |
+| **APM vault or backup** | `.dat` | A `vault.dat` file or a backup. It opens with that vault's master password. |
+| **1Password export (.1pux)** | `.1pux` | The items 1Password exports. 1Password leaves passkeys out of every export. |
+| **1Password CSV** | `.csv` | Logins and passwords only |
+| **Bitwarden JSON** | `.json`, `.zip` | Passkeys, folders, custom fields and password history. Choose `.zip` in Bitwarden to include attachments. |
+| **Bitwarden CSV** | `.csv` | Logins and notes only, without passkeys |
+| **Credential Exchange (CXF)** | `.json`, `.cxf` | Logins, passkeys with their private keys, one-time codes, cards, notes, SSH keys and Wi-Fi networks |
+| **KeePass XML** | `.xml` | Passkeys saved by KeePassXC come along. In KeePass 2, use **File → Export → KeePass XML (2.x)**. |
+| **KeePass CSV** | `.csv` | No passkeys or history. Export XML to keep them. |
+| **CSV** | `.csv` | A passwords CSV from Chrome, Edge, Brave, Firefox or Safari, or any CSV with name, url, username and password columns |
+| **Text with otpauth:// links** | `.txt` | One `otpauth://` link per line, as authenticator apps export them, or an APM text export |
+
+## When a file will not open
+
+| Message | What to do |
+|---|---|
+| "This is a KeePass database file. In KeePassXC choose Database > Export > XML File, or in KeePass choose File > Export > KeePass XML (2.x), then import that file. Passkeys stored by KeePassXC come along." | APM does not open `.kdbx` databases. Export XML and import that |
+| "1PIF is the old 1Password 7 format. In 1Password 8 choose File > Export, pick the account and the 1PUX format, then import the .1pux file." | Export again as `.1pux` |
+| "This is a 1Password vault folder, not an export. In 1Password 8 choose File > Export and the 1PUX format." | Export from 1Password instead of picking its data folder |
+| "This Bitwarden export is locked to your Bitwarden account and only Bitwarden can open it. Export again and choose .json (Password protected) or .json." | Export again in one of those formats |
+| "APM does not recognize data.json. It reads APM, 1Password (.1pux, .csv), Bitwarden (.json, .csv), KeePass (.xml, .csv), Credential Exchange (.json) and browser CSV exports." | Check that you exported from a supported app |
+| "export.csv is empty." or "No items were found in export.csv." | Export again. The file has no items |
+| "The CSV is not UTF-8 text." | Save the CSV as UTF-8 and try again |
+| "exports is a folder. Choose the export file inside it." | Pick the file, not its folder |
+| "That import is no longer open. Choose the file again." | The vault locked, or you opened several imports at once. Choose the file again |
+
+## Export
+
+Choose **Export...** from the File menu or **Export** in **Settings → Import and export**. To export only some items, select two or more in the list (<Kbd>⌘</Kbd>-click on a Mac or <Kbd>Ctrl</Kbd>-click on Windows and Linux, <Kbd>⇧</Kbd>-click for a range), then choose **Export** in the selection panel, or **Export selected…** when you right-click. The dialog title then reads, for example, **Export 3 selected items**.
+
+### Format
+
+| Format | What it holds | Passkeys | Encryption |
+|---|---|---|---|
+| **APM (recommended)** | Every item, passkeys, spaces and favorites | Yes | Argon2id and AES-256-GCM, on by default |
+| **Credential Exchange** | The FIDO standard for moving passkeys between managers | Only passkeys never used to sign in. The format leaves out any passkey whose sign-in counter is above zero. | No |
+| **Bitwarden** | Bitwarden's `.json` | Yes | Optional. PBKDF2-SHA256, AES-256-CBC and HMAC-SHA256. Bitwarden asks for it on import. |
+| **CSV** | Columns most browsers and managers read | No | No |
+| **Text** | A readable list | No | No |
+
+An encrypted APM export always uses Argon2id with the Standard profile's settings (3 passes, 64 MiB, 2 threads) and a 16-byte salt, whatever profile your vault uses, then AES-256-GCM with an HMAC-SHA256 over the result. Only a short header stays readable:
+
+```json title="apm-export-2026-10-05.json"
+{
+  "format": "apm-export",
+  "version": 2,
+  "created": "2026-10-05T15:35:02Z",
+  "encrypted": true,
+  "cipher": "AES-256-GCM",
+  "kdf": "Argon2id",
+  "data": "j7WL8qB4a/jv4UOAXY9onaVbVbX/acF0GY94…"
+}
+```
+
+The vault's name and the item counts are only in an unencrypted APM export. A password-protected Bitwarden export uses PBKDF2-SHA256 with 600,000 iterations.
+
+### What each format keeps
+
+Every format except APM rearranges some data:
+
+- A login's two-factor code becomes a separate authenticator entry. Bitwarden puts it back inside the login.
+- A login's custom fields are added to its notes as "Label: value" lines.
+- Bitwarden keeps logins, secure notes, cards, contacts (as identities) and SSH keys as themselves, and puts spaces in folders. Every other type, such as a Wi-Fi network or an API key, becomes a secure note.
+- CSV has the columns `name`, `url`, `username`, `password`, `note`, `totp`, `type` and `space`. The two-factor code is written as an `otpauth://` link. A secure note's text goes in the `password` column.
+
+A CSV export of a small vault looks like this:
+
+```text title="apm-export-2026-10-05.csv"
+name,url,username,password,note,totp,type,space
+GitHub,github.com,you@example.com,Summer2024!,Recovery PIN: 4821,,password,
+GitHub,github.com,,,,otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP,totp,
+Bank,bank.example.com,you,hunter2,,,password,Work
+Homelab runbook,,,Restart the NAS first.,,,note,
+Home-5G,,,Summer2024!,Security: WPA2 Personal,,wifi,
+Stripe live key,,Stripe,sk_live_51Hxample0000000000,,,apikey,Work
+```
+
+The same vault as Text, with **Include secrets** off:
+
+```text title="apm-export-2026-10-05.txt"
+APM Export
+==========
+
+LOGINS:
+Account: GitHub | Username: you@example.com | Website: github.com
+Account: Bank | Space: Work | Username: you | Website: bank.example.com
+
+AUTHENTICATOR CODES:
+Account: GitHub
+
+SECURE NOTES:
+Name: Homelab runbook
+
+WI-FI NETWORKS:
+Name: Home-5G
+
+API KEYS:
+Name: Stripe live key | Space: Work
+```
+
+With secrets on, each line also has the password, setup key, key or note text, such as `Password: Summer2024!`.
+
+### What to export
+
+Choose **Whole vault**, the items you selected, **By space** (tick spaces) or **By type** (tick types). **By type** only lists types your vault holds. With nothing ticked, nothing is exported.
+
+### Options
+
+The options shown depend on the format:
+
+| Option | Formats | Default |
+|---|---|---|
+| **Include passkeys**: private keys go into the file so you can sign in elsewhere. Anyone with the file can use them. | APM, Credential Exchange, Bitwarden | On |
+| **Include files**: documents, photos, audio and video, embedded in the file. It can get large. | APM | Off |
+| **Include secrets**: plain-text passwords. Turn it off for a printable inventory of what you have. | CSV, Text | On |
+| **Encrypt with a password**: enter an **Export password** and confirm it. | APM, Bitwarden | On for APM, off for Bitwarden |
+
+The export password needs at least 8 characters ("Use at least 8 characters."), both fields must match ("The passwords do not match."), and a strength meter rates it. Pick a new password, not your master password.
+
+The footer counts the items, passkeys and files that will be exported, and the summary lists them by type along with anything left out and why:
+
+| Left out because | Shown as |
+|---|---|
+| Files are off (APM) | "Files are left out. Turn on files to include them" |
+| The format cannot hold files | "CSV cannot hold files" or "Credential Exchange (CXF) cannot hold files" |
+| The format cannot hold passkeys | "CSV cannot hold passkeys" |
+| **Include passkeys** is off | "Passkeys are left out" |
+| A Credential Exchange export and a passkey that has signed in | "Credential Exchange only allows passkeys that never counted a sign-in. Use the APM or Bitwarden format for these" |
+
+If the file will hold readable secrets, a red notice says **This file will be readable by anyone**: anything that can read the folder you save it to can read every exported secret, and sign in with its passkeys if it holds any.
+
+Choose **Export**, then pick where to save it. The default name is `apm-export-` plus the date (or `apm-credentials-` for Credential Exchange, `bitwarden-from-apm-` for Bitwarden), with the format's extension. On macOS and Linux, APM saves the file so that only your user account can read it. The toast says, for example, "Exported 6 items", with **Show** to reveal the file.
+
+**Export** stays disabled while the selection holds nothing the format can export. If the file cannot be written, you see "APM cannot write" followed by the file name and the reason.
+
+<Callout type="warning">
+An export leaves the vault's protection. Encrypt it, keep it somewhere safe, and delete it when you are done.
+</Callout>
+
+## Compare with an export
+
+**Compare** checks an export or backup against your vault. Use it after an accident, to find what you lost since a backup. Open it from **Settings → Import and export → Compare**, or **Compare your vault with an earlier export** at the bottom of the export dialog.
+
+Drop or choose a file (APM, 1Password, Bitwarden, KeePass, Credential Exchange or CSV). Encrypted files ask for their password. APM then shows four groups:
+
+- **Only in the file**: items your vault no longer has. These are ticked.
+- **Changed**: items whose values differ. Expand one to compare.
+- **Same**: identical items. They are hidden until you click **Same**.
+- **Only in your vault**: items added since the export, marked **New since the export**.
+
+If nothing differs, **Nothing changed** says your vault holds exactly what the file holds.
+
+Choose **Restore N items only in the file** to add the ticked items back, each in the space it came from. Nothing else changes. The toast says, for example, "Restored 2 items" and names the file. With nothing ticked, the button reads **Nothing to restore**.
+
+<Callout type="note" title="Compare with an APM export or backup">
+Other formats store some data differently, so unchanged items can show as **Changed**, and extras such as a Wi-Fi network's security type can show under **Only in the file** as separate notes. **Only in your vault** also lists every item the file could not hold, such as everything except logins when you compare with a browser's passwords CSV.
+</Callout>
+
+## Encrypted backup
+
+**Settings → Import and export → Encrypted backup → Save a backup** copies `vault.dat` exactly as it is on disk, to a file you choose (by default `vault-` plus the date `.dat`). The card's footer says what the backup includes, such as "Includes 42 items and 3 spaces. History snapshots are not included." The backup opens with your current master password and nothing else. The toast says **Backup saved**, with **Show** to reveal the file.
+
+Import a backup, or compare with one, the same way as an export: choose **APM export or backup** and enter the master password it was saved with.
+
+## In the terminal
+
+`pm import`, `pm export --format apm|cxf|bitwarden|csv|txt` and `pm export compare` do the same from the terminal. See the [CLI reference](/docs/cli/commands).

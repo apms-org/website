@@ -1,0 +1,66 @@
+---
+title: Spaces
+description: Split one vault into separate areas such as Work and Personal, and switch between them.
+order: 8
+group: Guides
+---
+
+A space is a named area inside a vault, like a folder that every item belongs to. Every vault has a `default` space. Spaces keep unrelated items apart without a second vault or a second master password. They are not a security boundary: anyone who unlocks the vault can switch to any space.
+
+## Create, list and switch
+
+```sh title="Terminal"
+pm space create Work
+pm space list
+pm space switch Work
+```
+
+```text
+$ pm space list
+Available Spaces:
+  default (0 entries)
+* Work (3 entries)
+```
+
+`*` marks the current space. Only the current space's items are counted, so other spaces show `0 entries` even when they hold items. Space names are case-sensitive, so `work` and `Work` are different spaces. To go back to the default space, run `pm space switch default`.
+
+The current space is saved in the vault, so it stays selected for every later `pm` command until you switch again. The desktop app has its own space picker. See [Desktop app](/docs/desktop).
+
+You can also add spaces and pick the current one in the setup wizard: `pm setup` asks for comma-separated names.
+
+## What the current space affects
+
+| Command | Behaviour |
+|---|---|
+| `pm add` | Adds the item to the current space |
+| `pm get`, `pm totp` | Show only items in the current space |
+| `pm inject` | Looks names up in the current space |
+| `pm import` | Imports into the current space unless you pass `--space` or `--keep-spaces` |
+| `pm export` | Exports every space unless you pass `--space` |
+| `pm space list` | Lists every space, but counts items in the current space only |
+
+Item names only have to be unique within a space, so a `GitHub` login can exist in both `default` and `Work`.
+
+<Callout type="note" title="Inject in the default space">
+In the `default` space, `pm inject` can also match a login, code, token, note, API key, SSH key, Wi-Fi, recovery code or certificate with the same name in another space. Switch to the space you mean first when names repeat.
+</Callout>
+
+## Spaces from an import
+
+`pm import --keep-spaces` turns the source's own grouping into spaces: Bitwarden folders, 1Password vaults, KeePass groups and APM spaces. Imports of APM files keep their spaces by default. `--space <name>` imports everything into one space instead. See [Import and export](/docs/cli/import-export).
+
+## Keep a space off the cloud
+
+An `[spaces]` section in `.apmignore` leaves whole spaces out of every cloud upload while keeping them in your local vault:
+
+```ini title=".apmignore"
+[spaces]
+private
+temp_*
+```
+
+See [.apmignore](/docs/reference/apmignore).
+
+## What pm can't do with spaces
+
+`pm` has no command to rename or delete a space or move an item between spaces. Do those in the desktop app. `pm cleanup` reports logins and authenticator codes that point at a space that no longer exists, and can move them back to `default`. See [Health and maintenance](/docs/cli/health-and-audit#clean-up).

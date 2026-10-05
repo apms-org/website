@@ -1,0 +1,171 @@
+---
+title: The app and pm
+description: Install the pm command from the app, share one vault and session with your terminal, inject secrets into a shell and hand scoped sessions to scripts.
+order: 17
+group: Connections
+sidebarTitle: Terminal and pm
+---
+
+The app and `pm` are two faces of one engine. They use the same vault file, the same history and audit log, the same session and the same auto-lock rules. This page covers the places where the app helps you work with `pm`: installing it, sharing the vault and session, injecting secrets into a shell, and issuing short-lived sessions to scripts and agents.
+
+## The pm command
+
+On macOS, the packaged app can install `pm` for your terminal. Open **Settings → Developer → Command line**. Each time you open the page, the **pm command** row says **Checking…**, then shows which `pm` your terminal runs:
+
+| State | What you see | Action |
+|---|---|---|
+| None found | **Not installed. Adds pm to your terminal, linked to this app, so updating APM updates it too.** | **Install pm** |
+| Same version as the app | For example **pm 12.0.0 at /usr/local/bin/pm.** | **Up to date** |
+| An older `pm` | For example **pm 11.2.0 is installed at /usr/local/bin/pm. This app has 12.0.0.** (or **An older pm** when it reports no version) | **Update pm** |
+| An older `pm` from Homebrew | For example **pm 11.2.0 from Homebrew is at /opt/homebrew/bin/pm. This app has 12.0.0. Homebrew manages it, so upgrade it there.** | **Copy command** copies `brew upgrade pm` and shows **Copied brew upgrade pm** |
+| A newer `pm` | For example **pm 12.1.0 at /usr/local/bin/pm is newer than this app (12.0.0). Update APM to match it.** | **Newer than APM**. Update the app. |
+
+To find that `pm`, APM asks your login shell, the way a new terminal window would (`command -v pm`). If that fails, it looks through your `PATH`, with Homebrew's `/opt/homebrew/bin` first. It reads the version from `pm --version`, or from `pm info` for older versions. A `pm` whose real file is inside Homebrew's `Cellar` counts as Homebrew's.
+
+How it works:
+
+- **Install pm** creates a symlink at `/usr/local/bin/pm` that points at the `pm` inside `APM.app`. Updating the app updates the command too. You see **Installed the pm command** and **Open a new terminal window and run pm.**
+- **Update pm** points the older `pm` at the app's copy where it already is, so your `PATH` order and any `vault.dat` next to it stay as they were. A plain binary there is kept as `pm.old`, and a symlink is simply repointed. You see **Updated pm to 12.0.0** and **Your terminal now runs this app's engine.**
+- macOS asks for an administrator password when the folder is not writable. If you cancel that prompt, nothing changes and no message appears.
+- APM never replaces a real file at `/usr/local/bin/pm`, only a symlink. The **pm command** row shows the path of the `pm` your terminal runs, so you can see when another `pm` comes first on your `PATH`.
+
+Open a new terminal window afterwards and run `pm --version`. It prints the app's version, such as `12.0.0`.
+
+If something goes wrong, a message pops up:
+
+| Message | What to do |
+|---|---|
+| **/usr/local/bin/pm is a file APM did not install, so APM left it alone. Move or delete it, then try again.** | Something else put a real `pm` there. Move it away, or keep it and skip the app's command |
+| **macOS did not allow APM to change /usr/local/bin/pm.** followed by the reason | macOS refused even with an administrator. Check the folder's permissions |
+| **The pm bundled with APM is missing at** a path inside `APM.app` | The app folder is damaged. Download it again |
+| **Could not install the pm command.** or **Could not update the pm command.** | Something failed without a reason. Try again |
+
+If the check itself fails, the row shows the reason, or **Could not check the pm command.** Reopen the page to check again.
+
+The app has no button to remove the command. To remove it, check that it points into `APM.app` with `ls -l /usr/local/bin/pm`, then run `sudo rm /usr/local/bin/pm`.
+
+On Windows and Linux, and in an unpackaged source build, the row says **Only the packaged app installs the pm command.** Install the CLI separately. See [Install pm](/docs/getting-started/installation).
+
+The **Engine** row below shows which `pm` runs the app itself: **Inside APM.app**, **From APM_PM_PATH**, **Development build**, **From your PATH** or **Missing**, with its path.
+
+## Use the same vault from the terminal
+
+Without `APM_VAULT_PATH`, `pm` uses a `vault.dat` next to itself if there is one, otherwise `~/.apm/vault.dat`. That is the app's default too, so a fresh setup shares one vault with no extra steps. The `pm` the app installs is a symlink with no vault beside it, so it uses `~/.apm/vault.dat`.
+
+If the app uses a vault somewhere else, choose **Copy export** in the **Use this vault from the terminal** row. It copies a line like this, and shows **Copied the export line** and **Add it to your shell profile.**:
+
+```sh title="~/.zshrc"
+export APM_VAULT_PATH="/Users/you/Documents/vault.dat"
+```
+
+The line is written for zsh and bash. In fish or PowerShell, set `APM_VAULT_PATH` the way that shell sets variables.
+
+**Settings → General → Vault file** shows the app's vault path, with **Show in Finder**.
+
+## Shared session
+
+- Unlocking in the app unlocks `pm`, and locking in the app locks `pm`.
+- If `pm` is unlocked when you open the app, the app opens unlocked.
+- **Settings → Sessions → Terminal session** shows **pm is unlocked** with when it ends, or **pm is locked**.
+- If `pm` changes the vault while the app is open, the app picks up the change within a moment.
+- `pm lock` in your terminal locks only `pm`. The app stays unlocked.
+- Quitting the app leaves `pm` unlocked until its session ends.
+
+See [Lock and unlock](/docs/desktop/lock-and-unlock#sharing-a-session-with-pm).
+
+## Command chips
+
+Many settings cards, page headers and items show the matching `pm` command in a small chip, such as `pm get "GitHub"` on an item or `pm lgit undo` in History. Click a chip to copy the command. Turn them off with **Show pm commands** in **Settings → Appearance**.
+
+A chip shows the command to start from. Some need arguments filled in, such as `pm import <file>`.
+
+## Inject secrets into a shell
+
+**Settings → Developer → Inject into a shell** builds a `pm inject` command that puts secrets into your shell as environment variables for one session, then wipes them. Nothing is written to disk.
+
+<Steps>
+
+### Pick items
+
+Tick items in the list on the left. **Filter items** narrows it. When the page opens, up to three of your API keys, tokens and Docker registries are already ticked. Each type injects one field:
+
+| Type | Field |
+|---|---|
+| Login, Wi-Fi network | Password |
+| Authenticator | Setup key (`secret`) |
+| Token, Docker registry | Token |
+| Secure note | Content |
+| API key | Key |
+| SSH key, certificate, SSH host | Private key |
+| Recovery codes | The codes |
+| Cloud credentials | Secret key |
+
+Items of other types do not appear in the list.
+
+### Name the variables
+
+Each item gets a variable name made from its name in capitals, with every run of other characters turned into `_`, such as `STRIPE_LIVE_KEY`. Edit any name in the **Variable** column; letters become capitals and anything other than letters, digits and `_` becomes `_`. The table shows which field each variable comes from and the last four characters of its value, such as `••••4f2a`. With nothing ticked, it says **Pick at least one item.**
+
+### Run it or save it
+
+The **Run** block shows the command, for example `pm inject --inject "Stripe live key,Docker Hub"`. The **.apminject** block shows the same choices as a file:
+
+```yaml title=".apminject"
+- entry: "Stripe live key"
+  as: STRIPE_LIVE_KEY
+- entry: "Docker Hub"
+  as: DOCKER_HUB
+```
+
+Choose **Save .apminject** to save it into a project. Names you change in the **Variable** column are kept only in the file: the **Run** command passes item names, and `pm` makes the default names from them. See [.apminject](/docs/reference/apminject).
+
+</Steps>
+
+`pm` looks for `.apminject` in the current folder and its parents, so a plain `pm inject` works anywhere inside the project. Commit the file so teammates get the same variable names from their own vaults. End the session and wipe the variables with `pm inject kill`.
+
+The **Shell function** card shows how to install an `inject` function so you do not need `eval`. Pick **zsh**, **bash**, **fish** or **PowerShell**:
+
+```sh title="zsh"
+pm inject setup-shell
+source ~/.zshrc
+
+inject "Stripe live key,Docker Hub"
+```
+
+## Ephemeral sessions
+
+An ephemeral session is a scoped, expiring unlock for a process that should never see your master password, such as a CI job or an agent. Manage them in **Settings → Sessions → Ephemeral sessions**.
+
+<Steps>
+
+### Issue a session
+
+Choose **Issue session** and fill in:
+
+- **Label**: what it is for, such as "CI deploy". **Issue session** stays disabled until you type one.
+- **Agent name** (optional): if set, the process must send it too. Spaces become `-` as you type.
+- **Expires after**: **15 minutes**, **1 hour** (the default), **4 hours** or **24 hours**.
+- **Access**: **Read only** (the default) or **Read and write**.
+- **Bind to this Mac**: on by default. The session fails on any other machine.
+
+You cannot issue a session while the vault is open read-only.
+
+### Hand it to the process
+
+**Session issued** shows until when the session works, and two blocks to copy: **Environment** with the variables, and **Use it** with an example:
+
+```sh title="Terminal"
+APM_EPHEMERAL_ID=<session id> APM_EPHEMERAL_AGENT=github-actions pm get "Item name"
+```
+
+`APM_EPHEMERAL_AGENT` is left out when you gave no agent name.
+
+</Steps>
+
+The list shows each active session with its label (**Untitled session** without one), its scope, **host-bound** when it is bound to this Mac, its ID and agent, when it was issued, and a bar for the time left that turns to a warning in the last fifth. **Revoke** stops it immediately and shows **Revoked** with the label. With none active, the card says **No active sessions.** Up to five ended sessions are listed under **Expired and revoked**.
+
+<Callout type="warning" title="Sessions hold your master password">
+While a session lasts, APM keeps it in `ephemeral_sessions.json` in the APM config folder, together with your master password, unencrypted. Use short expiry times, and revoke a session as soon as the job is done. See [File locations](/docs/reference/file-locations#sessions).
+</Callout>
+
+`pm session issue` and `pm session list` do the same from the terminal. See [sessions in the CLI](/docs/cli/sessions).

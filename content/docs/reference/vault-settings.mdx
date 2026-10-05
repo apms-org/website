@@ -1,0 +1,61 @@
+---
+title: Vault settings
+description: The settings APM stores inside the vault, their keys, values and defaults, and which parts of APM use them.
+order: 6
+group: Configuration
+---
+
+Some settings belong to the vault rather than to one computer. APM stores them inside the encrypted vault, so they follow it to every computer that opens it, through backups and through cloud sync. You change most of them in the desktop app's **Settings**; `pm autolock` changes the three auto-lock settings.
+
+The keys below are what `pm` and the app use internally. You don't edit them directly, but they appear in messages such as the audit log entry `SETTINGS_CHANGED inactivity, sessionTimeout, lockOnSleep (pm autolock)`.
+
+## Settings
+
+| Key | Default | In the app | Values |
+|---|---|---|---|
+| `inactivity` | `"15"` | **Sessions** → **Lock after inactivity** | Minutes, as text. The app offers 1, 5, 15, 30, 60 and 240; `0` means never |
+| `sessionTimeout` | `"60"` | **Sessions** → **Maximum session** | Minutes, as text. The app offers 15, 60, 240, 480 and 1440; `0` means no limit |
+| `lockOnSleep` | `true` | **Sessions** → **Lock when the Mac sleeps** | `true` or `false` |
+| `clipboard` | `"30"` | **Security** → **Clear clipboard** | Seconds, as text: `10`, `30`, `90`, or `0` for never |
+| `copyOnClick` | `true` | **General** → **Copy on click** | `true` or `false` |
+| `confirmDelete` | `true` | **General** → **Confirm before deleting** | `true` or `false` |
+| `openOnLaunch` | `"all"` | **General** → **Open to** | `all` (All items), `fav` (Favorites), `last` (Last viewed), `authenticator` |
+| `siteIcons` | `"on"` | **Appearance** → **Show website icons** | `on` or `off` |
+| `showTypeIcons` | `true` | Not shown | Stored with the defaults; no screen changes it today |
+
+A setting that isn't stored, for example in a vault that has never been opened in the app, uses the default above. `pm autolock` stores only the three lock settings.
+
+## Who uses which setting
+
+| Setting | Desktop app | `pm` | Browser extension |
+|---|---|---|---|
+| `inactivity`, `sessionTimeout`, `lockOnSleep` | Yes | Yes: for every session `pm` starts, by `pm unlock` or by any command that asks for your master password, and for `pm extension serve` and the native host | Yes, through the app or bridge it talks to |
+| `clipboard` | Yes | No. `pm` never clears the clipboard | Yes |
+| `siteIcons` | Yes | `pm extension serve` and the native host | Yes |
+| `openOnLaunch` | Yes | No | No |
+| `copyOnClick`, `confirmDelete` | Stored and shown in **Settings**, but in 12.0.0 the app always copies on click and always asks before deleting | No | No |
+
+See [Auto-lock](/docs/cli/sessions#auto-lock) for how the three lock settings combine, and [`APM_ICONS_OFFLINE`](/docs/reference/environment-variables#no-website-logos) to turn logo downloads off regardless of `siteIcons`.
+
+## Change them from the terminal
+
+Only the auto-lock settings have a `pm` command:
+
+```sh title="Terminal"
+pm autolock                                  # show the current values
+pm autolock --idle 30m --max 8h --sleep on   # change them
+pm autolock --idle never                     # never lock when idle
+```
+
+```text
+Lock after inactivity:  30 minutes
+Maximum session:        8 hours
+Lock on sleep:          on
+Applies to the desktop app, pm sessions and the browser extension.
+```
+
+Changing them needs full access to the vault. A read-only session can show them but not change them.
+
+## Settings that aren't in the vault
+
+The app's look, such as its theme, density, sidebar and sounds, is stored by the app on each computer, not in the vault. So are the vault path the app opens and the per-computer files listed in [File locations](/docs/reference/file-locations). Other vault-wide choices have their own homes: the [active password policy](/docs/reference/policies), [cloud sync settings](/docs/cli/cloud-sync#where-settings-are-kept), recovery settings and the encryption profile are also stored in the vault, each managed by its own commands.

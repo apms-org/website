@@ -1,0 +1,69 @@
+---
+title: Choose your surface
+description: Which parts of APM to set up, from the desktop app alone to pm on a server, and how they share one vault.
+order: 4
+group: Learn
+---
+
+APM is one vault with four ways in. You can use any mix of them: they all open the same `vault.dat`, write the same history and follow the same auto-lock policy. This page helps you pick what to set up.
+
+## At a glance
+
+| | Desktop app | `pm` | APM for Chrome | AI tools (MCP) |
+|--|-------------|------|----------------|----------------|
+| Best for | Browsing and editing everything, Watchtower, settings | Scripts, servers, keyboard-driven work | Filling and saving logins, codes and passkeys on websites | Letting an assistant read or change chosen secrets |
+| Needs | Nothing else | Nothing else | The app or `pm` on the same computer | `pm`, an unlocked vault, and the desktop app to approve changes |
+| Unlock with | Master password, or Touch ID on a Mac | `pm unlock` with your master password, or Touch ID on a Mac | The popup, which unlocks the app or `pm` | Your `pm` session; the tool has its own token |
+| Runs on | macOS, Windows, Linux | macOS, Windows, Linux | Chrome, Edge, Brave, Arc, Vivaldi, Chromium | Claude Desktop, Cursor, VS Code, Cline and other MCP clients |
+
+## What each surface can do
+
+The app and `pm` can do almost everything. The extension is built for websites, and AI tools get only the MCP tools you allow.
+
+| Task | Desktop app | `pm` | APM for Chrome |
+|------|-------------|------|----------------|
+| Create a vault | **Create a new vault** | `pm setup` | No. It asks you to create one in the app |
+| Unlock | Master password, or Touch ID on a Mac | `pm unlock`, or Touch ID on a Mac after `pm auth touchid setup` | Through the app or `pm`, with your master password or their Touch ID |
+| Add items | All 25 types | All 25 types, with `pm add` | Logins only |
+| Edit and delete | Everything, with Trash | `pm get`, then <Kbd>e</Kbd> to edit or <Kbd>d</Kbd> to delete | A login's websites, its space and favorite; **Move to trash**; a changed password from the update prompt |
+| Fill on websites | No | No | Logins, one-time codes and suggested new passwords |
+| Passkeys | List, rename and remove | `pm get` lists a login's passkeys; its editor (<Kbd>e</Kbd>) renames or removes them | Create, sign in, list, rename and remove |
+| One-time codes | **Authenticator** | `pm totp` | **Codes** tab, and in code fields |
+| History and undo | **History** | `pm lgit log`, `pm lgit undo` | No. Its changes appear in the app's history |
+| Password health | **Watchtower** | `pm health` | Weak and reused warnings on matching logins |
+| Auto-lock policy | **Settings**, **Sessions** | `pm autolock` | No. It follows the policy; **Lock APM when Chrome closes** is its own |
+| Sync, recovery, import and export | **Settings** | `pm cloud`, `pm auth`, `pm import`, `pm export` | No |
+| AI tool tokens | **Settings**, **AI access** | `pm mcp token` | No |
+
+## Common setups
+
+### The app and the browser
+
+The setup most people want. Install the [desktop app](/docs/desktop/install), create a vault, then [install APM for Chrome](/docs/extension/install) and pair it with the app. The extension works whenever the app is open. On a Mac, let the app install `pm` too, so the terminal is one command away.
+
+### Everything, including the terminal and the browser without the app
+
+Add `pm` and run `pm extension link` once. When the app is closed, the browser starts `pm` on its own, so filling keeps working without the app or a terminal open. See [Use the extension without the app](/docs/extension/pairing#use-the-extension-without-the-app).
+
+### The terminal only
+
+Use [`pm`](/docs/cli/installation) by itself: `pm setup` creates the vault, `pm unlock` opens it for your shell, and `pm get`, `pm add` and `pm totp` cover daily use. For the browser, either run `pm extension serve` in a terminal or link `pm` with `pm extension link`.
+
+### Scripts, CI and servers
+
+`pm` runs anywhere you can put a binary. Use `pm session issue` for a short-lived, scoped session bound to a host, process or agent, instead of handing a script your master password, and `pm inject` to load secrets into your shell session as environment variables. See [pm commands](/docs/cli/commands).
+
+### AI assistants
+
+Create a token per tool with `pm mcp token` and pick the MCP tools it may call. The app's **AI access** page groups them as **Read** (names and structure, though its `search_vault` tool also returns the secret values of the items it finds), **Secrets** (secret values and one-time codes), **Write** (add, edit and delete items, manage spaces, sync), **Admin** (profiles, cloud settings, history and the audit log) and **Utility** (password generation and pending requests). Every add, edit or delete of an item waits until you approve it in the app. The other Write and Admin tools act at once. See [Set up an AI client](/docs/agents/setup).
+
+## How they share the vault
+
+- **One file.** Every surface works on the same encrypted `vault.dat`. Use `APM_VAULT_PATH` when it lives somewhere other than the default.
+- **One unlock, one lock.** Unlocking in the app also starts a `pm` session, and the extension unlocks through the app or `pm`. Locking from the app or the browser locks everywhere, and one auto-lock policy applies to all of them.
+- **One history.** A login saved from the browser, a password changed in the terminal and an edit made by an AI tool all land in the same signed history, which you can undo from the app or with `pm lgit undo`.
+- **One version.** The app and `pm` ship together with the same version number. Keep them matched; on a Mac, installing `pm` from the app does that for you.
+
+<Callout type="tip">
+Not sure? Start with the desktop app and APM for Chrome. You can add `pm` and AI tools later without moving anything: they open the vault you already have.
+</Callout>

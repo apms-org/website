@@ -1,0 +1,80 @@
+---
+title: Spaces
+description: Keep work, personal and other secrets apart inside one vault. Switch, create, rename, color and delete spaces.
+order: 9
+group: Using the app
+---
+
+A space is a separate group of items inside one vault, like Work or Family. Every space shares the same master password and the same file. Spaces are for keeping things apart and focused, not for keeping them from each other: anyone who can unlock the vault can see every space.
+
+Every vault has a **Default** space that cannot be renamed or removed. Item names must be unique within their type and space, so you can have a "GitHub" login in Work and another in Personal.
+
+## Switch spaces
+
+Click the vault name at the top of the sidebar. Under the name, it shows the current space and how many items it holds, such as "Work · 12 items" or "All spaces · 42 items". The menu lists:
+
+- **All spaces** with the total item count
+- **Default** and each of your spaces, with their item counts
+- **New space…** (<Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd>)
+- **Manage spaces…**, which opens **Settings → Spaces**
+
+The current space shows under the vault name with its color. Picking a space limits the item list, the type counts, search and the Authenticator page to that space. New items start in that space. The choice is remembered on this computer.
+
+The command menu (<Kbd>⌘</Kbd><Kbd>K</Kbd>) is not limited by the space you picked: it still finds items in every space. Choosing one there opens it even when it is in another space than the one shown in the list.
+
+## Create a space
+
+Press <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd>, choose **File → New Space...**, **New space** in the command menu, or **New space** in **Settings → Spaces**. The **New space** dialog says "A separate group of items inside this vault. Names must be unique." Give it a **Name**, such as Family, Clients or Homelab, and choose **Create space**. The button stays greyed out until you type a name.
+
+APM switches to the new space so the items you add next go into it, and confirms with **Created “Family”**: "Items you add now go into this space." It gets the first of the seven colors that no other space uses. Once all seven are taken, colors repeat.
+
+| Message | Why |
+|---|---|
+| "A space called Work already exists." | Space names are unique, ignoring case: "work" and "Work" are the same space |
+| "A space called Default already exists." | **Default** is reserved, in any case |
+| "Give the space a name." | The name is empty, or only spaces |
+
+Spaces at either end of a name are removed.
+
+## Manage spaces
+
+**Settings → Spaces** lists **Default** and each space with its item count and the date it was created, such as "12 items · created Oct 5, 2026". **Default** says "cannot be removed", and its color cannot be changed.
+
+- **Color**: click the dot to pick one of seven colors.
+- **Open**: switches to that space and shows **All items**.
+- `…` **→ Rename**: change the name and color. Items move with the space.
+- `…` **→ Delete space**: see below.
+
+### Rename a space
+
+The **Rename “Work”** dialog says "Items in this space move with it." Type the new name and choose **Rename**. The button stays greyed out while the name is empty or unchanged. Picking a color in the same dialog changes it at once, even if you cancel the rename.
+
+Renaming updates every item in the space, including items of that space in Trash. If you were looking at the space, the sidebar follows the new name. The toast says **Renamed to “Clients”**. The same name rules as for a new space apply.
+
+### Delete a space
+
+**Delete space** asks where its items should go. The dialog, **Delete “Work”?**, says "It has 3 items. Choose where they go. No items are deleted." Pick a destination under **Move its items to** (**Default** or another space) and choose **Delete space**. A space with no items says "It has no items." and has nothing to choose.
+
+No items are deleted. Items of that space in Trash are moved to the destination too, so they restore there. The toast says **Deleted space “Work”**, with "3 items moved to Default". If you were looking at the deleted space, the sidebar goes back to **All spaces**.
+
+If an item with the same name already exists in the destination, APM stops and names the items that clash: "These items already exist in the target space: GitHub, AWS root account." Nothing moves and the space stays. Rename those items, or pick another destination.
+
+## Move items between spaces
+
+- Select an item and choose **Move to space…** in the item menu.
+- Select several items and choose **Move**, or right-click and **Move to space…**.
+- While editing an item, change its **Space**.
+
+The **Move to space** dialog (**Move 3 items** for a selection) lists **Default** and every space with its color and item count, with the first item's current space ticked. Pick one and choose **Move**. The toast says **Moved to Work**.
+
+If an item with the same name and type is already there, that item stays where it was. When nothing can move, APM says "Items with the same name already exist there:" and the names. When only some clash, the others move and the toast still says **Moved to** the space, without naming the ones left behind, so check the list afterwards.
+
+## Spaces and other features
+
+- **Identifiers.** An item's identifier is `Space:type:Name`, shown in its header. `pm` and `.apmignore` use the same form.
+- **Sync.** Spaces sync as part of the vault. Use `.apmignore` in **Settings → Sync** to keep a whole space, or parts of one, off one provider or all of them. See [Cloud sync](/docs/desktop/sync#apmignore).
+- **Export.** The export dialog can export **By space**. See [Import and export](/docs/desktop/import-export).
+- **Import.** An import can go **Into** one space, or keep the spaces (or folders) from the file.
+- **Authenticator order.** Codes keep their place on the Authenticator page per space, so a code you move to another space loses its place. See [Arrange and filter](/docs/desktop/authenticator#arrange-and-filter).
+
+In the terminal, `pm space list` lists the same spaces.

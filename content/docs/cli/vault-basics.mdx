@@ -1,0 +1,176 @@
+---
+title: Vault basics
+description: Create a vault with pm setup, choose where it lives, pick an encryption profile and manage the master password.
+order: 2
+group: Get started
+---
+
+Everything APM stores sits in one encrypted file, the vault. This page covers creating it, finding it, choosing how hard it is to crack, and changing or losing the master password. For how the file is built, see [Vault format](/docs/security/vault-format).
+
+## Create a vault
+
+Run the setup wizard:
+
+```sh title="Terminal"
+pm setup
+```
+
+It walks through six steps:
+
+| Step | What happens |
+|---|---|
+| 1. Environment checks | Shows your OS, CPU cores and RAM, and creates the vault folder and a `policies` folder next to it |
+| 2. Vault | With no vault, asks for a new master password and creates one. With a vault, unlocks it |
+| 3. Security profile | Recommends a profile for this machine and lets you switch |
+| 4. Spaces | Lets you add spaces (comma-separated) and pick the active one |
+| 5. Cloud sync | Optionally sets up Google Drive, GitHub or Dropbox. See [Cloud sync](/docs/cli/cloud-sync) |
+| 6. Save | Writes the vault and prints the profile and active space |
+
+```text
+APM Setup
+Unified setup flow: project configuration, vault initialization, profiles, spaces, and cloud sync.
+
+[1/6] Environment and project checks
+System: darwin/arm64, CPU cores: 10, RAM: 16384 MB
+Project directories ready:
+- Vault: /Users/alex/.apm/vault.dat
+- Policies: /Users/alex/.apm/policies
+
+[2/6] Vault initialization and unlock
+No vault detected. Creating a new vault.
+Create Master Password:
+System recommended profile: paranoid (10 CPU cores and 16384 MB RAM detected)
+Use 'paranoid'? (Y/n):
+...
+Setup completed successfully.
+Assigned profile: paranoid
+Active space: default
+```
+
+`pm setup --non-interactive` uses the recommended profile and AES-256-GCM, and skips the spaces and cloud questions. It still asks for the master password. Running `pm setup` again on an existing vault is safe: it unlocks it and lets you change the profile, spaces and cloud settings.
+
+### Master password rules
+
+A new master password needs at least 8 characters, with at least one uppercase letter, one lowercase letter, one digit and one symbol from `!@#$%^&*()-_=+`. `pm setup` asks again until the password meets them. `pm auth change`, `pm auth recover` and `pm auth quorum-recover` don't check these rules, so keep to them yourself when you change or reset the password.
+
+<Callout type="danger" title="APM cannot reset your master password">
+Nothing on any server can decrypt your vault. If you forget the master password, only a recovery factor you set up in advance gets you back in. Set one up now: see [Recovery](/docs/cli/recovery).
+</Callout>
+
+## Where the vault lives
+
+`pm` picks the vault file in this order:
+
+1. The `--vault` (`-v`) flag, for that one command. A relative path is relative to the current folder.
+2. `APM_VAULT_PATH`. A relative path here is relative to the folder that holds the `pm` executable.
+3. A `vault.dat` next to the `pm` executable, if there is one.
+4. `~/.apm/vault.dat`, the same vault the desktop app uses.
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab>
+
+`/Users/<you>/.apm/vault.dat`
+
+</Tab>
+<Tab>
+
+`C:\Users\<you>\.apm\vault.dat`
+
+</Tab>
+<Tab>
+
+`/home/<you>/.apm/vault.dat`
+
+</Tab>
+</Tabs>
+
+`pm info` prints the vault path in use. Everything that belongs to a vault and not to your user account sits in the same folder: the `policies` folder, an optional `.apmignore` (though `pm` first uses one in the folder you run it from), and conflict copies from cloud downloads. See [File locations](/docs/reference/file-locations).
+
+```sh title="Terminal"
+pm --vault ~/work/vault.dat get aws     # one command against another vault
+export APM_VAULT_PATH=~/work/vault.dat   # every command in this shell
+```
+
+<Callout type="tip" title="Several vaults">
+Each vault has its own master password and spaces, but the `pm` session file is shared. If you switch between vaults in different shells, give each shell its own session with `APM_SESSION_ID`. See [Per-shell sessions](/docs/cli/sessions#per-shell-sessions).
+</Callout>
+
+## Encryption profiles
+
+A profile sets how the key is derived from your master password and which cipher encrypts the vault. Higher memory and time costs make guessing the password slower for an attacker, and unlocking slower for you.
+
+| Profile | KDF | Memory | Time | Threads | Salt | Nonce |
+|---|---|---|---|---|---|---|
+| `standard` | Argon2id | 64 MB | 3 | 2 | 16 bytes | 12 bytes |
+| `hardened` | Argon2id | 256 MB | 5 | 4 | 32 bytes | 12 bytes |
+| `paranoid` | Argon2id | 512 MB | 6 | 4 | 32 bytes | 24 bytes |
+| `legacy` | Argon2id (labelled PBKDF2) | 8 KB, Argon2's minimum | 600,000 | 1 | 16 bytes | 12 bytes |
+
+All built-in profiles use AES-256-GCM. `pm setup` recommends `paranoid` on machines with at least 16 GB of RAM and 8 cores, `hardened` with at least 8 GB and 4 cores, and `standard` otherwise.
+
+```sh title="Terminal"
+pm profile list            # every profile; * marks the active one
+pm profile current         # the active profile's parameters
+pm profile set hardened    # switch to a built-in profile (re-encrypts the vault)
+pm profile edit            # tune memory, time, threads, cipher, salt and nonce
+pm profile create fast     # build a custom profile step by step
+```
+
+`pm profile edit` and `pm profile create` let you choose the cipher: `aes-gcm` or `xchacha20-poly1305`. XChaCha20-Poly1305 always uses a 24-byte nonce. See [Encryption profiles](/docs/security/profiles) for what each parameter protects against.
+
+`pm cinfo` shows the parameters stored in the vault header, without unlocking:
+
+```text
+APM Crypto Configuration
+========================
+Format:    APMVAULT v4
+Profile:   paranoid
+KDF:       Argon2id
+  Time:    6
+  Memory:  512 KB
+  Threads: 4
+Cipher:    AES-256-GCM
+  Nonce:   24 bytes
+  Salt:    32 bytes
+Integrity: HMAC-SHA256 (Encrypt-then-MAC)
+```
+
+<Callout type="note">
+The `Memory` line of `pm cinfo` is the Argon2 memory in megabytes, despite its `KB` label. `pm profile current` shows the same value as `512 MB`. The `KDF` line always says `Argon2id`, and that is right for every profile. `legacy` is labelled PBKDF2 elsewhere, but `pm` derives its key with Argon2id too, with 600,000 passes over only 8 KB of memory.
+</Callout>
+
+## Change the master password
+
+```sh title="Terminal"
+pm auth change
+```
+
+`pm` unlocks the vault with the current password (or your session), asks for the new one twice and re-encrypts the vault. If Touch ID is set up, the Keychain copy is updated too. Run `pm unlock` afterwards to start a session with the new password.
+
+## A vault from a newer pm
+
+The vault records which `pm` revision wrote it. When an older `pm` opens a vault written by a newer one, it opens it read-only and prints:
+
+```text
+This vault was updated by a newer version of pm. Update pm to edit it.
+```
+
+Reading still works. Commands that would write stop before changing anything. Update `pm` to edit the vault again.
+
+<Callout type="warning" title="Don't go back to pm 11">
+`pm` 12 moves standalone authenticator codes into their logins and stores more fields on logins. `pm` 11.x and older do not understand these and would drop them on save. Once `pm` 12 has opened a vault, don't edit it with an older `pm`.
+</Callout>
+
+## Delete a vault in an emergency
+
+```sh title="Terminal"
+pm compromise
+```
+
+Type `DESTROY` to confirm. `pm` overwrites the vault file with random bytes, deletes it and ends the session. History snapshots in your config folder are not removed by this command; delete the `lgit_snapshots` folder too if they must go. See [File locations](/docs/reference/file-locations#history-and-audit).
+
+## Related
+
+- [Sessions](/docs/cli/sessions): unlock once, lock when you leave.
+- [Spaces](/docs/cli/spaces): split one vault into Work, Personal and so on.
+- [Recovery](/docs/cli/recovery): what to set up before you need it.

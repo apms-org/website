@@ -1,0 +1,217 @@
+---
+title: Lock and unlock
+description: The lock screen, Touch ID, failed attempts, read-only unlocks, auto-lock and how the app shares its session with pm.
+order: 3
+group: Get started
+---
+
+While the vault is locked, the background engine holds no key and the window shows only the lock screen. Unlocking derives the key from your master password (or gets it from Touch ID). Locking wipes it from memory again.
+
+## The lock screen
+
+The lock screen shows **Unlock your vault**, your vault's name and item count, a password field and, when it is set up, **Unlock with Touch ID**. The name and count are the ones APM saw the last time you unlocked this vault on this computer. Before your first unlock here, it says **Your vault**.
+
+Below that, a status line says why the vault is locked:
+
+- **Locked after a period of inactivity**
+- **Locked when your Mac went to sleep**
+- **Locked when the session ended**
+- **Locked from the browser**
+- **Locked** with how long ago, for a manual lock
+
+When **Unlock read-only for 15 minutes** is ticked, the status line says **Will open read-only for 15 minutes** instead.
+
+Type your password and press <Kbd>↵</Kbd>. While the key is derived, a progress bar shows **Deriving key** and the profile's settings, such as **Argon2id · t=5 · 256 MiB · p=4**. Stronger profiles take longer. See [encryption profiles](/docs/security/profiles).
+
+If unlocking fails for another reason, the message shows under the field. For example, **No vault found at** and the path means the file was moved or deleted since the app started. Use **More options → Open another vault**.
+
+Click the vault's name to go to the Welcome screen and open a different vault.
+
+The footer has a theme button and **More options**:
+
+| Option | What it does |
+|---|---|
+| **Unlock read-only for 15 minutes** | A checkmark toggle. The next unlock opens the vault read-only for 15 minutes. |
+| **Forgot master password** | Starts recovery. See [Forgot your master password](#forgot-your-master-password). |
+| **Open another vault** | Goes to the Welcome screen. |
+
+## Touch ID
+
+On a Mac with Touch ID, you can unlock with your fingerprint instead of typing your password. Turn it on in **Settings → Security → Unlock with Touch ID**, or during setup. APM keeps your master password in your login keychain, as an item named **APM Vault**, and reads it only after a fingerprint check. `pm` uses the same Keychain entry.
+
+<Callout type="warning" title="The fingerprint check is APM's, not the Keychain's">
+APM saves the item as an ordinary Keychain password, without a macOS fingerprint lock on the item itself. Other programs that run as you may be able to read it from your unlocked login keychain without a fingerprint.
+</Callout>
+
+How the lock screen uses it:
+
+- **Inline.** The packaged app draws macOS's own Touch ID glyph inside the **Unlock with Touch ID** button. No system dialog appears. While the window has focus, Touch ID is armed, so you can just touch the sensor, the way the macOS lock screen works. The button reads **Touch the sensor** while it waits.
+- **After a miss.** If a fingerprint is rejected, or Touch ID locks out after too many tries, the lock screen stops re-arming. Type your password, or press the button to try again.
+- **Fallback.** Without the inline module (some source builds), the lock screen offers the system Touch ID dialog, named APM, once per launch. Press the button to bring it up again.
+- **Typing wins.** If you type your password and press <Kbd>↵</Kbd> while Touch ID is armed, the fingerprint check is cancelled.
+
+When the browser extension asks to unlock with Touch ID, macOS shows a system dialog named APM. The inline check also stands down when the APM window loses focus, and starts again when you come back to it.
+
+What the lock screen can say:
+
+| Message | What happened | What to do |
+|---|---|---|
+| **Touch ID did not recognise that fingerprint. Enter your master password.** | The inline check rejected the finger | Type your password, or press the button to try again |
+| **Touch ID was cancelled. Enter your master password.** | The system dialog failed (builds without the inline module) | Type your password, or press the button again |
+| **Touch ID is locked after too many tries. Unlock with your master password.** | macOS locked Touch ID | Type your password. macOS may ask for your login password before Touch ID works again |
+| **Touch ID has an outdated master password. Unlock with your password, then set Touch ID up again.** | The password in the Keychain no longer opens the vault | Unlock with your password, then turn Touch ID off and on in **Settings → Security** |
+| **Touch ID is not available on this Mac.** | macOS reports no usable Touch ID | Type your password |
+
+Closing the prompt yourself shows no message. An outdated Keychain password does not count as a failed attempt.
+
+### Turn Touch ID on or off
+
+In **Settings → Security**, switch **Unlock with Touch ID** on. The **Set up Touch ID** dialog asks for your master password. Choose **Turn on Touch ID**, and you see **Touch ID is on**. A wrong password shows **That is not your master password.**
+
+Switch it off and confirm **Turn off Touch ID?**. APM deletes the Keychain entry, and you see **Touch ID removed**. The app and `pm` both ask for your password again. The switch is disabled on a Mac without Touch ID.
+
+<Callout type="note" title="Touch ID after a password change">
+Changing your master password in the app updates the Keychain entry, so Touch ID keeps working. If the stored password is out of date anyway (for example after a change made elsewhere), you see **Touch ID has an outdated master password.** Unlock with your password, then turn Touch ID off and on again in **Settings → Security**.
+</Callout>
+
+## Failed attempts
+
+APM slows down guessing. Starting from a clean count, the lock screen shows:
+
+| Wrong password | Message |
+|---|---|
+| 1st | **Incorrect password. 5 attempts left before a wait.** |
+| 2nd | **Incorrect password. 4 attempts left before a wait.** |
+| 3rd | **Too many attempts. Try again in 30 seconds.** The field is disabled and the status line counts down **Try again in 30s** |
+| 4th | **Incorrect password. 2 attempts left before a wait.** |
+| 5th | **Incorrect password. 1 attempt left before a wait.** |
+| 6th | **This vault is locked after repeated failed attempts. Use recovery to regain access.** |
+
+Despite the wording, the number counts down to the lockout at six, not to the next wait. After the sixth, the vault refuses password and Touch ID unlocks. Use **More options → Forgot master password**. During a 30-second wait, **Unlock with Touch ID** is refused too.
+
+How the count works:
+
+- It is kept in a small file, `.apm_lock`, in the vault's folder (or in `APM_STATE_DIR`, if you set it), so quitting the app does not reset it. The 30-second pauses restart their count of three when the app restarts.
+- Wrong passwords typed in the browser extension count toward the same limit, whether the app or `pm` answers the browser.
+- A successful unlock, or a reset with recovery, clears it.
+- `pm` in a terminal adds to the same count when it opens the same vault, by default or through `APM_VAULT_PATH`. See [Failed attempts in pm](/docs/security/sessions-and-locking#failed-attempts).
+
+When security alerts are on, each failed attempt raises an alert. In APM 12.0.0 alerts are written to a local log file, not emailed. See [Settings → Alerts](/docs/desktop/settings#alerts).
+
+## Lock the vault
+
+Lock it yourself in any of these ways:
+
+- Press <Kbd>⌘</Kbd><Kbd>L</Kbd>.
+- Click **Lock vault** at the bottom of the sidebar.
+- Choose **Lock Vault** in the app menu (macOS) or the **File** menu (Windows and Linux).
+- Choose **Lock vault** in the command menu.
+- Choose **Lock now** in **Settings → Sessions**.
+
+Locking also ends `pm`'s session in your terminal. With **Sounds** on (**Settings → General**), APM plays a soft chime on unlock and lock.
+
+Quitting APM wipes the key from the app, but it does not end `pm`'s session. Until that session ends, `pm` in your terminal stays unlocked, and the app opens unlocked the next time you start it. Lock first if you want both closed.
+
+## Auto-lock
+
+The vault locks itself on three rules. Set them in **Settings → Sessions → Auto-lock**:
+
+| Setting | Default | Options |
+|---|---|---|
+| **Lock after inactivity** | 15 minutes | 1, 5, 15 or 30 minutes, 1 or 4 hours, or **Never** |
+| **Maximum session** | 1 hour | 15 minutes, 1, 4, 8 or 24 hours, or **Never** |
+| **Lock when the Mac sleeps** | On | Also when the screen locks or the lid closes |
+
+- **Inactivity** means no key presses or pointer movement in the APM window and no requests from the browser extension. Working in other apps counts as idle.
+- **Maximum session** locks even while you are using the vault, then asks for your password again. It counts from when this window unlocked.
+- APM checks both every 5 seconds, so a lock can come a few seconds after the limit.
+- A limit set with `pm autolock` that is not in the list, such as 45 minutes, shows up as an extra choice.
+
+These rules are stored in the vault. The app, `pm` in your terminal and the browser extension all follow them. `pm autolock` changes the same settings from the terminal.
+
+Choosing **Never** for either rule asks you to confirm, in **Never lock when idle?** or **Remove the session limit?**. When a rule is off, the card explains what that means:
+
+| Inactivity | Maximum session | Warning on the card |
+|---|---|---|
+| **Never** | A time | **APM doesn't lock when you step away** |
+| A time | **Never** | **Sessions have no time limit** |
+| **Never** | **Never**, sleep lock on | **APM only locks when the Mac sleeps** |
+| **Never** | **Never**, sleep lock off | **APM never locks on its own** |
+
+**Settings → Security → Auto-lock** shows a one-line summary, such as **Locks after 15 minutes idle, 1 hour after unlocking or when the Mac sleeps.**, and a warning badge, **Only on sleep** or **Never locks**, when neither time limit is set.
+
+<Callout type="note" title="Closing the window on macOS does not lock the vault">
+On macOS, closing the window leaves APM running with the vault unlocked, and the browser extension can keep using it. The inactivity and maximum-session checks and the sleep lock keep running while the window is closed, including for a vault you unlock from the browser. Each extension request counts as activity, and closing the window restarts the inactivity timer. To lock right away, press <Kbd>⌘</Kbd><Kbd>L</Kbd> before you close the window, or quit with <Kbd>⌘</Kbd><Kbd>Q</Kbd>. On Windows and Linux, closing the window quits APM.
+</Callout>
+
+<Callout type="warning">
+With both rules set to **Never** and sleep locking off, the vault stays unlocked until you lock it or quit APM. Anyone who uses the computer in the meantime can read every secret, in the app, in `pm` and in the browser.
+</Callout>
+
+## Read-only sessions
+
+A read-only session lets you look and copy, but nothing can be added, edited or deleted. Use it when you only need to look something up, or when someone else is at the screen.
+
+- On the lock screen, tick **More options → Unlock read-only for 15 minutes** before you unlock.
+- While unlocked, open **Settings → Sessions → This session** and choose **Read-only**, then under **Stay read-only for** pick **15 minutes**, **30 minutes**, **1 hour** or **4 hours**. You see **Read-only for 15 minutes** (or the time you chose) and **Nothing can be added, edited or deleted.**
+
+The sidebar shows **Read-only until** a time, and **This session** shows **Mode: Read-only until** that time. Edit buttons are disabled. Choose **End read-only** in **Settings → Sessions** to turn editing back on early, and you see **Editing is back on**. When the time runs out, editing comes back on its own.
+
+A vault written by a newer `pm` is always read-only in this app. See [Troubleshooting](/docs/desktop/troubleshooting#the-vault-is-read-only).
+
+## Sharing a session with pm
+
+The app and `pm` share one encrypted session file:
+
+- Unlocking in the app also unlocks `pm` in your terminal, with the same auto-lock rules.
+- Locking in the app (by hand or automatically) locks `pm` too.
+- If `pm` is already unlocked when you open the app, the app opens unlocked. A read-only `pm` session opens the app read-only.
+- If that terminal session holds a password that does not open this vault, for example one for another vault, the app ends the terminal session and shows the lock screen.
+- `pm lock` in a terminal ends only the terminal session. The app stays unlocked until you lock it in the app.
+- Quitting APM does not end the terminal session. See [Lock the vault](#lock-the-vault).
+
+**Settings → Sessions → Terminal session** shows **pm is unlocked** with **Until** a time, how many minutes idle end it and **· read-only** when it is read-only, or **pm is locked** with **pm asks for your master password the next time you run it.** See [The app and pm](/docs/desktop/terminal).
+
+## Unlocked from the browser
+
+If you unlock from the browser extension while the app is open and locked, the app unlocks too, with the message **Unlocked from the browser**. Locking from the extension locks the app, and the lock screen says **Locked from the browser**. See [Browser extension](/docs/desktop/browser-extension).
+
+## Forgot your master password
+
+Choose **More options → Forgot master password**. What you see depends on the recovery methods you set up in **Settings → Recovery**.
+
+If none are set up, APM shows **Recovery is not set up for this vault**. Without a recovery method there is no way in. Try your password again, or restore an older copy from sync.
+
+### With a recovery email and key
+
+<Steps>
+
+### Email
+
+Enter the vault's recovery email. A hint shows a masked version of it, such as **Hint: y•••@example.com. APM sends a 6-digit code there.** Choose **Send code**. **That is not the recovery email for this vault.** means the address does not match.
+
+### Code
+
+Type the 6-digit code from the email. It expires 15 minutes after sending. A wrong or expired code shows **That code does not match. It expires 15 minutes after sending.**
+
+### Recovery key
+
+Enter your recovery key, such as `K7M3-P2R9-WXHT-4826`. Letters are capitalized as you type. A wrong key shows **That recovery key is not correct.**
+
+### Second factor
+
+If you also set up a recovery passkey or one-time codes, prove it is you with one of them. **Passkey** opens your browser to ask for the passkey you registered. **One-time code** takes one of your printed codes, such as `A1B2C3-D4E5`, and shows how many are unused, for example **3 of 10 codes unused**. Each code works once; a used or wrong one shows **That code is not valid or was already used.** Without a second factor set up, this step is skipped.
+
+### New password
+
+Set a new master password. It must meet the same rules as when you created the vault, or you see **The new password does not meet the rules yet.** Choose **Reset password**.
+
+</Steps>
+
+### With trustee shares
+
+If you split your recovery key between trustees, choose **Use trustee shares** (or it is the only option). Enter the recovery email and paste at least as many shares as the threshold. **Add another share** adds a field. Too few shares shows **Enter at least 2 shares.** (with your threshold), and shares that do not fit together show **Those shares do not combine into this vault's recovery secret.** Then set a new password.
+
+When it works, you see **You are back in** and **Your master password has been reset.** Choose **Open vault**. A reset also clears the failed-attempt count. If you use Touch ID, APM updates the Keychain entry with the new password. If Touch ID later reports an outdated password, turn it off and on again in **Settings → Security**.
+
+See [Recovery](/docs/desktop/recovery) to set these methods up, and [how recovery works](/docs/security/recovery).

@@ -1,0 +1,176 @@
+@property --web-beam{syntax:"<angle>";inherits:false;initial-value:0deg}
+
+:root{
+  --web-frame:1200px;
+  --web-gutter:clamp(16px, 4vw, 48px);
+  /* How far anything visible stays inside the rails: section headers, column bodies, lists, cards and the inner padding of every bordered cell. */
+  --web-inset:20px;
+  --web-nav:72px;
+  --web-display:clamp(44px, 7.6vw, 100px);
+  --web-h2:clamp(32px, 3.9vw, 52px);
+  --web-term-bg:var(--mark-tile);
+  --web-term-edge:rgba(255, 255, 255, 0.08);
+  --web-term-text:#d9d9de;
+  --web-term-dim:#8a8a94;
+  --web-term-key:#a1a1ab;
+  --web-term-ok:#3ecf8e;
+  --web-term-warn:#f2b441;
+  --web-term-bad:#ff6b78;
+  --web-term-accent:#7fa6ff;
+  --web-rail:var(--border);
+  --web-grid-line:color-mix(in srgb, var(--border) 80%, transparent);
+  --web-grid-hot:var(--border-hover);
+  --web-lit:color-mix(in srgb, var(--fill) 75%, transparent);
+  --web-glow:rgba(17, 17, 19, 0.045);
+  --web-sheen:rgba(255, 255, 255, 0.6);
+  --web-beam-ink:rgba(17, 17, 19, 0.5);
+  --web-spot:rgba(17, 17, 19, 0.035);
+  --web-spot-edge:rgba(17, 17, 19, 0.16);
+  --web-ptr-shadow:rgba(0, 0, 0, 0.28);
+  --web-ink-low:color-mix(in srgb, var(--text) 58%, var(--bg));
+  --web-tilt:20deg;
+  --web-sec-pad:clamp(64px, 7.4vw, 108px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --web-glow:rgba(255, 255, 255, 0.075);
+  --web-sheen:rgba(255, 255, 255, 0.07);
+  --web-beam-ink:rgba(255, 255, 255, 0.72);
+  --web-spot:rgba(255, 255, 255, 0.04);
+  --web-spot-edge:rgba(255, 255, 255, 0.2);
+  --web-lit:color-mix(in srgb, var(--fill) 55%, transparent);
+}}
+:root[data-theme="dark"]{
+  --web-glow:rgba(255, 255, 255, 0.075);
+  --web-sheen:rgba(255, 255, 255, 0.07);
+  --web-beam-ink:rgba(255, 255, 255, 0.72);
+  --web-spot:rgba(255, 255, 255, 0.04);
+  --web-spot-edge:rgba(255, 255, 255, 0.2);
+  --web-lit:color-mix(in srgb, var(--fill) 55%, transparent);
+}
+
+/* The gutter stays reserved while the open drawer locks scrolling, so nothing shifts sideways when the scrollbar goes away. */
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--web-nav) + 16px);background:var(--bg);scrollbar-gutter:stable}
+html.is-drawer{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;overflow-x:hidden}
+a{color:inherit}
+::selection{background:color-mix(in srgb, var(--accent) 24%, transparent)}
+*:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.web-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.link{color:var(--accent);text-decoration:none;background:linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;transition:background-size var(--dur-base) var(--ease-out)}
+.link:hover{background-size:100% 1px}
+
+.page{position:relative;isolation:isolate;overflow-x:clip}
+/* The rails start under the full-width nav bar and fade in, so they never run through its links and buttons. */
+.page::before,.page::after{content:"";position:absolute;top:calc(var(--web-nav) + env(safe-area-inset-top, 0px));bottom:0;z-index:-1;width:1px;background:var(--web-rail);pointer-events:none;-webkit-mask-image:linear-gradient(transparent, #000 32px);mask-image:linear-gradient(transparent, #000 32px)}
+.page::before{left:calc(50% - min(var(--web-frame) / 2, 50% - var(--web-gutter)))}
+.page::after{left:calc(50% + min(var(--web-frame) / 2, 50% - var(--web-gutter)) - 1px)}
+
+.frame{position:relative;box-sizing:border-box;width:100%;max-width:calc(var(--web-frame) + 2 * var(--web-gutter));margin-inline:auto;padding-inline:var(--web-gutter)}
+.tick{position:absolute;top:-5px;z-index:2;width:9px;height:9px;pointer-events:none}
+.tick::before,.tick::after{content:"";position:absolute;background:var(--text-tertiary)}
+.tick::before{left:4px;top:0;width:1px;height:9px}
+.tick::after{top:4px;left:0;width:9px;height:1px}
+.tick-l{left:calc(var(--web-gutter) - 4px)}
+.tick-r{right:calc(var(--web-gutter) - 4px)}
+
+.sec{position:relative;box-shadow:inset 0 1px 0 var(--border)}
+.sec-in{padding-bottom:var(--web-sec-pad)}
+.sec-note{margin:var(--space-6) 0 0;padding-inline:var(--web-inset);color:var(--text-tertiary);text-align:center}
+
+.sh{display:flex;flex-direction:column;gap:var(--space-5);padding-block:var(--web-sec-pad) clamp(40px, 5vw, 64px);padding-inline:var(--web-inset)}
+.sh-label{display:flex;align-items:center;gap:var(--space-3);font-family:var(--font-mono);font-size:12px;line-height:16px;letter-spacing:0.02em;color:var(--text-tertiary)}
+.sh-index{color:var(--accent);font-variant-numeric:tabular-nums}
+.sh-rule{width:24px;height:1px;background:var(--border-strong)}
+.sh-grid{display:grid;grid-template-columns:minmax(0, 7fr) minmax(0, 5fr);gap:var(--space-12);align-items:end}
+.sh-title{margin:0;max-width:17ch;font-size:var(--web-h2);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance;color:var(--text)}
+.sh-body{margin:0;max-width:46ch;color:var(--text-secondary);font-size:16px;line-height:26px;letter-spacing:-0.006em;text-wrap:pretty}
+.sh.is-center{align-items:center;text-align:center}
+.sh.is-center .sh-grid{grid-template-columns:minmax(0, 1fr);justify-items:center;gap:var(--space-5)}
+
+.copy{display:inline-flex;align-items:center;gap:6px;height:var(--control-sm);padding:0 10px;border:0;border-radius:var(--radius-sm);background:var(--surface);box-shadow:var(--shadow-xs), inset 0 0 0 1px var(--border);color:var(--text-secondary);font-family:var(--font-sans);font-size:12px;font-weight:500;cursor:pointer;transition:color var(--dur-fast) ease,transform var(--dur-fast) ease}
+.copy:hover{color:var(--text)}
+.copy:active{transform:scale(0.97)}
+.copy.is-done{color:var(--success)}
+.copy.is-done .apm-icon{animation:web-pop 360ms var(--ease-spring)}
+
+.pw{font-family:var(--font-mono);letter-spacing:0.02em;word-break:break-all;color:var(--text)}
+.pw .pw-d{color:var(--accent)}
+.pw .pw-s{color:var(--warning)}
+
+.scope{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--radius-xs);background:var(--fill);color:var(--text-secondary);font-family:var(--font-mono);font-size:11px;font-weight:500;line-height:20px}
+.scope.is-secrets{background:var(--accent-soft);color:var(--accent)}
+.scope.is-write{background:var(--warning-soft);color:var(--warning)}
+.scope.is-admin{background:var(--danger-soft);color:var(--danger)}
+
+.bv-chip{display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface);box-shadow:inset 0 0 0 1px var(--border-strong);color:var(--text);font-size:12px;font-weight:500;white-space:nowrap}
+.bv-chip.is-primary{background:var(--primary);color:var(--on-primary);box-shadow:none}
+.bv-chip.is-press{animation:web-press-chip 900ms var(--ease-out) 900ms both}
+
+.cell-glow{position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;opacity:0;background:radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), var(--web-spot), transparent 60%);transition:opacity var(--dur-slow) ease}
+.cell-glow::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), var(--web-spot-edge), transparent 70%);-webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)}
+*:hover > .cell-glow{opacity:1}
+
+.lights{display:inline-flex;gap:8px}
+.lights i{width:12px;height:12px;border-radius:var(--radius-full);background:var(--fill-active);box-shadow:inset 0 0 0 0.5px var(--border-strong)}
+.win{box-sizing:border-box;border-radius:var(--radius-xl);background:var(--bg);box-shadow:var(--shadow-lg), 0 0 0 1px var(--border);overflow:hidden}
+
+.term{background:var(--web-term-bg);box-shadow:var(--shadow-lg), 0 0 0 1px var(--web-term-edge);color:var(--web-term-text);text-align:left}
+.term .lights i{background:rgba(255, 255, 255, 0.14);box-shadow:none}
+.term-bar{position:relative;display:flex;align-items:center;height:36px;padding:0 var(--space-3);box-shadow:inset 0 -1px 0 var(--web-term-edge)}
+.term-title{position:absolute;left:0;right:0;text-align:center;color:var(--web-term-dim);pointer-events:none}
+.term-body{display:flex;flex-direction:column;gap:2px;padding:var(--space-3) var(--space-4) var(--space-4);font-size:12.5px;line-height:19px}
+.term-line{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
+.term-line > span:nth-child(3){min-width:0;overflow:hidden;text-overflow:ellipsis}
+.term-ps{color:var(--web-term-accent)}
+.term-arrow{color:var(--web-term-ok)}
+.term-out{white-space:pre-wrap;color:var(--web-term-text)}
+.term-out.is-dim{color:var(--web-term-dim)}
+.term-out.is-success{color:var(--web-term-ok)}
+.term-out.is-warning{color:var(--web-term-warn)}
+.term-out.is-danger{color:var(--web-term-bad)}
+.term-k{color:var(--web-term-key);white-space:pre}
+.term-caret{display:inline-block;flex:none;width:7px;height:15px;margin-left:-4px;background:var(--web-term-text);animation:web-blink 1.1s steps(1) infinite}
+.term-pw{color:var(--web-term-text)}
+.term-pw .pw-d{color:var(--web-term-accent)}
+.term-pw .pw-s{color:var(--web-term-warn)}
+
+.roll{display:inline-flex}
+.roll-col{display:inline-block;height:1em;overflow:hidden}
+.roll-strip{display:flex;flex-direction:column;transform:translateY(calc(var(--d) * -1em))}
+.roll-strip span{display:block;height:1em;line-height:1}
+.roll-strip.is-on{transform:translateY(calc((var(--d) + 10) * -1em));transition:transform 1.6s cubic-bezier(.16, 1, .3, 1)}
+
+.tk-k{color:var(--text)}
+.tk-v{color:var(--success)}
+.tk-n{color:var(--accent)}
+
+@supports (animation-timeline:view()){
+  @media (prefers-reduced-motion:no-preference){
+    .sh-label,.sh-title,.sh-body,.cell > :not(.cell-glow),.vx-scene,.vx-row,.kd-cell > *,.guard > :not(.cell-glow),.ag-card > :not(.cell-glow):not(.ag-wire),.ag-scope,.ag-code,.cx-group,.cx-side > *,.mv-cell > :not(.cell-glow),.repo > :not(.cell-glow),.stat > *,.faq-q,.types-head,.types-row,.sx-frame,.sx-inline{animation:web-rv linear both;animation-timeline:view();animation-range:entry 0% entry 60%}
+    .sh-title{animation-range:entry 0% entry 80%}
+    .sh-body{animation-range:entry 10% entry 90%}
+  }
+}
+
+@keyframes web-rv{from{opacity:0.2;transform:translateY(32px)}to{opacity:1;transform:none}}
+@keyframes web-blink{0%,55%{opacity:1}56%,100%{opacity:0}}
+@keyframes web-pop{40%{transform:scale(1.3)}}
+@keyframes web-beam{to{--web-beam:360deg}}
+@keyframes web-shine{0%{transform:translateX(-120%)}26%,100%{transform:translateX(120%)}}
+@keyframes web-fade{from{opacity:0.001;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes web-live{50%{box-shadow:0 0 0 6px transparent}}
+@keyframes web-press-chip{0%,100%{transform:none}40%{transform:scale(0.94)}}
+
+@media (max-width:960px){
+  .sh-grid{grid-template-columns:minmax(0, 1fr);gap:var(--space-4)}
+  .sh-title{max-width:20ch}
+}
+@media (max-width:680px){
+  :root{--web-sec-pad:64px;--web-inset:14px}
+  .sh{gap:var(--space-4)}
+  .sh-body{font-size:15px;line-height:24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  html{scroll-behavior:auto}
+}

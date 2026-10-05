@@ -1,0 +1,101 @@
+---
+title: APM for Chrome
+description: Fill logins, one-time codes and passkeys from your APM vault in any Chromium browser.
+order: 0
+sidebarTitle: Overview
+---
+
+APM for Chrome is the browser extension for APM. It fills logins and one-time codes, offers to save and update logins after you sign in, and creates and signs in with passkeys. It works in Chrome, Edge, Brave, Arc, Vivaldi and Chromium, version 116 or later.
+
+The extension never opens `vault.dat`. It never keeps your master password: when you unlock from the popup, it passes the password straight to APM. A passkey's private key never leaves APM. Everything it fills, it asks APM for, one request at a time.
+
+## How it reaches your vault
+
+The extension cannot decrypt anything by itself. It sends requests to a copy of APM running on the same computer, and that copy holds the key while the vault is unlocked. There are two ways to reach it.
+
+| Route | When it is used | Who answers |
+|-------|-----------------|-------------|
+| Loopback HTTP on `127.0.0.1:41417` | The APM desktop app is open, or `pm extension serve` is running in a terminal | The desktop app, or `pm extension serve` |
+| Chrome native messaging, host `dev.apm.bridge` | The app is closed and you ran `pm extension link` once | `pm`, started by the browser on demand |
+
+The extension always tries the loopback bridge first. If nothing answers there, and you have linked `pm`, it starts `pm` through native messaging and sends the same requests over that channel. While it talks to `pm`, it tries the app again at most every 5 seconds, and switches back to the app as soon as it answers.
+
+Both routes require pairing. The first time the extension finds APM, it asks to connect and shows a 6-character code. You confirm the same code in the desktop app, or answer `y` in the terminal. After that the extension sends a pairing token with every request. See [Pairing](/docs/extension/pairing).
+
+<Callout type="note" title="What APM sends back">
+Lists of items carry names, usernames, websites, spaces and dates, never secret values. A password or another secret field leaves APM only when you fill, copy or reveal it, and APM records that access on the item. Two exceptions: live one-time codes are sent whenever the popup or the field menu shows them, and opening a login in the popup returns its two-factor setup key and its custom fields (hidden ones included) as they are.
+</Callout>
+
+## What you need
+
+- A Chromium browser, version 116 or later: Chrome, Edge, Brave, Arc, Vivaldi or Chromium. There is no Firefox or Safari version.
+- APM 12 on the same computer: the [desktop app](/docs/desktop/install), or [`pm`](/docs/cli/installation). The extension does nothing on its own.
+- Node.js 20.19 or a later 20.x release, or Node.js 22.12 or newer, and `git`, to build it. See [Install](/docs/extension/install).
+
+## What it does
+
+- **Fills logins.** A menu opens under username and password fields with the logins saved for the site. Choose one and APM fills it. See [Autofill](/docs/extension/autofill).
+- **Fills one-time codes.** After you fill a login that has a code, APM copies the code (you can turn this off) and offers it in the code field on the next page.
+- **Suggests strong passwords** in sign-up and change-password forms, using the generator settings from the toolbar popup.
+- **Saves and updates logins.** When you sign in with a login APM does not know, or with a changed password, it offers to save or update it. See [Saving and updating](/docs/extension/saving-and-updating).
+- **Creates and uses passkeys.** APM generates the key, stores it in the vault and signs with it, so the passkey works in every browser you pair. See [Passkeys](/docs/extension/passkeys).
+- **Shows the whole vault** in the toolbar popup: logins for the current site, every item by space and type, live one-time codes, the password generator and your passkeys. See [Toolbar popup](/docs/extension/popup).
+
+Everything the extension draws on a web page (the field menu, the save and update prompts, the passkey sheets and its small notices) runs in extension frames inside closed shadow roots, so the page cannot read it.
+
+It fills logins, one-time codes, generated passwords and passkeys. It does not fill cards, contacts or other item types: the popup shows those, and you can copy their fields.
+
+## Inside the extension
+
+The extension is a handful of small parts, each with one job:
+
+| Part | Where it runs | What it does |
+|------|---------------|--------------|
+| Background (`background.js`) | The browser's service worker for the extension | Talks to APM, keeps the pairing token and your settings, decides what to offer on each page, and holds pending prompts |
+| `relay.js` | Every page and frame, from the moment it starts loading | Carries passkey requests between the page and the background |
+| `main-world.js` | Every page and frame, in the page's own JavaScript | Wraps `navigator.credentials.create` and `get`, so APM can answer passkey requests |
+| `autofill.js` | Every page and frame, once the page's HTML has loaded | Finds login, code and new password fields, places the field icon and menu, fills, and notices when you submit a form |
+| Popup (`popup.html`) | The toolbar | Unlock, the vault, codes, the generator and passkeys |
+| Settings (`options.html`) | A browser tab | Every option. See [Settings](/docs/extension/options) |
+| Field menu (`inline.html`) and prompts (`prompt.html`) | Frames inside the page, in closed shadow roots | The menu under fields, the save and update prompts, the passkey sheets and notices |
+| Clipboard page (`offscreen.html`) | A hidden page | Copies to the clipboard and clears it later, because a service worker cannot |
+
+### What happens when you fill a login
+
+<Steps>
+
+### You choose a login
+
+You pick a login in the field menu, choose **Fill** in the popup, or press <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>F</Kbd>. The background checks that the login is saved for the page, that the page is `https://` (unless you allowed `http://`), that the form is not in a frame from another site, and that the site is not paused.
+
+### APM hands over the login
+
+The background asks APM for that one login. APM records the use on the item and sends back its username, password and, if it has one, the current one-time code.
+
+### The page gets the values
+
+The background passes the two values to the frame that holds the form. `autofill.js` sets them in the username and password fields and fires the key, input and change events that typing would, so sites built with JavaScript frameworks notice. The fields flash, and the cursor moves to the password field. The form is not submitted.
+
+### The code is ready
+
+If the login has a one-time code, the background copies it to the clipboard (unless you turned that off) and, for the next 3 minutes, offers it in the code field on the next page.
+
+</Steps>
+
+## Locking follows APM
+
+The extension has no lock of its own. When APM locks, the extension is locked. When you choose **Lock vault** in the popup, or press <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>L</Kbd>, APM itself locks: the desktop app, the `pm` session in your terminal and every paired browser. The vault locks on the auto-lock policy you set with `pm autolock` or in the app's **Settings**, **Sessions**.
+
+## In this section
+
+<Cards>
+  <Card title="Install" href="/docs/extension/install" icon="download">Build the extension and load it in your browser.</Card>
+  <Card title="Pairing" href="/docs/extension/pairing" icon="plug">Connect it to the desktop app or to pm.</Card>
+  <Card title="Autofill" href="/docs/extension/autofill" icon="mouse-pointer-click">The field menu, matching rules and one-time codes.</Card>
+  <Card title="Saving and updating" href="/docs/extension/saving-and-updating" icon="save">The prompts after you sign in.</Card>
+  <Card title="Passkeys" href="/docs/extension/passkeys" icon="fingerprint-pattern">Create and sign in with passkeys kept in your vault.</Card>
+  <Card title="Toolbar popup" href="/docs/extension/popup" icon="panel-top">Every control in the popup.</Card>
+  <Card title="Settings" href="/docs/extension/options" icon="settings">Every option on the settings page.</Card>
+  <Card title="Privacy and permissions" href="/docs/extension/privacy-and-permissions" icon="shield-check">What each permission is for and where data goes.</Card>
+  <Card title="Troubleshooting" href="/docs/extension/troubleshooting" icon="wrench">Fixes for connection, filling and passkey problems.</Card>
+</Cards>

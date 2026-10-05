@@ -1,0 +1,135 @@
+---
+title: Install the extension
+description: Build APM for Chrome from source and load it into Chrome, Edge, Brave, Arc, Vivaldi or Chromium.
+order: 1
+sidebarTitle: Install
+group: Set up
+---
+
+APM for Chrome is not listed on the Chrome Web Store. You build it from its source repository and load the result as an unpacked extension. It takes a minute and works the same in every Chromium browser.
+
+## Before you start
+
+You need:
+
+- A Chromium browser, version 116 or later: Chrome, Edge, Brave, Arc, Vivaldi or Chromium.
+- [Node.js](https://nodejs.org) 20.19 or a later 20.x release, or 22.12 or newer, with `npm`.
+- `git`, to get the source.
+- APM 12 on the same computer: the [desktop app](/docs/desktop/install), or [`pm`](/docs/cli/installation). The extension does nothing on its own.
+
+## Build and load it
+
+<Steps>
+
+### Get the source
+
+The extension lives in its own repository, [apms-org/extension](https://github.com/apms-org/extension).
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/extension.git
+cd extension
+```
+
+### Build it
+
+```sh title="Terminal"
+npm install
+npm run build
+```
+
+The build writes the finished extension to `dist/` and ends with a summary line:
+
+```text title="Output"
+built dist in 54ms, 553 KB of scripts
+```
+
+It needs no network access after `npm install`: the design system and React it uses are already in `vendor/design-system`, and `npm install` fetches only the bundler, Rolldown, and what it needs. The extension has its own version number, 1.0.0, separate from APM's.
+
+### Load it unpacked
+
+1. Open your browser's extensions page: `chrome://extensions` in Chrome. Edge, Brave and the others have their own address, such as `edge://extensions`.
+2. Turn on **Developer mode**.
+3. Choose **Load unpacked** and select the `dist` folder you just built.
+
+### Pin it to the toolbar
+
+Open the browser's extensions menu (the puzzle icon) and pin **APM**. The toolbar icon is how you unlock the vault and open the popup.
+
+### Connect it to APM
+
+On first install the extension opens its settings page with a **Welcome to APM for Chrome** panel. It lists three steps: open the APM app or run `pm extension link`, confirm the pairing code, then pin the extension and unlock. Follow [Pairing](/docs/extension/pairing) for the details. The panel opens only on a first install, not when you reload or update the extension.
+
+</Steps>
+
+<Callout type="note" title="The extension ID stays the same">
+The build pins the extension ID `ioooalainhfihaebgpbmngoaojmfdlac` through the manifest `key`, so every unpacked copy on every computer has the same ID. `pm extension link` registers that ID with the browser, so you do not have to look it up.
+</Callout>
+
+## What the build contains
+
+`dist/` holds everything the browser loads. The extension loads no code, styles or fonts from the network.
+
+| File | What it is |
+|------|------------|
+| `manifest.json` | Manifest V3: the name **APM**, the pinned `key`, Chrome 116 or later, the permissions and the keyboard shortcuts |
+| `background.js` | The service worker that talks to APM |
+| `relay.js`, `main-world.js`, `autofill.js` | The scripts added to web pages |
+| `popup.html`, `options.html`, `inline.html`, `prompt.html`, `offscreen.html` | The popup, the settings page, the field menu, the prompts and passkey sheets, and the hidden clipboard page, each with its own `.js` |
+| `tokens.css`, `ds.css`, `ds.js`, `extension.css`, `ui.css`, `fonts/` | The APM design system and its fonts |
+| `react.production.min.js`, `react-dom.production.min.js` | React, bundled |
+| `icons/` | The toolbar icons, in a normal and a locked version |
+
+See [Privacy and permissions](/docs/extension/privacy-and-permissions#permissions) for what each permission is for.
+
+## Update it
+
+Pull the latest source, build again, then reload the extension.
+
+```sh title="Terminal"
+git pull
+npm install
+npm run build
+```
+
+On the extensions page, choose the reload button on the **APM** card. Then reload any tabs you want to fill in: the browser only adds the extension's scripts to pages that load after it.
+
+Your pairing, settings and excluded sites are kept, because they live in the browser's storage for the extension ID, and that ID does not change.
+
+## Other build commands
+
+| Command | What it does |
+|---------|--------------|
+| `npm run build` | Build the extension into `dist/` |
+| `npm run build:watch` | Build, then rebuild whenever a file in `src/` or `vendor/` changes |
+| `npm run zip` | Build, then pack `dist/` into `apm-extension-<version>.zip`, printing a line such as `wrote apm-extension-1.0.0.zip, 301 KB`. It runs the `zip` command, which Windows does not include |
+| `npm test` | Run the unit tests for site matching, the generator and strength meter, settings, encoding and other shared helpers, and for how the extension reaches the app or `pm` |
+| `npm run icons` | Render the toolbar icons |
+| `npm run ds:sync` | Copy the design system from a `design-system` folder next to this one into `vendor/`. Point it elsewhere with `--from=<path>` or `APM_DESIGN_SYSTEM` |
+
+### Build for another port
+
+The extension looks for APM on port `41417`. If you run APM on another port with `APM_BRIDGE_PORT`, you can either change the port in the extension's settings (**Connection**, **Bridge**, **Address**), or build a copy that looks there from the start:
+
+```sh title="Terminal"
+node scripts/build.mjs --port=41533 --out=/tmp/apm-ext
+```
+
+`--port` sets the default port and `--out` writes the build somewhere other than `dist/`. The summary line then ends with `, bridge port 41533`. `--port` takes four or five digits; anything else stops the build with `--port takes a number`. A port you set in the settings page still wins over the built-in one.
+
+## When the build fails
+
+| Message | What to do |
+|---------|------------|
+| Any error, with an older Node.js | Check `node --version`. The build needs Node.js 20.19 or a later 20.x release, or 22.12 or newer |
+| `MARK not found in vendor/design-system/bundle.js. Run npm run ds:sync.` | `vendor/design-system` is missing or incomplete. Check out the repository again, or run `npm run ds:sync` with the design system next to it |
+| `extension.css not found in vendor/design-system. Run npm run ds:sync.` | Same as above |
+| `No design system at <path>.` from `npm run ds:sync` | There is no `design-system` folder next to `extension`. Pass `--from=<path>` |
+| `--port takes a number` | Give `--port` a port number of four or five digits, such as `--port=41533` |
+
+## Remove it
+
+1. Remove **APM** from the browser's extensions page. The browser deletes the extension's storage with it, including its copy of the pairing token.
+2. If you linked `pm` for use without the app, run `pm extension unlink` to remove the native messaging registration.
+3. Optional: run `pm extension rotate`, or choose **Rotate** under **Manual pairing** in the desktop app's **Settings**, **Browser extension**. Every paired browser shares one pairing token, so rotating it disconnects all of them until they pair again.
+
+Removing the extension does not touch your vault.

@@ -1,0 +1,110 @@
+---
+title: Team edition
+description: pm-team, a separate experimental CLI for a shared vault with users, roles, departments and approvals.
+order: 18
+group: Guides
+---
+
+`pm-team` is a second command-line tool in the same repository, for a vault several people share. It isn't part of `pm` and APM's releases don't include it, so you [build it](#build-it) yourself. It has its own vault file, its own logins and its own commands; it does not read or write your personal vault, and the desktop app and browser extension don't use it.
+
+<Callout type="warning" title="Experimental">
+The team edition is less mature than `pm`. Some commands only handle some item types, and multi-user key handling is incomplete: for example, a user added with `pm-team user add` can't log in, and moving a user to another department doesn't give them that department's key. Try it with test data before trusting it with real secrets.
+</Callout>
+
+## Build it
+
+```sh title="Terminal"
+cd team
+go build -o pm-team .
+```
+
+## Where its data lives
+
+| File | Location |
+|---|---|
+| `team_vault.dat` | Next to the `pm-team` binary. There is no flag or variable to move it |
+| `pm_team_session.json` | Next to the `pm-team` binary. A login lasts 15 minutes |
+
+The session file holds the active department's key while you are logged in, so keep the binary in a folder only you can read.
+
+## Set up an organization
+
+```sh title="Terminal"
+pm-team init "Acme" alice      # create the vault, a "general" department and admin alice
+pm-team login alice
+pm-team whoami
+pm-team logout
+```
+
+`init` asks for the admin's password twice. `login` asks for the user's password and opens a 15-minute session in that user's active department. Admins see how many approval requests are waiting.
+
+## Roles
+
+| Role | Add items | Edit or delete items | Manage users and departments | View audit trail |
+|---|---|---|---|---|
+| `ADMIN` | Yes | All | Yes | Yes |
+| `MANAGER` | Yes | All | Yes | No |
+| `USER` | Yes | Their own | No | No |
+| `AUDITOR` | No | No | No | Yes |
+| `SECURITY` | No | No | No | Yes |
+
+Changing roles, granting permission overrides, switching a user's department, approving requests and exporting are admin-only.
+
+### Permission overrides
+
+An admin can override a single permission for one user. An override wins over the role in both directions:
+
+```sh title="Terminal"
+pm-team user permission grant bob view_audit
+pm-team user permission revoke carol delete_entry
+```
+
+Permission names: `add_entry`, `edit_entry`, `delete_entry`, `share_entry`, `manage_depts`, `manage_users`, `view_audit`.
+
+## Commands
+
+### Users and departments
+
+| Command | What it does |
+|---|---|
+| `pm-team user list` | List users (admins see everyone, others see themselves) |
+| `pm-team user add <username> [--role USER] [--dept general]` | Add a user; asks for their password. Roles: `ADMIN`, `MANAGER`, `USER`, `AUDITOR`, `SECURITY` |
+| `pm-team user remove <username>` | Remove a user. Only admins can remove admins |
+| `pm-team user promote <username> <role>` | Change a user's role |
+| `pm-team user roles` | List the roles |
+| `pm-team user permission grant/revoke <username> <permission>` | Set an override |
+| `pm-team dept list` | List departments (admins see all) |
+| `pm-team dept create <name>` | Create a department. Its ID is the name in lowercase with `_` for spaces |
+| `pm-team dept switch <username> <dept_id>` | Move a user to another department |
+
+### Shared items
+
+| Command | What it does |
+|---|---|
+| `pm-team add` | Add an item of one of 22 types, interactively |
+| `pm-team list` | List shared items |
+| `pm-team get [query]` | Find and show an item; `-i` for interactive search |
+| `pm-team edit <name>` | Edit an item |
+| `pm-team delete <name>` | Delete an item |
+| `pm-team gen [--length 20]` | Generate a password (default 20 characters) |
+
+Each type also has its own group with `add`, `list` and `get <query>`: `password`, `totp`, `apikey`, `token`, `note`, `ssh`, `cert`, `wifi`, `recovery`, `banking`, `doc`, `gov`, `medical`, `travel`, `contact`, `cloud`, `k8s`, `docker`, `ssh-config`, `cicd`, `license`, `legal`. For example `pm-team password list`.
+
+### Approvals
+
+When a non-admin adds an item marked sensitive, it goes into an approval queue instead of the vault.
+
+| Command | What it does |
+|---|---|
+| `pm-team approvals list` | List pending requests |
+| `pm-team approvals approve <n>` | Approve request number `n` |
+| `pm-team approvals deny <n>` | Deny it, with a reason |
+
+### Organization
+
+| Command | What it does |
+|---|---|
+| `pm-team info` | Organization name, departments, users and item counts |
+| `pm-team health` | A security review of the shared vault |
+| `pm-team audit` | The organization's audit trail |
+| `pm-team export` | Print the organization's metadata, users and audit trail as JSON (admin only; no item values, but it includes every user's wrapped department keys) |

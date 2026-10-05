@@ -1,0 +1,167 @@
+---
+title: Browser extension from the CLI
+description: Serve the APM extension without the desktop app, link pm to your browsers through native messaging, and manage the pairing token.
+order: 13
+sidebarTitle: Browser extension
+group: Guides
+---
+
+The APM browser extension never opens your vault file. It asks APM for what it needs, over a small private API on your own computer, and if you unlock the vault from the extension, the master password you type there goes to APM the same way. Three things can answer it, and all three serve the same API:
+
+| Answers the extension | When | Set up with |
+|---|---|---|
+| The desktop app | While the app is open | Nothing; see [Pairing](/docs/extension/pairing) |
+| `pm extension serve` | While that command runs in a terminal | [Serve the bridge](#serve-the-bridge) |
+| `pm`, started by the browser | Whenever the app is closed | [Link pm to your browsers](#link-pm-to-your-browsers), once |
+
+If you use `pm` without the desktop app, linking is the easiest choice: you do it once and the browser starts `pm` on its own. `pm extension serve` suits a session where you want to watch requests in a terminal.
+
+## Link pm to your browsers
+
+```sh title="Terminal"
+pm extension link
+```
+
+```text
+  Google Chrome   /Users/alex/Library/Application Support/Google/Chrome/NativeMessagingHosts/dev.apm.bridge.json
+  Brave           /Users/alex/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/dev.apm.bridge.json
+Linked Google Chrome and Brave.
+The browser starts /usr/local/bin/pm when the APM app is closed, for the vault at /Users/alex/.apm/vault.dat.
+
+Now click the APM icon in your browser.
+If it shows a code, check it matches the one here. Waiting for the browser (Ctrl+C to finish now)...
+
+Chrome 141 on macOS asks to connect. Code K7M-2QX. Connect it? [y/N] y
+Connected Chrome 141 on macOS. The extension now works without the APM app.
+```
+
+What it does:
+
+1. Registers `pm` as the native messaging host `dev.apm.bridge` with every supported Chromium browser it finds on this computer, allowed only for the APM extension.
+2. Records which vault and which `pm` binary to use in `native_host.json` in your APM config folder. The browser starts `pm` with its own environment, so this is how it finds your vault even if you set `APM_VAULT_PATH` in your shell.
+3. Creates the pairing token if there isn't one, then waits up to 5 minutes for the extension to connect. If the extension isn't paired yet, it shows a code; answer `y` only if the terminal shows the same code. If the desktop app or `pm extension serve` is running, it doesn't wait: the extension uses that for now, and you approve a new pairing there.
+
+From then on, whenever the desktop app is closed, the browser starts `pm` itself and the extension talks to it over stdin and stdout. That `pm` holds the vault key only while it runs, unlocks from an existing `pm` session if there is one, locks on the vault's [auto-lock policy](/docs/cli/sessions#auto-lock), and exits when the browser closes. While the desktop app or `pm extension serve` is running, the extension uses that instead.
+
+### Supported browsers
+
+| ID | Browser | macOS | Linux | Windows |
+|---|---|---|---|---|
+| `chrome` | Google Chrome | Yes | Yes | Yes |
+| `chrome-beta` | Chrome Beta | Yes | Yes | |
+| `chrome-canary` | Chrome Canary | Yes | Yes (`google-chrome-unstable`) | |
+| `chromium` | Chromium | Yes | Yes | Yes |
+| `edge` | Microsoft Edge | Yes | Yes | Yes |
+| `brave` | Brave | Yes | Yes | Yes |
+| `vivaldi` | Vivaldi | Yes | Yes | Yes |
+| `arc` | Arc | Yes | | |
+
+On macOS and Linux, `pm` writes `NativeMessagingHosts/dev.apm.bridge.json` into each browser's profile folder. On Windows it writes the manifest to `native-messaging\dev.apm.bridge.json` in your APM config folder and adds a registry key under `HKCU\Software\<browser>\NativeMessagingHosts\dev.apm.bridge`.
+
+### Link options
+
+| Flag | Meaning |
+|---|---|
+| `--browser chrome,edge` | Only these browsers. Use it to link a browser `pm` didn't find |
+| `--id <extension id>` | Also allow this extension ID, for a development build. IDs are 32 letters from `a` to `p` |
+| `--no-wait` | Register and exit without waiting for the browser |
+
+When stdin isn't a terminal, `pm extension link` registers and exits. Run it again in a terminal to confirm a pairing code.
+
+<Callout type="warning" title="Link a real binary">
+The manifest stores the path of the `pm` you ran (or the `pm` on your `PATH` when that is the same file). If you move or delete that binary, `pm extension status` reports it and you need to link again. Don't link from `go run`.
+</Callout>
+
+### Check and undo
+
+```sh title="Terminal"
+pm extension status
+```
+
+```text
+Google Chrome:   linked
+Brave:           linked
+Microsoft Edge:  not linked
+Linked vault:    /Users/alex/.apm/vault.dat
+Linked on:       Oct 5, 2026 14:02
+Right now:       the APM app is closed, so the browser starts pm
+Token:           e6555a (fingerprint)
+```
+
+```sh title="Terminal"
+pm extension unlink
+```
+
+`unlink` removes `pm` from every browser it was linked with and deletes the link records. The extension keeps working while the desktop app is open. The pairing itself is kept; run `pm extension rotate` to revoke it.
+
+## Serve the bridge
+
+```sh title="Terminal"
+pm extension serve
+```
+
+```text
+Browser extension bridge on 127.0.0.1:41417 · /Users/alex/.apm/vault.dat · unlocked
+Locks after 15 minutes idle, 1 hour at most and on sleep. Press Ctrl+C to stop.
+14:03:10  Vault locked: Locked after 15 minutes idle.
+14:05:42  Vault unlocked from the browser.
+```
+
+`pm extension serve` serves the same loopback API as the desktop app, then waits until you press <Kbd>Ctrl</Kbd> <Kbd>C</Kbd>. It uses your `pm` session if there is one, and otherwise asks for the master password. When it stops, the vault key is dropped from memory.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--port` | `41417`, or `APM_BRIDGE_PORT` | Port to listen on |
+| `--locked` | | Start locked and let the extension unlock the vault |
+| `--idle` | the vault's auto-lock | Lock after this long without browser activity. `0` turns idle locking off |
+
+If the port is taken, it exits and says the APM app may already be serving the extension.
+
+### Pairing with serve
+
+When the extension asks to connect, the terminal shows its code:
+
+```text
+Connect Chrome 141 on macOS? Code K7M-2QX [y/N]
+```
+
+Answer `y` only if the extension shows the same code. A request expires after 2 minutes, only one can wait at a time (a new one replaces it), and a bridge accepts at most 5 requests a minute. When `pm extension serve` is not running in a terminal, it denies every request and tells you to pair with the token instead.
+
+## The pairing token
+
+Every request except pairing and the version check (`/api/info`) must carry the pairing token. It is a random 64-character hex string in `bridge_token` in your APM config folder, shared by the desktop app, `pm extension serve` and the native host.
+
+```sh title="Terminal"
+pm extension token          # masked
+pm extension token --show   # in full, to paste into the extension's manual pairing field
+pm extension rotate         # replace it
+```
+
+`pm extension rotate` needs your master password or session. Every paired browser must pair again; a running bridge picks up the new token on its next request.
+
+## Check what is running
+
+`pm extension status` also probes the bridge port. When the desktop app or `pm extension serve` answers, its output ends like this:
+
+```text
+Right now:       the extension uses the APM app
+Listening:       127.0.0.1:41417
+Version:         12.0.0 (bridge API 2)
+Vault:           unlocked, 214 items
+Token:           e6555a (fingerprint)
+```
+
+It exits with status 1 when the extension can't reach APM at all (nothing is listening on the port and no browser is linked), when a program other than APM holds the port, or when the running bridge rejects your pairing token or doesn't answer the status request. `--port` probes another port.
+
+## How the bridge stays private
+
+- It listens only on `127.0.0.1` and only answers requests addressed to `127.0.0.1` or `localhost`, which blocks DNS rebinding.
+- It refuses requests from web pages. Only `chrome-extension://`, `moz-extension://` and `safari-web-extension://` origins get CORS headers.
+- The token is compared in constant time.
+- Passkeys are created and signed inside APM; the extension never receives a private key.
+
+The extension's side of all this, including what it shows while pairing, is in [Pairing](/docs/extension/pairing).
+
+## Website logos
+
+While the vault is unlocked, `pm extension serve` (like the desktop app) fetches each login's logo from the site itself, never from a third-party service, and caches it in `icons/` in your APM config folder. Turn this off with the vault setting **Show website icons** in the desktop app, or for one process with `APM_ICONS_OFFLINE=1`. See [File locations](/docs/reference/file-locations#browser-extension).

@@ -1,0 +1,148 @@
+---
+title: History and undo
+description: Every save is a signed commit with an encrypted snapshot. Undo changes, restore old versions of the vault, and read the audit log.
+order: 12
+group: Keep it safe
+---
+
+Every time the vault is saved, by the app or by `pm`, APM records a commit: a signed entry with an encrypted snapshot of the whole vault. That means any change can be undone, and any snapshot you still have can be restored. This history is APM's local git (`pm lgit`).
+
+Open it with **History** in the sidebar or <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>4</Kbd> (<Kbd>Ctrl</Kbd><Kbd>Alt</Kbd><Kbd>4</Kbd> on Windows and Linux).
+
+## Undo the last change
+
+Press <Kbd>⌘</Kbd><Kbd>Z</Kbd> (<Kbd>Ctrl</Kbd><Kbd>Z</Kbd> on Windows and Linux) when you are not typing in a field, choose **Undo last change** at the top of the History page, or use **Undo last change** in the command menu. The vault goes back to the version before your most recent change. An **UNDO** commit is recorded, with the note "Back 1 step(s)", so you can restore the newer version again from the list.
+
+The button on the History page asks first: **Undo the last change?** The shortcut and the command menu undo straight away and confirm with **Undone**, "Vault restored to the previous version."
+
+Undo needs at least two commits, and it is not available in a read-only session.
+
+<Callout type="tip">
+Deleting an item to Trash also offers **Undo** in its toast, and an import offers **Undo import** on its last screen. To change one item back without touching anything else, use that item's [version history](/docs/desktop/items#version-history) instead.
+</Callout>
+
+## The status bar
+
+Three boxes at the top of the page:
+
+- **HEAD**: the latest commit's action and short ID, and how long ago it was made ("Latest commit 5 minutes ago"). Before the first save it says **No commits**.
+- **Chain**: **Verify signatures** checks every commit's HMAC-SHA256 signature over itself and its parent, then shows how many verified, for example **24 of 24 verified**. The badge turns red when any commit fails.
+- **Snapshots**: how many commits still have a snapshot, the space they take, and how many commits can be restored, for example "18 of 24 commits can be restored".
+
+The `…` menu next to **Undo last change** has:
+
+| Entry | What it does |
+|---|---|
+| **Reset to HEAD** | Restores the latest snapshot over the current vault file. A **CHECKOUT** commit is recorded. It asks **Reset to HEAD?** first. |
+| **Squash history…** | Keeps the newest commits and deletes the rest with their snapshots. See below. |
+| **Prune snapshots** | Deletes snapshot files that no commit points to, to free disk space. Commits are not affected. It asks **Prune snapshots?** first, then says how many it pruned and kept, for example "Pruned 3 snapshots". |
+
+## Commits
+
+The **Commits** tab lists this vault's commits, newest first, up to 200. Each row shows the action, a note, a **HEAD** tag on the newest one, its short ID (the last 12 characters), when it was made and a check mark: green when its signature checks out, red when it does not.
+
+| Action | Recorded when |
+|---|---|
+| **SAVE** | The vault was saved. A vault created in the app starts with a **SAVE** commit noted "Vault created". |
+| **UNDO** | You undid a change |
+| **CHECKOUT** | You restored a version or reset to HEAD |
+| **SQUASH** | You squashed history |
+
+The note says what the app changed. Some you will see:
+
+| Note | Change |
+|---|---|
+| "Added GitHub", "Edited GitHub", "Duplicated GitHub" | An item was added, edited or duplicated |
+| "Deleted GitHub", "Deleted 3 items" | Items went to Trash |
+| "Deleted 2 item(s) permanently", "Emptied trash (5)" | Items were deleted from Trash, or Trash was emptied |
+| "Moved 3 item(s) to Work", "Starred 2 item(s)" | Items were moved or starred |
+| "Created space Work", "Renamed space Work to Office", "Deleted space Office" | Spaces changed |
+| "Settings changed", "Settings changed: alerts" | A setting stored in the vault changed. The vault's name, alert settings and active space are named; other settings, such as auto-lock, are not |
+| "Re-encrypted with hardened profile" | The encryption profile or cipher changed |
+| "Imported chrome.csv (Chrome, Edge or Brave passwords CSV): 2 added" | An import |
+| "Cleanup fixed 2 issue(s)" | **Clean up** fixed issues |
+| "Connected GitHub", "Merged 2 cloud change(s) from GitHub" | Sync |
+| "Recovery key created", "Trustee shares created" | Recovery changed |
+| "Back 1 step(s)", "Restored 3f9c1a2b7d4e", "Kept the last 10" | Undo, restore and squash |
+
+A commit without a note shows "Saved".
+
+Click a commit to see its full **Commit** ID, **Time**, **Data hash**, **Parent hash** ("none (root)" for the first), **Snapshot** (`lgit_snapshots` with its size, or "missing") and **Signature** (**Verified** or **Broken**).
+
+### Restore an older version
+
+Open a commit and choose **Restore this version**. It asks **Restore this version?** and says when that version is from. The vault goes back to how it was at that time, a **CHECKOUT** commit is recorded, so this is undoable too, and the toast says, for example, "Vault restored to Oct 1, 2026". The newest commit has no **Restore this version**: use **Reset to HEAD** instead.
+
+The snapshot must decrypt with your current master password. If you restore a version from before you changed your master password, the vault file is still replaced, and the app locks. Unlock it with the password that version used.
+
+If a commit's snapshot was squashed or pruned, you see **Snapshot was squashed. Only newer versions can be restored.**
+
+## Where history is kept
+
+History lives outside the vault, in APM's config folder on this computer:
+
+| System | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/apm` |
+| Windows | `%AppData%\apm` |
+| Linux | `~/.config/apm`, or `$XDG_CONFIG_HOME/apm` |
+
+The commits are in `lgit.jsonl`, each snapshot is a full copy of the encrypted vault file in `lgit_snapshots`, and commits are signed with a key in `lgit_signing.key`. A commit ID is the time in nanoseconds followed by the start of the vault file's SHA-256, so the short ID in the list is that hash prefix, and a commit receipt shows its last 7 characters. A save that leaves the file unchanged adds no commit.
+
+Snapshots are encrypted like the vault itself, with the master password that was current when they were made.
+
+<Callout type="warning" title="If you use more than one vault on this computer">
+All vaults on this computer share one history file. The list shows only this vault's commits, but **Verify signatures** checks every vault's commits, **Squash history** keeps the newest commits of all of them, and **Undo last change** goes back to the second-newest commit in the file, even if another vault made it. If you have just used another vault, restore one of this vault's commits with **Restore this version** instead of undoing.
+</Callout>
+
+## Audit log
+
+The **Audit log** tab shows security events from the audit log that the app and `pm` share: unlocks, failed attempts, saves, exports, syncs, AI requests, recovery changes and so on. Each entry has its time, action, details, who did it and whether its signature is valid. Failures and anomalies are highlighted.
+
+Filter with the chips, or type in **Filter events**, which searches the action, the details and who:
+
+| Chip | Actions it shows |
+|---|---|
+| **All** | Everything |
+| **Unlocks** | Actions with UNLOCK, LOCK, ANOMALY, READONLY, SESSION or EPHEMERAL in their name |
+| **Changes** | SAVED, LGIT, PROFILE, SETTINGS, IMPORT, EXPORT, CLEANUP, PASSWORD, POLICY or INJECT |
+| **Sync** | CLOUD |
+| **AI** | MCP |
+| **Recovery** | RECOVERY, TOUCHID, MASTER, PASSKEY or BRIDGE |
+
+"Who" is your user name and the computer's name, such as `you@MacBook-Pro.local`. An entry with no details says "No details". The check mark's tooltip reads "Signature verified" or "Signature does not match". When nothing matches, you see **No events match**.
+
+The tab shows the newest 200 matching entries, out of the newest 500.
+
+The audit log is a hash-chained file, `audit.json`, signed with a key in `audit_signing.key`. Both are in the same config folder as history, outside the vault.
+
+## Vault events
+
+The **Vault events** tab shows the history chain stored inside the vault itself. It travels with the vault file. Each entry is an item event, with the item's name and its type, or **Space** for a space:
+
+| Event | Meaning |
+|---|---|
+| **ADD** | An item was added |
+| **EDIT** | An item was changed |
+| **GET** | An item was viewed or copied |
+| **DEL** | An item was deleted |
+| **MERGE** | An item was merged from sync |
+
+Filter by event with the chips. The tab shows the newest 200.
+
+## Keep history small
+
+Snapshots take disk space, roughly one vault's size per commit.
+
+- **Prune snapshots** removes snapshot files that no commit uses.
+- **Squash history…** opens a dialog with a **Keep the last** slider. It starts at 10 and goes up to 100, or to the number of commits you have. The dialog shows how many commits you have and the oldest date you will still be able to restore. Choose **Squash N commits**. The remaining chain is re-linked and re-signed, a **SQUASH** commit noted "Kept the last 10" is added, and the toast says **History squashed** with the number of older commits removed.
+
+**Settings → Maintenance** has the same buttons, plus **Verify integrity** and a storage bar that shows the vault and its snapshots side by side. **Prune** there runs without asking and reports files, such as "Pruned 3 files". **Verify** reports "All 24 commits verified", or, for example, "2 of 24 commits failed". **Squash** is disabled with fewer than 2 commits, and **Squash**, **Prune** and **Reset to HEAD** need a session that can edit.
+
+<Callout type="warning" title="History keeps deleted items">
+Snapshots hold the whole vault, including items you have since deleted from Trash. To remove a secret for good, delete it, empty Trash, then squash history so you keep only commits made after that, and prune snapshots.
+</Callout>
+
+## In the terminal
+
+`pm lgit log`, `pm lgit undo`, `pm lgit squash`, `pm lgit prune` and `pm lgit verify` work on the same history. See the [CLI reference](/docs/cli/commands).

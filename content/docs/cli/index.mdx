@@ -1,0 +1,98 @@
+---
+title: Command line
+description: pm is APM's command-line tool and vault engine. Everything the desktop app and the extension do runs on it.
+order: 0
+sidebarTitle: Overview
+---
+
+`pm` is the command-line side of APM. It creates and opens your vault, adds and finds items, generates passwords and one-time codes, imports and exports, syncs to the cloud, injects secrets into your shell, and serves the browser extension and AI agents. It is a single Go binary with no daemon: each command opens the vault file, does its work and exits.
+
+`pm` is also the engine behind the [desktop app](/docs/desktop). The app starts its own copy of `pm` in the background (`pm desktop`, a hidden command) and talks to it over stdin and stdout. Both read and write the same vault file, history and audit log, so a change made in one shows up in the other.
+
+## How pm fits together
+
+| Piece | What it is | Where it lives |
+|---|---|---|
+| The vault | One encrypted file holding every item, space, setting and recovery record | `~/.apm/vault.dat` by default. See [Vault basics](/docs/cli/vault-basics#where-the-vault-lives) |
+| A `pm` session | Your master password, encrypted with a local key, so later commands don't ask again | A file in your temp folder. See [Sessions](/docs/cli/sessions) |
+| History (lgit) | A signed snapshot of the vault after every save, for undo | Your APM config folder. See [History and undo](/docs/cli/history) |
+| The desktop app | A GUI on top of the same engine | Runs `pm desktop` in the background |
+| The browser extension | Talks to the app, to `pm extension serve`, or to `pm` started by the browser | See [Browser extension](/docs/cli/browser-extension) |
+| AI agents | Talk to `pm mcp serve` over MCP | See [AI agents](/docs/agents) |
+
+The desktop app and `pm` share one session. Unlocking the app with your password or Touch ID starts the same session that `pm unlock` starts, and locking the app ends it.
+
+## A first session
+
+```sh title="Terminal"
+pm setup              # create a vault (or check an existing one)
+pm unlock             # enter your master password once
+pm add password       # add a login
+pm get github         # search, view, copy, edit or delete
+pm totp               # live one-time codes
+pm lock               # forget the password now
+```
+
+Most commands ask for what they need. You can also pass a type or a name as an argument to skip the first prompt, for example `pm add totp` or `pm get github`.
+
+## Conventions
+
+- **The master password is asked once per session.** Any command that needs the vault uses the active session. Without one, it asks for the password and starts a session on your [auto-lock policy](/docs/cli/sessions#auto-lock).
+- **Interactive by default, scriptable when piped.** On a terminal, `pm get` and `pm totp` open full-screen views. When stdin is not a terminal they print plain lists instead, and prompts read their answers from stdin. See [Scripting and automation](/docs/cli/scripting).
+- **Esc cancels and Ctrl+C stops.** Every prompt reads keys the same way in every terminal. See [Keys at prompts](#keys-at-prompts).
+- **One vault per command.** The global flag `--vault` (or `-v`) picks a different vault file for that command. `APM_VAULT_PATH` does the same for every command in a shell.
+- **`--version` prints just the version** (`12.0.0`), so scripts can read it.
+- **Spaces scope what you see.** `pm add`, `pm get`, `pm totp` and `pm inject` work in the current [space](/docs/cli/spaces).
+
+<Callout type="note" title="No shell completion">
+`pm` does not ship a `completion` command, and `pm help` is hidden. Use `pm --help` or `pm <command> --help` for usage.
+</Callout>
+
+## Keys at prompts
+
+Every prompt in `pm` reads keys the same way on macOS, Linux and Windows: in Windows Terminal and conhost, inside tmux, over SSH, and in Git Bash with a pseudo console.
+
+| Key | What it does |
+|---|---|
+| <Kbd>Esc</Kbd> | Cancels the command at any typed prompt. `pm` prints `Cancelled.` and exits with status 1. At the master password prompt it doesn't count as a failed attempt |
+| <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Stops `pm`, puts your terminal back as it was and exits with status 130 |
+
+When you type a line, these keys edit it, and a paste goes in as you pasted it:
+
+| Key | What it does |
+|---|---|
+| <Kbd>←</Kbd> <Kbd>→</Kbd> | Move the cursor |
+| <Kbd>Home</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>A</Kbd> | Jump to the start of the line |
+| <Kbd>End</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>E</Kbd> | Jump to the end of the line |
+| <Kbd>⌫</Kbd> and <Kbd>Delete</Kbd> | Delete the character before and after the cursor |
+| <Kbd>Ctrl</Kbd> <Kbd>U</Kbd> | Clear the line |
+| <Kbd>Ctrl</Kbd> <Kbd>W</Kbd> | Delete the word before the cursor |
+| <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> | Delete from the cursor to the end of the line |
+
+Other prompts:
+
+- **Yes/no questions** take one key, with no <Kbd>↵</Kbd> after it: <Kbd>y</Kbd> or <Kbd>n</Kbd>. <Kbd>↵</Kbd> takes the default, which is the capital letter in `(Y/n)` or `(y/N)`; a plain `(y/n)` defaults to No. <Kbd>Esc</Kbd> means No.
+- **Press Enter to continue...** also continues on <Kbd>Esc</Kbd>, <Kbd>Space</Kbd> or <Kbd>q</Kbd>.
+- **Menus** in `pm import`, `pm export` and `pm mcp token` are lists you move through with <Kbd>↑</Kbd> <Kbd>↓</Kbd>. <Kbd>↵</Kbd> chooses and <Kbd>Esc</Kbd> cancels. See [Import and export](/docs/cli/import-export#import) and [Set up a client](/docs/agents/setup).
+- **Passwords** are never shown as you type.
+- **The full-screen views** (`pm get`, its editor and `pm totp`) have their own keys, listed in [Items](/docs/cli/items#find-items) and [One-time codes](/docs/cli/totp#see-live-codes). <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> in them exits with 130 as well.
+- **Without a terminal**, prompts read a line from stdin and none of these keys apply. See [Scripting and automation](/docs/cli/scripting).
+
+<Callout type="note" title="The extension approval questions">
+`pm extension serve` and `pm extension link` ask you to approve a pairing request with `[y/N]`. Those still read a typed line: type `y` and press <Kbd>↵</Kbd>. The one-key answers and <Kbd>Esc</Kbd> above don't apply to them. See [Browser extension](/docs/cli/browser-extension).
+</Callout>
+
+<Callout type="warning" title="Old Git Bash can't hide a password">
+Git Bash without pseudo console support can't turn off echo, so `pm` won't ask for a password there. Before any hidden prompt it stops with a message and exit status 1. Run it as `winpty pm ...`, use Windows Terminal, or reinstall Git for Windows with **Enable experimental support for pseudo consoles** checked. Newer Git Bash, with a pseudo console, needs none of this.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Card title="Install pm" href="/docs/cli/installation" icon="download">From the desktop app, a release archive or source.</Card>
+  <Card title="Vault basics" href="/docs/cli/vault-basics" icon="vault">Create a vault, choose where it lives, change the master password.</Card>
+  <Card title="Sessions" href="/docs/cli/sessions" icon="lock-keyhole">Unlock, lock, auto-lock, read-only and scoped sessions.</Card>
+  <Card title="Items" href="/docs/cli/items" icon="key-round">Add, search, view, edit and delete all 25 item types.</Card>
+  <Card title="Import and export" href="/docs/cli/import-export" icon="arrow-left-right">Move in from 1Password, Bitwarden, KeePass and browsers.</Card>
+  <Card title="Command reference" href="/docs/cli/commands" icon="square-terminal">Every command, flag and default.</Card>
+</Cards>

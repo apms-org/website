@@ -1,0 +1,72 @@
+---
+title: Passkeys
+description: Where passkeys come from, where they show up in the app, and how to rename, remove, import and export them.
+order: 8
+group: Using the app
+---
+
+A passkey lets you sign in to a website without a password. APM stores each passkey on the login it belongs to, with its private key encrypted inside the vault. The browser extension uses it to sign in. The app is where you see and manage them.
+
+The app's window never receives a passkey's private key. It only gets what it shows: the site, the user name, the label, the credential ID, the dates and the sign-in count.
+
+## Where passkeys come from
+
+- **The browser extension.** When a site offers to create a passkey and the extension is connected, APM creates it and saves it to the matching login. See [passkeys in the extension](/docs/extension/passkeys).
+- **An import.** Bitwarden, KeePass or KeePassXC, Credential Exchange (CXF) and APM exports can carry passkeys. 1Password leaves passkeys out of its exports. See [Import and export](/docs/desktop/import-export).
+
+You cannot create a passkey from inside the app. When you edit a login that has none, the **Passkeys** section says "No passkeys yet. When a site offers to create one, the APM browser extension saves it to this login."
+
+## See a login's passkeys
+
+A login with passkeys shows a **Passkey** (or **N passkeys**) badge in its header, and a **Passkeys** section below its fields. Each passkey shows:
+
+- Its label, or the user name when it has no label.
+- The site it belongs to (the relying party ID, such as `github.com`).
+- When it was added, when it was last used, and how many sign-ins it has made, such as "Added Oct 5, 2026 · used 3 days ago · 12 sign-ins", or "never used".
+
+Use the pencil to **Rename passkey**. Type a label (up to 120 characters) in the **Passkey name** box, then **Save**, or press <Kbd>Esc</Kbd> to cancel. Saving an empty box clears the label, and the passkey shows its user name again. Use the bin to **Remove passkey**.
+
+The same section, with the same buttons, appears while you edit the login.
+
+## See every passkey
+
+**Settings → Browser extension → Saved passkeys** lists every passkey in the vault, most recently used first. Its description reads "The private key is stored encrypted inside the item it belongs to." With more than four, a **Filter passkeys** field appears. It matches the site, the user name, the label and the login's name.
+
+Each row shows the site, the label, the user name (or "No user name"), the login it is in (click it to open the login), when it was last used and its sign-in count, such as "you@example.com · in GitHub · used 2h · 12 sign-ins".
+
+With no passkeys, the card says "No passkeys yet. Create one on any site with the extension installed." When the filter matches nothing, it says "No passkeys match."
+
+The `…` menu on each row has:
+
+- **Rename**: give it a label, like the device you made it on. The **Rename passkey** dialog ("A label to tell your passkeys apart, like the device you made it on.") takes up to 120 characters, and **Save** stays greyed out while the box is empty. To clear a label, rename it from the login instead.
+- **Copy credential ID**: copies the passkey's credential ID and says **Credential ID copied**. The ID is not secret, so the clipboard is not cleared.
+- **Remove**
+
+## Remove a passkey
+
+Removing a passkey asks you to confirm. Afterwards you can no longer sign in to that site with it.
+
+- From a login, the dialog asks **Remove this passkey?**: "You will no longer be able to sign in to github.com with it. Removing it here does not remove it from the website's account settings."
+- From **Saved passkeys**, it asks **Remove the github.com passkey?**: "You will not be able to sign in to github.com with it. Remove it from the site's security settings too."
+
+Both confirm with **Remove passkey**, and the toast says **Passkey removed**. A removal is a vault change like any other: it shows in [History](/docs/desktop/history) as "Removed a passkey from GitHub", and right after it, **Undo last change** (<Kbd>⌘</Kbd><Kbd>Z</Kbd>) puts the vault back as it was, passkey included. Renaming shows as "Renamed a passkey on GitHub". The audit log records `PASSKEY_DELETED` and `PASSKEY_RENAMED`.
+
+<Callout type="warning" title="Remove it from the website too">
+Removing a passkey in APM does not remove it from your account on the website. Open the site's security settings and remove it there as well.
+</Callout>
+
+Deleting a login that has passkeys moves them to Trash with it. The delete dialog warns "It has 1 passkey. Deleting the item stops those passkeys from working in the browser extension." Restoring the login from Trash brings them back.
+
+**Duplicate** on a login does not copy its passkeys. The copy starts with none.
+
+## Export passkeys
+
+The **APM**, **Credential Exchange** and **Bitwarden** export formats can include passkeys. **Credential Exchange** only takes passkeys that have never been used to sign in; use APM or Bitwarden for the rest. In the export dialog, **Include passkeys** controls whether they go in. Private keys are written into the file so you can sign in elsewhere, which means anyone with the file can use them. Encrypt the export, and delete it when you are done. CSV and text exports never include passkeys.
+
+## Recovery passkeys are different
+
+**Settings → Recovery → Recovery passkey** registers a passkey in your browser that proves it is you during vault recovery. The passkey itself stays in your browser or security key, and it is not used to sign in to websites. See [Recovery](/docs/desktop/recovery#recovery-passkey).
+
+## In the terminal
+
+`pm get` shows a login's passkeys under **Passkeys**: the site, the user name, the label, when it was added and when it was last used, never their private keys. To rename or remove one, open the login in `pm get`, press <Kbd>e</Kbd> to edit it, pick the passkey with the arrow keys, then press <Kbd>↵</Kbd> to rename it or <Kbd>x</Kbd> to remove it, and <Kbd>s</Kbd> to save. `pm` can't create website passkeys. See [Find items](/docs/cli/items#find-items).

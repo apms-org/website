@@ -1,0 +1,88 @@
+---
+title: Security
+description: How APM protects your vault, what it keeps in the clear, and where its protection ends.
+order: 0
+sidebarTitle: Overview
+---
+
+APM keeps every secret in one encrypted file, `vault.dat`. There is no APM account and no server that holds your keys. The desktop app, `pm`, the browser extension and the MCP server all go through the same Go engine, so they share one encryption scheme, one file format and one auto-lock policy.
+
+This section describes what that engine does today, checked against its source. It also lists the places where the protection is weaker than you might assume. Read [Threat model](/docs/security/threat-model) before you rely on APM for anything high-stakes.
+
+## The short version
+
+- **One password, three keys.** Argon2id turns your master password and a random salt into 96 bytes. They split into an encryption key, an authentication key and a password validator. See [Encryption](/docs/security/encryption).
+- **A random data key encrypts the vault.** A 256-bit data key, made once with your vault, encrypts the vault body with AES-256-GCM or XChaCha20-Poly1305. The key from your password only seals that data key.
+- **Every byte is signed.** An HMAC-SHA256 tag covers the whole file. `pm` checks it before it decrypts anything, so a changed file is refused.
+- **New salt on every save.** Each save picks a fresh salt, so the keys derived from your password change every time the file is written.
+- **The cost is yours to tune.** A security profile sets how much memory and time each password guess costs. See [Security profiles](/docs/security/profiles).
+- **Unlocks expire.** By default the vault locks after 15 minutes idle, after 1 hour at most, and when the computer sleeps. See [Sessions and locking](/docs/security/sessions-and-locking).
+- **Recovery is opt-in.** Without a recovery method, a forgotten master password means a lost vault. See [Recovery](/docs/security/recovery).
+- **Sync moves the encrypted file.** Google Drive, Dropbox and GitHub only ever receive `vault.dat`, never your password or a decrypted copy. Where the file ends up depends on the sync mode. See [Sync security](/docs/security/sync-security).
+
+## The layers of vault.dat
+
+The file is a short header followed by the encrypted body. The header holds no secrets you could use without your password, with one exception covered in [Vault format](/docs/security/vault-format#recovery-block).
+
+| Layer | What it holds | Encrypted |
+|---|---|---|
+| Header | `APMVAULT` and the format version (`4`) | No |
+| Profile | Key derivation and cipher settings | No |
+| Recovery block | Recovery settings, and a second slot for the data key that your recovery key can open | No |
+| Salt and validator | A fresh salt from this save, and a value that rejects a wrong password early | No |
+| Key slot | The data key, sealed with the key from your master password | Yes |
+| Body | Every item, field, passkey, setting and sync token | Yes |
+| Signature | HMAC-SHA256 over every byte above | Not needed |
+
+The exact byte layout is in [Vault format](/docs/security/vault-format).
+
+## What is encrypted and what is not
+
+| Encrypted (inside the body) | In the clear (header or local files) |
+|---|---|
+| All 25 item types and every field on them | The profile: KDF settings, cipher, salt and nonce lengths |
+| Item history, Trash and favorites | The recovery block: hashes, the wrapped data key, a masked recovery email |
+| Spaces, password policy and app settings, including auto-lock | The alert email address, if you set one |
+| Cloud sync tokens for Google Drive, Dropbox and GitHub | The audit log and lgit history index in your config folder |
+| Your full recovery email address | Site names the desktop app looks up favicons for (sent to those sites) |
+
+## Where the pieces live
+
+| What | Where |
+|---|---|
+| The vault | The `--vault` flag if you pass one. Otherwise `APM_VAULT_PATH` (a relative path is taken from the folder `pm` is in), then `vault.dat` next to `pm` if one exists there, then `~/.apm/vault.dat` |
+| Session file | Your temp folder: `pm_session_global.json`, or `pm_session_<id>.json` when `APM_SESSION_ID` is set |
+| Session key, ephemeral sessions, MCP tokens and requests, audit log, lgit history, the extension's pairing token | The `apm` folder in your user config directory: `~/Library/Application Support/apm` on macOS, `~/.config/apm` (or `$XDG_CONFIG_HOME/apm`) on Linux, `%AppData%\apm` on Windows |
+| Failed-attempt counter and access log | `.apm_lock` and `apm_audit.log` in `~/.apm`, or in the folder of `APM_VAULT_PATH` if you set it. `APM_STATE_DIR` overrides both. The desktop app and `pm` use the same files. See [Failed attempts](/docs/security/sessions-and-locking#failed-attempts). |
+| Security alert log | `email.log` in the folder you ran `pm` from. The desktop app writes it next to the vault. |
+| Touch ID copy of your master password | The macOS login keychain, item **APM Vault** |
+
+All of these files are written with owner-only permissions (`0600`, folders `0700`) where the operating system supports it. Environment variables are listed in [Environment variables](/docs/reference/environment-variables).
+
+The config folder of a vault that has been used for a while looks like this:
+
+```text title="Output"
+-rw-------   1 you  staff     32  5 Oct 20:55 audit_signing.key
+-rw-------   1 you  staff  18864  5 Oct 21:09 audit.json
+-rw-------   1 you  staff     64  5 Oct 20:57 bridge_token
+-rw-------   1 you  staff    510  5 Oct 21:08 ephemeral_sessions.json
+-rw-------   1 you  staff     32  5 Oct 20:55 lgit_signing.key
+drwx------  20 you  staff    640  5 Oct 21:09 lgit_snapshots
+-rw-------   1 you  staff  14191  5 Oct 21:09 lgit.jsonl
+-rw-------   1 you  staff     44  5 Oct 20:56 session.key
+```
+
+Other files appear once you use the feature: `mcp_auth.json` and `mcp_transactions.json` for AI clients, `native_host.json`, `extension_link.json` and `extension_seen.json` for the browser extension, `lgit_notes.json` for history notes, and an `icons` folder for website logos. `ephemeral_sessions.json` holds your master password in plain text while an ephemeral session exists, and `session.key` opens the session file that holds it, so treat this folder as sensitive.
+
+## Read next
+
+<Cards>
+  <Card title="Encryption" href="/docs/security/encryption" icon="key-round">Key derivation, ciphers, the data key and the HMAC.</Card>
+  <Card title="Vault format" href="/docs/security/vault-format" icon="file-lock-2">Byte by byte, including the cleartext recovery block.</Card>
+  <Card title="Security profiles" href="/docs/security/profiles" icon="sliders-horizontal">Standard, Hardened, Paranoid and custom.</Card>
+  <Card title="Sessions and locking" href="/docs/security/sessions-and-locking" icon="timer">Unlock sessions, auto-lock, Touch ID and failed attempts.</Card>
+  <Card title="Recovery" href="/docs/security/recovery" icon="life-buoy">Recovery key, emailed code, one-time codes, passkey and trustees.</Card>
+  <Card title="Sync security" href="/docs/security/sync-security" icon="cloud">What leaves your computer, and where it goes.</Card>
+  <Card title="Threat model" href="/docs/security/threat-model" icon="shield-alert">What APM protects against, and what it does not.</Card>
+  <Card title="Report a vulnerability" href="/docs/security/reporting" icon="bug">How to tell the maintainers.</Card>
+</Cards>

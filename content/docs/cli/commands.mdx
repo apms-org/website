@@ -1,0 +1,163 @@
+---
+title: Command reference
+description: Every pm command and subcommand, with global flags and links to the full reference for each.
+order: 19
+sidebarTitle: All commands
+group: Command reference
+---
+
+This is the complete list of `pm` 12.0.0 commands, checked against the source. Each row links to its full entry with usage, flags and examples. Run `pm <command> --help` for the same usage in your terminal.
+
+## Global flags
+
+`-v` and `-h` work with every command. `--version` works only on `pm` itself:
+
+| Flag | Meaning |
+|---|---|
+| `-v`, `--vault <path>` | Use this vault file for this command. Overrides `APM_VAULT_PATH` and the default: a `vault.dat` next to `pm` if there is one, otherwise `~/.apm/vault.dat`. See [Where the vault lives](/docs/cli/vault-basics#where-the-vault-lives) |
+| `-h`, `--help` | Show usage for the command |
+| `--version` | Print the version number only, for example `12.0.0`. Run it as `pm --version`; after a command name it is an unknown flag |
+
+`-v` means `--vault`, not `--version`.
+
+## Vault and sessions
+
+| Command | What it does |
+|---|---|
+| [`pm setup`](/docs/cli/commands-vault#pm-setup) | Create or check a vault: profile, spaces, cloud |
+| [`pm unlock`](/docs/cli/commands-vault#pm-unlock) | Start a session |
+| [`pm lock`](/docs/cli/commands-vault#pm-lock) | End the session |
+| [`pm mode`](/docs/cli/commands-vault#pm-mode) | `unlock`, `readonly`, `lock` and `compromise` in one group |
+| [`pm mode readonly`](/docs/cli/commands-vault#pm-mode-readonly) | Start a read-only session |
+| [`pm autolock`](/docs/cli/commands-vault#pm-autolock) | Show or change the auto-lock policy |
+| [`pm session issue`](/docs/cli/commands-vault#pm-session-issue) | Issue an ephemeral session |
+| [`pm session list`](/docs/cli/commands-vault#pm-session-list) | List ephemeral sessions |
+| [`pm session revoke`](/docs/cli/commands-vault#pm-session-revoke) | Revoke one |
+| [`pm profile list`](/docs/cli/commands-vault#pm-profile-list) | List encryption profiles |
+| [`pm profile current`](/docs/cli/commands-vault#pm-profile-current) | Show the active profile |
+| [`pm profile set`](/docs/cli/commands-vault#pm-profile-set) | Switch to a built-in profile |
+| [`pm profile edit`](/docs/cli/commands-vault#pm-profile-edit) | Tune a custom profile |
+| [`pm profile create`](/docs/cli/commands-vault#pm-profile-create) | Create a custom profile |
+| [`pm cinfo`](/docs/cli/commands-vault#pm-cinfo) | Show the vault's crypto parameters |
+| [`pm info`](/docs/cli/commands-vault#pm-info) | Show version, install folder and vault path |
+| [`pm update`](/docs/cli/commands-vault#pm-update) | Check for updates, and install them on Windows |
+| [`pm compromise`](/docs/cli/commands-vault#pm-compromise) | Destroy the vault |
+
+## Items
+
+| Command | What it does |
+|---|---|
+| [`pm add`](/docs/cli/commands-items#pm-add) | Add an item |
+| [`pm get`](/docs/cli/commands-items#pm-get) | Search, view, copy, edit and delete items |
+| [`pm gen`](/docs/cli/commands-items#pm-gen) | Generate a password |
+| [`pm totp`](/docs/cli/commands-items#pm-totp) | Live one-time codes, or copy one |
+| [`pm totp link`](/docs/cli/commands-items#pm-totp-link) | Link a code to a site |
+| [`pm totp unlink`](/docs/cli/commands-items#pm-totp-unlink) | Remove a code's site links |
+| [`pm space create`](/docs/cli/commands-items#pm-space-create) | Create a space |
+| [`pm space switch`](/docs/cli/commands-items#pm-space-switch) | Change the current space |
+| [`pm space list`](/docs/cli/commands-items#pm-space-list) | List spaces |
+| [`pm inject`](/docs/cli/commands-items#pm-inject) | Put items into shell variables |
+| [`pm inject kill`](/docs/cli/commands-items#pm-inject-kill) | Remove them |
+| [`pm inject setup-shell`](/docs/cli/commands-items#pm-inject-setup-shell) | Install the `inject` shell function |
+| [`pm import`](/docs/cli/commands-items#pm-import) | Import from another manager or an export |
+| [`pm export`](/docs/cli/commands-items#pm-export) | Export the vault |
+| [`pm export compare`](/docs/cli/commands-items#pm-export-compare) | Compare the vault with an export |
+
+## Security, history and maintenance
+
+| Command | What it does |
+|---|---|
+| [`pm auth change`](/docs/cli/commands-security#pm-auth-change) | Change the master password |
+| [`pm auth email`](/docs/cli/commands-security#pm-auth-email) | Set the recovery email and key |
+| [`pm auth recover`](/docs/cli/commands-security#pm-auth-recover) | Recover with the recovery key |
+| [`pm auth reset`](/docs/cli/commands-security#pm-auth-reset) | Remove all recovery data |
+| [`pm auth codes generate`](/docs/cli/commands-security#pm-auth-codes-generate) | Create one-time recovery codes |
+| [`pm auth codes status`](/docs/cli/commands-security#pm-auth-codes-status) | Count the codes left |
+| [`pm auth passkey register`](/docs/cli/commands-security#pm-auth-passkey-register) | Register a recovery passkey |
+| [`pm auth passkey verify`](/docs/cli/commands-security#pm-auth-passkey-verify) | Test it |
+| [`pm auth passkey disable`](/docs/cli/commands-security#pm-auth-passkey-disable) | Remove it |
+| [`pm auth quorum-setup`](/docs/cli/commands-security#pm-auth-quorum-setup) | Split the recovery key into trustee shares |
+| [`pm auth quorum-recover`](/docs/cli/commands-security#pm-auth-quorum-recover) | Recover with trustee shares |
+| [`pm auth touchid setup`](/docs/cli/commands-security#pm-auth-touchid-setup) | Store the password for Touch ID (macOS) |
+| [`pm auth touchid status`](/docs/cli/commands-security#pm-auth-touchid-status) | Is Touch ID set up? |
+| [`pm auth touchid test`](/docs/cli/commands-security#pm-auth-touchid-test) | Try the sensor |
+| [`pm auth touchid remove`](/docs/cli/commands-security#pm-auth-touchid-remove) | Remove the Keychain item |
+| [`pm auth alerts`](/docs/cli/commands-security#pm-auth-alerts) | Turn security alerts on or off |
+| [`pm auth level`](/docs/cli/commands-security#pm-auth-level) | Set the alert level |
+| [`pm policy load`](/docs/cli/commands-security#pm-policy-load) | Activate a password policy |
+| [`pm policy show`](/docs/cli/commands-security#pm-policy-show) | Show the active policy |
+| [`pm policy clear`](/docs/cli/commands-security#pm-policy-clear) | Stop enforcing |
+| [`pm loaded`](/docs/cli/commands-security#pm-loaded) | Show available policies and the `.apmignore` in use |
+| [`pm health`](/docs/cli/commands-security#pm-health) | Security score |
+| [`pm trust`](/docs/cli/commands-security#pm-trust) | Per-secret trust scores |
+| [`pm cleanup`](/docs/cli/commands-security#pm-cleanup) | Find and fix broken entries |
+| [`pm logs`](/docs/cli/commands-security#pm-logs) | Vault history, audit log and lgit commits |
+| [`pm lgit tree`](/docs/cli/commands-security#pm-lgit-tree) | List history commits (`pm lgit log` is the same) |
+| [`pm lgit status`](/docs/cli/commands-security#pm-lgit-status) | Compare the vault with the latest commit |
+| [`pm lgit show`](/docs/cli/commands-security#pm-lgit-show) | Show one commit |
+| [`pm lgit verify`](/docs/cli/commands-security#pm-lgit-verify) | Check the history's signatures |
+| [`pm lgit undo`](/docs/cli/commands-security#pm-lgit-undo) | Restore the previous snapshot |
+| [`pm lgit checkout`](/docs/cli/commands-security#pm-lgit-checkout) | Restore a chosen snapshot |
+| [`pm lgit squash`](/docs/cli/commands-security#pm-lgit-squash) | Drop old snapshots |
+| [`pm lgit prune`](/docs/cli/commands-security#pm-lgit-prune) | Delete orphaned snapshot files |
+
+## Sync, extension and agents
+
+| Command | What it does |
+|---|---|
+| [`pm cloud init`](/docs/cli/commands-sync#pm-cloud-init) | Set up Google Drive, GitHub or Dropbox |
+| [`pm cloud sync`](/docs/cli/commands-sync#pm-cloud-sync) | Upload the vault |
+| [`pm cloud auto-sync`](/docs/cli/commands-sync#pm-cloud-auto-sync) | Upload on every change |
+| [`pm cloud get`](/docs/cli/commands-sync#pm-cloud-get) | Download a vault |
+| [`pm cloud diff`](/docs/cli/commands-sync#pm-cloud-diff) | Compare with the cloud copy and merge |
+| [`pm cloud delete`](/docs/cli/commands-sync#pm-cloud-delete) | Delete the vault's cloud copy |
+| [`pm cloud reset`](/docs/cli/commands-sync#pm-cloud-reset) | Forget all cloud settings |
+| [`pm extension serve`](/docs/cli/commands-sync#pm-extension-serve) | Serve the browser extension without the app |
+| [`pm extension status`](/docs/cli/commands-sync#pm-extension-status) | Linked browsers, the running bridge and the pairing token |
+| [`pm extension token`](/docs/cli/commands-sync#pm-extension-token) | Print the pairing token |
+| [`pm extension rotate`](/docs/cli/commands-sync#pm-extension-rotate) | Replace the pairing token |
+| [`pm extension link`](/docs/cli/commands-sync#pm-extension-link) | Let browsers start `pm` for the extension |
+| [`pm extension unlink`](/docs/cli/commands-sync#pm-extension-unlink) | Undo the link |
+| [`pm mcp token`](/docs/cli/commands-sync#pm-mcp-token) | Create an MCP token for an AI client |
+| [`pm mcp list`](/docs/cli/commands-sync#pm-mcp-list) | List MCP tokens |
+| [`pm mcp revoke`](/docs/cli/commands-sync#pm-mcp-revoke) | Revoke one |
+| [`pm mcp config`](/docs/cli/commands-sync#pm-mcp-config) | Show the MCP server entry for your assistant's config |
+| [`pm mcp serve`](/docs/cli/commands-sync#pm-mcp-serve) | Run the MCP server (started by your AI client) |
+
+## Hidden commands
+
+These don't appear in `pm --help`. Other programs start them; you normally don't run them yourself.
+
+| Command | Started by |
+|---|---|
+| `pm desktop` | The desktop app, as its background engine. It speaks JSON over stdin and stdout |
+| `pm mcp serve --token <token>` | Your AI client. See [AI agents](/docs/agents/setup) |
+| `pm extension host [origin]` | The browser, through native messaging. Chromium also starts `pm` directly with the extension's `chrome-extension://` origin as the first argument, which runs the same host |
+
+## Team edition
+
+`pm-team` is a separate binary with its own commands. See [Team edition](/docs/cli/team-edition).
+
+## Removed and renamed commands
+
+Older guides, scripts and the previous documentation site use commands that no longer exist. `pm` answers them with an error such as `Error: unknown command`, a not-found message or a usage screen, and still exits with status 0, so check old scripts by hand.
+
+| Old command | Now |
+|---|---|
+| `pm plugins …` (`installed`, `list`, `market`, `add`, `install`, `push`, `remove`, `search`, `local`, `access`, `run`) | Removed in 12.0 with the plugin marketplace. There is no replacement |
+| `pm passkeys …` (`list`, `rename`, `rm`, `remove`) | Removed. A login's passkeys show when you open it with [`pm get`](/docs/cli/commands-items#pm-get), and its edit screen renames or removes them |
+| `pm bridge serve`, `pm bridge status`, `pm bridge token`, `pm bridge rotate` | [`pm extension serve`](/docs/cli/commands-sync#pm-extension-serve), [`pm extension status`](/docs/cli/commands-sync#pm-extension-status), [`pm extension token`](/docs/cli/commands-sync#pm-extension-token) and [`pm extension rotate`](/docs/cli/commands-sync#pm-extension-rotate). `pm bridge` has no alias |
+| `pm autofill …`, `pm autocomplete …` | Removed. Windows autofill, its hotkey and fill sequences are gone. Use the [browser extension](/docs/extension) |
+| `pm autocomplete link-totp` | [`pm totp link <entry> <domain>`](/docs/cli/commands-items#pm-totp-link) |
+| `pm audit` | [`pm logs`](/docs/cli/commands-security#pm-logs) |
+| `pm readonly <minutes>` | [`pm mode readonly <minutes>`](/docs/cli/commands-vault#pm-mode-readonly) |
+| `pm space remove`, `pm space current` | Removed. `pm space list` marks the current space with `*`; delete spaces in the desktop app |
+| `pm cloud autosync` | [`pm cloud auto-sync --true`](/docs/cli/commands-sync#pm-cloud-auto-sync) |
+| `pm import json\|csv\|txt <file>` | [`pm import <file>`](/docs/cli/commands-items#pm-import). The format is detected; `--from` overrides it |
+| `pm import … --decrypt` | `-p`, `--password`. `pm` asks for the password when a file needs one |
+| `pm export json\|csv\|txt` | [`pm export --format apm\|cxf\|bitwarden\|csv\|txt`](/docs/cli/commands-items#pm-export). The command takes no positional arguments |
+| `pm export … --no-password` | `--without-password` |
+| `pm policy load ./policies/` | [`pm policy load <name>`](/docs/cli/commands-security#pm-policy-load). Loads one policy by its `name` from the `policies` folder next to the vault |
+| `pm completion` | Not available. `pm` has no shell completion |
+| `pm-team dept info`, `pm-team user role` | `pm-team dept list` and `pm-team user promote`. See [Team edition](/docs/cli/team-edition) |
+| `pm-team init "<org>"` | `pm-team init <org> <admin-username>` |

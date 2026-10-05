@@ -1,0 +1,330 @@
+---
+title: Sessions and locking
+description: How an unlock is remembered, when the vault locks itself, how Touch ID works, and what happens after failed attempts.
+order: 3
+group: Model
+sidebarTitle: Sessions and locking
+---
+
+Deriving keys from your master password is slow on purpose, so APM remembers an unlock for a while instead of asking on every command. This page covers where that unlock lives, when it ends, and the trade-offs that come with it.
+
+## What "unlocked" means
+
+| Where | What is kept while unlocked | Ends when |
+|---|---|---|
+| `pm` in a terminal | An encrypted **session file** holding your master password | The auto-lock policy fires, you run `pm lock`, or the app locks |
+| Desktop app | The decrypted vault and your master password, in the engine's memory | The auto-lock policy fires, you lock it, or you quit the app. On macOS the policy is only checked while the window is open. |
+| Bridge without the app (`pm extension serve`, the native host) | The decrypted vault and your master password, in memory | The auto-lock policy fires, the browser locks it, or the process stops |
+| Ephemeral session | Your master password, in a local file, behind a session ID | Its time to live runs out, or you revoke it |
+
+The desktop app and `pm` share the terminal session: unlocking in the app also unlocks `pm` in your terminal, and locking the app locks `pm` too. `pm lock` only ends the terminal session. The app keeps its own unlock until it locks itself or you lock it. See [Lock and unlock](/docs/desktop/lock-and-unlock) for the app's lock screen.
+
+<Callout type="note" title="On macOS, closing the window doesn't lock the vault">
+On a Mac, closing the APM window leaves the app running, and its engine keeps the vault unlocked, so the browser extension can keep using it, and can even unlock it. Auto-lock keeps running while the window is closed: the idle limit, the maximum session and lock on sleep all still apply. Each request from the extension counts as activity, and so does closing the window, so the idle timer starts over when you close it. Choose **Lock Vault** (<Kbd>⌘</Kbd><Kbd>L</Kbd>) before you close the window, lock from the extension's popup, or quit APM. On Windows and Linux, closing the window quits APM.
+</Callout>
+
+## The pm session
+
+Any `pm` command that needs the vault asks for your master password (3 attempts) when there is no session, then starts one. `pm unlock` does only that:
+
+```sh title="Terminal"
+pm unlock
+```
+
+```text title="Output"
+Master Password (attempt 1/3):
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+```
+
+The line appears twice: once when the password is accepted, and once when `pm unlock` starts the session. It describes your vault's [auto-lock policy](#auto-lock). On Windows it has no "on sleep", because a terminal session there cannot tell that the computer slept. With every limit off, it reads "Vault unlocked. It stays unlocked until you run 'pm lock'."
+
+If a session is already open, `pm unlock` does not ask again. It starts the session over on the vault's policy, or on the flags below, and prints the line once.
+
+The session is a file in your temp folder:
+
+- `pm_session_global.json` by default, shared by every shell of your user.
+- `pm_session_<id>.json` when `APM_SESSION_ID` is set. Use a different ID per shell to keep their sessions apart. Only letters and digits of the ID are used.
+
+The file is encrypted with AES-256-GCM and HMAC-SHA256 using a random 32-byte key stored in `session.key` in your APM config folder. It contains your master password, whether the session is read-only, its expiry, the last time it was used, the idle limit, and whether to end on sleep. On disk it is a small JSON wrapper, `{"version":1,"ciphertext":"…"}`, and `session.key` holds the key as base64. Both are written readable only by you.
+
+Every `pm` command that uses the session updates the last-used time. Nothing runs in the background: the next `pm` command checks the limits, deletes a session that has run out, and asks for your password.
+
+```text title="Session lifecycle"
+             pm unlock, or any pm command that asks for your password
+   Locked ─────────────────────────────────────────────────────────► Unlocked
+     ▲                                                                   │
+     │   pm lock, or locking the app                                     │ each pm command
+     │   idle limit passed      ┐                                        │ resets the idle timer
+     │   maximum session passed ├ noticed by the next pm command         │
+     │   computer slept         ┘ (macOS and Linux)                      │
+     └───────────────────────────────────────────────────────────────────┘
+```
+
+<Callout type="warning" title="The session key sits next to the session">
+`session.key` is a plain file readable by your user. While a session is active, any program running as you can read both files and recover your master password. The session protects against other users on the computer and against reading the temp folder alone, not against software you run yourself. Lock when you step away, and keep the idle limit short.
+</Callout>
+
+Override the vault's policy for one session:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--timeout <duration>` | The vault's maximum session | How long the session can last. `0` means no limit. |
+| `--inactivity <duration>` | The vault's idle limit | Lock after this long without a `pm` command. `0` means none. |
+
+```sh title="Terminal"
+pm unlock --timeout 4h --inactivity 30m
+```
+
+```text title="Output"
+Vault unlocked. It locks after 30 minutes idle, 4 hours at most and on sleep.
+```
+
+The flags apply to this session only. The vault's policy stays as it is.
+
+`pm lock` deletes the session file straight away and prints "Vault locked." With no session open it prints `No active session to kill or error: remove …/pm_session_global.json: no such file or directory` instead.
+
+`pm mode readonly <minutes>` replaces the session with a read-only one that lasts that many minutes, with no idle limit and no lock on sleep:
+
+```text title="Output"
+Confirming access for READ-ONLY mode...
+Vault session updated to READ-ONLY mode for 30 minutes.
+```
+
+Anything that is not a whole number of minutes above zero gets "Please provide a valid number of minutes."
+
+## Auto-lock
+
+The auto-lock policy is stored inside the encrypted vault, so the desktop app, `pm` and the browser extension follow the same rules.
+
+| Setting | Default | `pm autolock` flag |
+|---|---|---|
+| Lock after inactivity | 15 minutes | `--idle` |
+| Maximum session | 1 hour | `--max` |
+| Lock when the computer sleeps | On | `--sleep on` or `--sleep off` |
+
+```sh title="Terminal"
+pm autolock --idle 30m --max 8h
+```
+
+```text
+Auto-lock updated.
+Lock after inactivity:  30 minutes
+Maximum session:        8 hours
+Lock on sleep:          on
+Applies to the desktop app, pm sessions and the browser extension.
+```
+
+Run `pm autolock` with no flags to see the current policy. Durations take Go syntax (`15m`, `4h`) or a number of minutes. `never`, `off`, `none` and `0` turn a limit off. Values round up to whole minutes, so `--idle 90s` becomes 2 minutes, and the longest allowed is 30 days. If a `pm` session is open, it starts over on the new policy straight away.
+
+Changing the policy needs a full-access unlock. These stop `pm autolock` with exit status 1, and change nothing:
+
+| Message | Cause |
+|---|---|
+| `--idle: "5x" is not a duration. Use something like 15m, 4h or never` | The value is not a duration, a number or `never` (days such as `45d` are not accepted either) |
+| `--max: "800h" is longer than 30 days. Use never to turn it off` | The value is over 30 days |
+| `--sleep: "maybe" is not on or off` | `--sleep` takes `on`, `off`, `yes`, `no`, `true`, `false`, `1` or `0` |
+| `This session is read-only. Unlock with full access to change auto-lock.` | The session came from `pm mode readonly` or a `read` [ephemeral session](#ephemeral-sessions) |
+
+Setting the values you already have prints "Nothing changed." and the current policy. A policy that weakens locking ends with a warning:
+
+| Policy | Warning |
+|---|---|
+| No idle limit | `Warning: the vault no longer locks when you step away. It stays unlocked for up to 1 hour.` |
+| No maximum session | `Warning: there is no maximum session. As long as it is in use within 15 minutes, the vault stays unlocked.` |
+| Neither limit, lock on sleep on | `Warning: the vault only locks when the computer sleeps or you lock it. Anyone who can use this computer while it is awake can read every secret.` |
+| Nothing at all | `Warning: the vault never locks on its own. It stays unlocked until you run 'pm lock', quit the app or close the browser. Anyone who can use this computer meanwhile can read every secret.` |
+
+In the desktop app, set the same three values in **Settings → Sessions → Auto-lock**. See [Settings](/docs/desktop/settings).
+
+<Callout type="warning">
+With both limits set to `never`, the vault stays unlocked until you lock it, quit the app or the computer sleeps. Anyone who can use your computer in the meantime can read every secret.
+</Callout>
+
+### What counts as activity
+
+| Surface | Idle means |
+|---|---|
+| `pm` | No `pm` command used the session |
+| Desktop app | No key press or pointer movement in the APM window, and no browser-extension activity. Typing in other apps does not count. |
+| Bridge without the app | No request from the browser extension that does something: fills, reveals, codes, passkeys, saves and unlocks count, while the extension's own status checks, login lists for the badge and logo lookups do not. `pm extension serve --idle` overrides the limit for that bridge. |
+
+### Lock on sleep
+
+| Surface | macOS | Linux | Windows |
+|---|---|---|---|
+| `pm` session | Yes, from the system wake time | Yes, from time spent suspended | No |
+| Desktop app, window open | On sleep and when the screen locks | On sleep | On sleep and when the screen locks |
+| Desktop app, window closed | On sleep and when the screen locks, as with the window open | Closing the window quits APM | Closing the window quits APM |
+| Bridge without the app | Yes, when the clock jumps more than 20 seconds | Same | Same |
+
+On Windows, a `pm` session started in a terminal does not notice sleep. It still ends on the idle and maximum limits.
+
+Without the app, the bridge checks the policy every 2 seconds. It locks with one of these reasons, which `pm extension serve` prints after the time: "Locked after 15 minutes idle", "Locked after 1 hour, the maximum session" or "Locked when the computer went to sleep".
+
+## Ephemeral sessions
+
+An ephemeral session is a scoped, expiring unlock you hand to a script, a CI job or an agent, so it does not need your master password or your own session.
+
+```sh title="Terminal"
+pm session issue --scope read --ttl 1h --agent ci
+```
+
+```text title="Output"
+Ephemeral session issued.
+ID:         eps_8fae6868af98a75ddfedaf86
+Scope:      read
+Expires:    2026-10-05T22:08:01+05:30
+Host bind:  enabled
+Agent bind: ci
+
+Export this for consumers:
+  set APM_EPHEMERAL_ID=eps_8fae6868af98a75ddfedaf86
+  set APM_EPHEMERAL_AGENT=ci
+```
+
+The ID is `eps_` followed by 24 random hexadecimal digits. The expiry is in your local time zone. `pm` prints the variables in Windows `set` syntax on every platform. On macOS and Linux, use `export` instead. The consumer sets `APM_EPHEMERAL_ID` to the ID, and `APM_EPHEMERAL_AGENT` to the agent label if you bound one. Every `pm` it runs then unlocks through that session, without a password prompt and without touching your own session.
+
+```text title="Ephemeral session"
+You                                   Script, CI job or agent
+ │                                     │
+ │ pm session issue --scope read …     │
+ │   → stored in ephemeral_sessions.json, ID printed
+ │                                     │
+ │ hand over APM_EPHEMERAL_ID ───────► │ APM_EPHEMERAL_ID=eps_… pm <command>
+ │                                     │   → pm checks: not revoked, not expired,
+ │                                     │     same computer and user, same agent label
+ │                                     │   → opens the vault (read-only for read scope)
+ │                                     │
+ │ pm session revoke eps_…             │ the next command falls back to your own
+ │   or the TTL runs out               │ session or a password prompt
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--ttl` | `15m` | Lifetime |
+| `--scope` | `read` | `read` opens the vault read-only. `write` allows changes. |
+| `--label` | none | A name for your own reference |
+| `--agent` | none | Only works when `APM_EPHEMERAL_AGENT` matches |
+| `--bind-host` | on | Only works on this computer, for this user |
+| `--bind-pid` | off | Only works for the `pm` process with the issuing PID |
+
+`--scope` takes only `read` or `write`; anything else stops with `Failed to issue ephemeral session: invalid scope 'admin': use read or write`. A `--ttl` of zero or less stops with `ttl must be greater than zero`.
+
+`pm session list` shows the sessions that have not expired yet, revoked ones included:
+
+```text title="Output"
+ID                             SCOPE  EXPIRES                   REVOKED    AGENT
+-------------------------------------------------------------------------------------
+eps_8fae6868af98a75ddfedaf86   read   2026-10-05 22:08:01       false      ci
+```
+
+`pm session revoke <id>` stops one immediately and prints `Ephemeral session revoked: eps_…`, or `Session not found: eps_…` for an unknown ID. In the desktop app, use **Settings → Sessions → Ephemeral sessions**, where a session can last up to 24 hours.
+
+If the ID has expired, was revoked or fails a binding, `pm` ignores it and falls back to your own session or a password prompt.
+
+<Callout type="danger" title="Know what an ephemeral session holds">
+- Ephemeral sessions are stored in `ephemeral_sessions.json` in your APM config folder. Each one includes your master password **in plain text**. The file is readable only by your user, but any program running as you can read it while a session exists. A revoked session stays in the file, password included, until its time to live runs out.
+- Scope is checked by each `pm` command, not enforced by encryption, and not every command checks it. A `read` session can, for example, run `pm session issue --scope write` or `pm auth change`, and the MCP server ignores the scope altogether. Give a `read` session only to code you would also trust with write access.
+- `--bind-pid` compares against the process ID of the `pm` command that issued the session, which exits right away. In practice no other process can use a PID-bound session.
+</Callout>
+
+For agents, prefer an MCP token, which carries narrower scopes and an approval step for writes. See [Scopes and approval](/docs/agents/scopes-and-approval).
+
+## Touch ID
+
+On a Mac with Touch ID, you can unlock with your fingerprint. Set it up in the desktop app under **Settings → Security → Unlock with Touch ID**, or from the terminal:
+
+| Command | What it does |
+|---|---|
+| `pm auth touchid setup` | Unlocks the vault, asks for a fingerprint, then stores your master password in the login keychain. It refuses in a read-only session. |
+| `pm auth touchid status` | Shows whether Touch ID is available and set up |
+| `pm auth touchid test` | Runs a fingerprint check without unlocking |
+| `pm auth touchid remove` | Asks for a fingerprint, then deletes the keychain item |
+
+macOS shows the reason for each fingerprint check: "Set up Touch ID for APM", "Unlock APM vault", "Remove Touch ID from APM" or "Test Touch ID for APM".
+
+`pm auth touchid status` prints one of these lines:
+
+| Line | Meaning |
+|---|---|
+| `Touch ID is configured and ready` | `pm` tries Touch ID first |
+| `Touch ID is available but not configured. Run 'pm auth touchid setup'.` | This Mac has Touch ID, but APM has no keychain item |
+| `Touch ID is not available on this Mac` | No Touch ID hardware, or it is turned off |
+| `Touch ID is only available on macOS` | Windows or Linux |
+
+Once it is set up, `pm` tries Touch ID before asking for the password, and prints `  Unlocked via Touch ID` when it works. If you cancel the prompt or the fingerprint does not match, it asks for the password. Any other failure prints `Touch ID error: … — falling back to password` first. Set `APM_DESKTOP_NO_TOUCHID` to any value to skip Touch ID.
+
+Changing your master password with `pm auth change`, in the app, or through recovery updates the keychain item. If the stored password no longer opens the vault, for example after a change on another computer, `pm` prints `Touch ID password is outdated. Run 'pm auth touchid setup' to refresh it.` and asks for the password once. It never rewrites the keychain item on its own.
+
+How it works: your master password is stored as a generic password in the macOS login keychain, under the service **APM Vault** and the account **master-password**. APM asks macOS for a fingerprint check, and if it passes, reads the item.
+
+<Callout type="warning" title="The fingerprint check is APM's, not the keychain's">
+The keychain item is not tied to biometrics. The fingerprint prompt is a check APM runs before it reads the item. Other programs running as you can read the item with the `security` command while your login keychain is unlocked. Turn Touch ID off if you run software you don't trust.
+</Callout>
+
+Touch ID is macOS only. APM has no Windows Hello or Linux fingerprint support.
+
+## Failed attempts
+
+APM counts wrong master passwords in a small file, `.apm_lock`, that holds just the number. Where it is depends on who is counting:
+
+| Who counts | Where `.apm_lock` is |
+|---|---|
+| `pm` in a terminal | `~/.apm`, or the folder of `APM_VAULT_PATH` if you set it to an absolute path |
+| The desktop app, `pm extension serve`, and the `pm` the browser starts | The folder of the vault they open |
+
+`APM_STATE_DIR` overrides both. With the default vault, or one you point `APM_VAULT_PATH` at, that is the same folder, so wrong passwords typed in the app and in a terminal add up to one count. They count in different folders when a terminal `pm` opens its vault with `--vault`, through a relative `APM_VAULT_PATH`, or from a `vault.dat` next to `pm`: it still counts in `~/.apm`, while the app counts in that vault's folder. Set `APM_STATE_DIR` to put both in one folder.
+
+Older versions of `pm` kept the counter next to the `pm` executable. If `APM_STATE_DIR` isn't set, `pm` in a terminal still reads that file as well and uses the higher of the two numbers, so updating doesn't hand out fresh attempts. New failures are written to the state folder, never to the old file.
+
+A successful unlock or a completed recovery clears the count, and deletes the old file too. Next to the counter, APM also appends a line to `apm_audit.log` for every attempt: the time, a hash of the computer and user name, and `ATTEMPT`, `FAIL` or `UNLOCK`. That log is neither encrypted nor signed.
+
+| Failures | `pm` | Desktop app and browser extension |
+|---|---|---|
+| Every 3rd in a row | The command stops after 3 attempts | 30-second wait |
+| 6 or more | `pm` no longer checks the password. It opens a decoy vault, read-only, filled with made-up entries. | Refuses to unlock: **This vault is locked after repeated failed attempts. Use recovery to regain access.** |
+| 9 or more | Refuses: `vault permanently locked due to suspected breach` | Same as above |
+
+Three wrong passwords in one `pm` command look like this. The command still exits with status 0:
+
+```text title="Output"
+Master Password (attempt 1/3):
+Error: incorrect password
+Master Password (attempt 2/3):
+Error: incorrect password
+Master Password (attempt 3/3):
+Error: incorrect password
+too many failed attempts
+```
+
+From the sixth failure, `pm` accepts whatever you type and prints the usual unlocked lines. What opens is the decoy, and every such unlock counts as one more failure. From the ninth, it stops before asking:
+
+```text title="Output"
+[SECURITY BREACH NOTIFICATION]
+Multiple failed unlock attempts detected. This system has been locked for your protection.
+Please contact security administrator or use your physical recovery key.
+vault permanently locked due to suspected breach
+```
+
+The app shows "Incorrect password. 5 attempts left before a wait." after the first wrong password, then 4, and "Too many attempts. Try again in 30 seconds." on the third. The number counts down to the lockout at six, not to the next wait. The browser extension words it as "Incorrect password. 4 attempts left before recovery is required."
+
+Edge cases:
+
+- **Anything that stops the vault from opening counts.** A changed or damaged file, or one with an unknown format version, fails like a wrong password: `pm` prints `Error: vault file has been tampered with or corrupted` or `Error: unsupported vault version: 9` for each try, and the app reports it as an incorrect password.
+- **A state folder that can't be written counts nothing.** If `pm` can't write `.apm_lock` and `apm_audit.log` to the state folder, for example on a read-only volume, it skips them without a message. The limits then never apply, and nothing is logged.
+- **Odd-hour warning.** If no session is open and you unlock between 2:00 and 5:59, `pm` first prints `ΓÜá SECURITY WARNING: Unusual activity detected!` and a line such as `  - Unusual activity time (03:00)`. The first characters are a garbled warning sign. The unlock goes ahead as normal.
+
+The counter is a plain number in a plain file, so it only slows down guessing at this computer: anyone who can write to that folder can reset it. Someone with a copy of `vault.dat` can guess offline at whatever speed your [profile](/docs/security/profiles) allows. To get back in after a lockout, use [Recovery](/docs/security/recovery).
+
+## Clipboard
+
+The desktop app clears the clipboard after you copy a secret: after 30 seconds by default, or 10 or 90 seconds, or never, in **Settings → Security → Clear clipboard**. It only clears it if the clipboard still holds what APM copied.
+
+`pm` does not clear the clipboard. After `pm totp` or copying from `pm get`, the secret stays there until something else replaces it. How `pm` copies depends on the platform:
+
+| Platform | How `pm` copies | Watch out for |
+|---|---|---|
+| macOS | Pipes the value to `pbcopy` | Nothing |
+| Windows | Runs PowerShell's `Set-Clipboard` with the value on its command line | Other programs running as you can see process command lines |
+| Linux | Pipes the value to `xclip -selection clipboard` | Without `xclip`, nothing is copied, yet `pm` still reports a copy, such as `Secret copied to clipboard.` or `Copied TOTP for GitHub to clipboard.` |

@@ -1,0 +1,279 @@
+---
+title: "Commands: vault and sessions"
+description: Reference for pm setup, unlock, lock, mode, autolock, session, profile, cinfo, info, update and compromise.
+order: 20
+sidebarTitle: Vault and sessions
+group: Command reference
+---
+
+Commands that create and open the vault, control sessions and encryption profiles, and report on the installation. Every command also takes the [global flags](/docs/cli/commands#global-flags). For a guided tour, see [Vault basics](/docs/cli/vault-basics) and [Sessions](/docs/cli/sessions).
+
+## Setup
+
+<Command name="pm setup" summary="Create a vault, or check and adjust an existing one">
+
+```sh
+pm setup [--non-interactive]
+```
+
+Runs six steps: environment checks (creating the vault folder and its `policies` folder), vault creation or unlock, security profile, spaces, cloud sync, and a final save. With no vault it asks for a new master password (8+ characters with an uppercase letter, a lowercase letter, a digit and one of `!@#$%^&*()-_=+`) and recommends a profile for this machine. With a vault it unlocks it and lets you change the profile, add spaces, pick the active space and set up cloud sync. Refuses to run on a read-only session.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--non-interactive` | `false` | Use the recommended profile and AES-256-GCM, and skip the profile, spaces and cloud questions. The master password is still asked for |
+
+```sh
+pm setup
+pm --vault ~/work/vault.dat setup --non-interactive
+```
+
+</Command>
+
+## Sessions
+
+<Command name="pm unlock" summary="Unlock the vault for later commands">
+
+```sh
+pm unlock [--timeout <duration>] [--inactivity <duration>]
+```
+
+Asks for the master password (Touch ID first, if set up) and starts a session on the vault's [auto-lock policy](/docs/cli/sessions#auto-lock). Three attempts per run. If a session already exists it is reused and restarted, keeping its read-only flag. Also available as `pm mode unlock`.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--timeout` | the policy's maximum session (1 hour by default) | Maximum session length. `0` for no limit |
+| `--inactivity` | the policy's idle limit (15 minutes by default) | Lock after this long without a command. `0` for none |
+
+```sh
+pm unlock
+pm unlock --timeout 8h --inactivity 30m
+```
+
+When it has to ask for the password, `pm` prints two lines: first the vault's own policy, then the session it actually starts. The last line is the one in force:
+
+```text
+Master Password (attempt 1/3):
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+Vault unlocked. It locks after 30 minutes idle, 8 hours at most and on sleep.
+```
+
+</Command>
+
+<Command name="pm lock" summary="End the session now">
+
+```sh
+pm lock
+```
+
+Deletes the session file. The next command asks for the master password. Also available as `pm mode lock`. Prints a notice if there was no session.
+
+</Command>
+
+<Command name="pm mode" summary="Group for unlock, readonly, lock and compromise">
+
+```sh
+pm mode unlock | readonly <minutes> | lock | compromise
+```
+
+`pm mode unlock`, `pm mode lock` and `pm mode compromise` are the same commands as `pm unlock`, `pm lock` and `pm compromise`. `pm mode readonly` is only available here.
+
+</Command>
+
+<Command name="pm mode readonly" summary="Start a read-only session">
+
+```sh
+pm mode readonly <minutes>
+```
+
+Asks for the master password if there is no session (an existing session is reused without asking), then replaces the session with a read-only one lasting the given number of whole minutes. While it lasts, `pm add`, edits and deletes in `pm get`, `pm import`, `pm profile` changes and `pm autolock` changes refuse. Not every command checks it: `pm auth change`, `pm session issue`, `pm cloud init`, `pm policy load` and `pm space create`, among others, still work. Run `pm lock` and `pm unlock` to get full access back.
+
+```sh
+pm mode readonly 30
+```
+
+</Command>
+
+<Command name="pm autolock" summary="Show or change when the vault locks itself">
+
+```sh
+pm autolock [--idle <duration|never>] [--max <duration|never>] [--sleep on|off]
+```
+
+Without flags, prints the policy. With flags, changes it, saves it in the vault (shared with the desktop app and the extension) and restarts the current session on the new policy. Durations take Go syntax (`15m`, `4h`) or a bare number of minutes, round up to whole minutes and can be at most 30 days. `never`, `off`, `none` and `0` turn a limit off. Exits with status 1 when the vault can't be unlocked or saved, on an invalid value or on a read-only session.
+
+| Flag | Default policy | Meaning |
+|---|---|---|
+| `--idle` | `15m` | Lock after this long without use |
+| `--max` | `1h` | Lock after this long, even in use |
+| `--sleep` | `on` | Lock when the computer sleeps (`on`/`off`, also `yes`/`no`, `true`/`false`, `1`/`0`) |
+
+```sh
+pm autolock
+pm autolock --idle 30m --max 8h
+pm autolock --idle never --max never
+pm autolock --sleep off
+```
+
+</Command>
+
+## Ephemeral sessions
+
+<Command name="pm session issue" summary="Issue a short-lived, scoped session for a script or agent">
+
+```sh
+pm session issue [--ttl 15m] [--scope read|write] [--label <text>] [--agent <label>] [--bind-host] [--bind-pid]
+```
+
+Unlocks the vault and records a new ephemeral session, printing its ID (`eps_…`). Consumers use it by setting `APM_EPHEMERAL_ID`, plus `APM_EPHEMERAL_AGENT` when it is bound to an agent. See [Ephemeral sessions](/docs/cli/sessions#ephemeral-sessions).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--ttl` | `15m` | Lifetime; must be greater than zero |
+| `--scope` | `read` | `read` opens the vault read-only; `write` allows changes |
+| `--label` | | A note for yourself |
+| `--agent` | | Only callers whose `APM_EPHEMERAL_AGENT` equals this can use it |
+| `--bind-host` | `true` | Only usable on this host by this user. `--bind-host=false` turns it off |
+| `--bind-pid` | `false` | Bind to the issuing process ID (which exits immediately) |
+
+```sh
+pm session issue --ttl 30m --scope read --agent ci --label nightly
+```
+
+</Command>
+
+<Command name="pm session list" summary="List ephemeral sessions that haven't expired">
+
+```sh
+pm session list
+```
+
+```text
+ID                             SCOPE  EXPIRES                   REVOKED    AGENT
+-------------------------------------------------------------------------------------
+eps_b8cf56d8749aa7d29f0d2ed0   read   2026-10-05 19:55:50       false      ci
+```
+
+</Command>
+
+<Command name="pm session revoke" summary="Revoke an ephemeral session">
+
+```sh
+pm session revoke <id>
+```
+
+Marks the session revoked; it stops working immediately. Doesn't need the vault unlocked.
+
+</Command>
+
+## Encryption profiles
+
+<Command name="pm profile list" summary="List the encryption profiles">
+
+```sh
+pm profile list
+```
+
+Also `pm profile ls`. Lists `standard`, `hardened`, `paranoid` and `legacy` with their KDF, time, memory, threads, salt, nonce and cipher, marks the active one with `*`, and adds the active custom profile if there is one. See [Encryption profiles](/docs/cli/vault-basics#encryption-profiles).
+
+</Command>
+
+<Command name="pm profile current" summary="Show the active profile's parameters">
+
+```sh
+pm profile current
+```
+
+Also `pm profile status`.
+
+```text
+Current profile
+===============
+Name:        paranoid
+KDF:         argon2id
+Memory:      512 MB
+Time:        6
+Parallelism: 4
+Cipher:      AES-256-GCM
+SaltLen:     32
+NonceLen:    24
+```
+
+</Command>
+
+<Command name="pm profile set" summary="Switch to a built-in profile">
+
+```sh
+pm profile set <standard|hardened|paranoid|legacy>
+```
+
+Re-encrypts the vault with the profile's parameters. Unknown names print the available profiles. Needs write access.
+
+</Command>
+
+<Command name="pm profile edit" summary="Tune and apply a custom profile">
+
+```sh
+pm profile edit [name]
+```
+
+Asks for a profile name (default: the argument, the current custom name or `custom`), then memory in MB, time, parallelism, cipher (`aes-gcm` or `xchacha20-poly1305`), salt length and nonce length, each defaulting to the active profile's value. XChaCha20-Poly1305 always uses a 24-byte nonce. Applies the result and re-encrypts the vault.
+
+</Command>
+
+<Command name="pm profile create" summary="Create a custom profile step by step">
+
+```sh
+pm profile create <name>
+```
+
+Explains each parameter and asks for it, with defaults of 64 MB, 3 iterations, 2 threads, a 16-byte salt, `aes-gcm` and a 12-byte nonce (24 for XChaCha20-Poly1305). Applies the profile and re-encrypts the vault.
+
+</Command>
+
+## Information
+
+<Command name="pm cinfo" summary="Show the vault's cryptographic parameters">
+
+```sh
+pm cinfo
+```
+
+Reads the vault header without unlocking: format version, profile, KDF parameters, cipher, nonce and salt length, and the integrity scheme. The `Memory` line is in megabytes despite its `KB` label. The `KDF` line always reads `Argon2id`. That is true even for a `legacy` vault: its profile is labelled PBKDF2, but `pm` derives its keys with Argon2id, 600,000 passes and almost no memory (its `Time` line shows 600000 and `Memory` shows 0).
+
+</Command>
+
+<Command name="pm info" summary="Show version, install folder and vault path">
+
+```sh
+pm info
+```
+
+Prints the version, the folder `pm` is installed in, the vault path in use, the project repository and a status check that the vault file exists. Doesn't need the vault unlocked.
+
+</Command>
+
+<Command name="pm update" summary="Check for a newer pm and install it">
+
+```sh
+pm update [--force]
+```
+
+Compares this version with the latest release of `apms-org/apm` on GitHub. On Windows it downloads the release's Windows `.exe` (it doesn't check the processor type), keeps the current binary as `<name>.old` and replaces it. On macOS and Linux it only takes an asset whose name has no dot in it. The release's binaries are named `apm-v<version>-<os>_<arch>`, so it finds none and prints the release page for you to download by hand. If you installed `pm` from the desktop app, update the app instead.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--force` | `false` | Download even if you have the latest version |
+
+</Command>
+
+## Danger zone
+
+<Command name="pm compromise" summary="Destroy the vault">
+
+```sh
+pm compromise
+```
+
+Asks you to type `DESTROY`. It doesn't ask for the master password. Then overwrites the vault file with random bytes, deletes it and ends the session. History snapshots in your config folder are kept. Also available as `pm mode compromise`.
+
+</Command>

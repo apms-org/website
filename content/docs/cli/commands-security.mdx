@@ -1,0 +1,407 @@
+---
+title: "Commands: security, history and maintenance"
+description: Reference for pm auth, policy, loaded, health, trust, cleanup, logs and lgit.
+order: 22
+sidebarTitle: Security and history
+group: Command reference
+---
+
+Commands for the master password and recovery, password policies, security reports, the logs and the vault's snapshot history. Every command also takes the [global flags](/docs/cli/commands#global-flags). Guides: [Recovery](/docs/cli/recovery), [Policies](/docs/cli/policies), [Health and maintenance](/docs/cli/health-and-audit), [History and undo](/docs/cli/history).
+
+Commands marked **Needs write access** refuse to run in a read-only session. Some others that change the vault don't check yet, including `pm auth change`, `pm auth email`, `pm auth reset`, `pm auth alerts`, `pm auth level`, `pm policy load` and `pm policy clear`. See [Known limitations](/docs/security/threat-model#known-limitations).
+
+## Master password
+
+<Command name="pm auth change" summary="Change the master password">
+
+```sh
+pm auth change
+```
+
+Unlocks with the current password or session, asks for the new password twice and re-encrypts the vault. Updates the Touch ID Keychain item if Touch ID is set up. It doesn't check the new password against the rules `pm setup` uses.
+
+</Command>
+
+## Recovery
+
+<Command name="pm auth email" summary="Set the recovery email and generate the recovery key">
+
+```sh
+pm auth email <address>
+```
+
+Emails a 6-digit code to `address` (valid 15 minutes, 5 tries). After you enter it, generates a recovery key, emails a notice that recovery was configured, shows the key once and saves the vault. If the notice can't be sent, it stops there: no key is shown and nothing is saved. Needs internet access.
+
+The saved vault holds a hash of the key and a copy of the vault's data key sealed with it. That save also writes a masked copy of the key into the file's unencrypted header; see [After you create a recovery key](/docs/security/recovery#after-you-create-a-recovery-key).
+
+Running it again replaces the address and the key. Trustee shares made from the old key stop working, so run `pm auth quorum-setup` again.
+
+</Command>
+
+<Command name="pm auth recover" summary="Set a new master password with the recovery key">
+
+```sh
+pm auth recover
+```
+
+Doesn't need the master password. Asks for the recovery email, emails a 6-digit code, then asks for the recovery key (3 tries), the email code (5 tries), a recovery code or recovery passkey if either is set up, and a new master password. The recovery key and the email code must both be entered within 15 minutes of the email. Resets the failed-attempt counter.
+
+It only works while the file's header still holds the masked copy of the key, which is dropped the next time the vault is saved after a fresh unlock. After that it stops with `Recovery record found but key is missing. Manual recovery required.` Recover in the desktop app, or with `pm auth quorum-recover` if you set up trustee shares.
+
+</Command>
+
+<Command name="pm auth reset" summary="Remove all recovery data">
+
+```sh
+pm auth reset
+```
+
+Removes the recovery email, recovery key, trustee shares, recovery codes and recovery passkey from the vault. Doesn't ask for confirmation.
+
+</Command>
+
+<Command name="pm auth codes generate" summary="Create one-time recovery codes">
+
+```sh
+pm auth codes generate [--count 10]
+```
+
+Replaces any existing codes and prints the new ones once, in the form `3FA91C-7D2E`. Each works once as the second factor in `pm auth recover`. Needs write access.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--count` | `10` | How many codes, up to 50 |
+
+</Command>
+
+<Command name="pm auth codes status" summary="Count recovery codes">
+
+```sh
+pm auth codes status
+```
+
+```text
+Recovery codes: 10 total, 9 remaining, 1 used
+```
+
+</Command>
+
+<Command name="pm auth passkey register" summary="Register a recovery passkey">
+
+```sh
+pm auth passkey register
+```
+
+Opens a page on `http://localhost` (random port) in your browser to create a passkey for the vault's recovery. Needs write access.
+
+</Command>
+
+<Command name="pm auth passkey verify" summary="Check the recovery passkey">
+
+```sh
+pm auth passkey verify
+```
+
+Opens the local page again and asks the passkey to sign in.
+
+</Command>
+
+<Command name="pm auth passkey disable" summary="Remove the recovery passkey">
+
+```sh
+pm auth passkey disable
+```
+
+Needs write access.
+
+</Command>
+
+<Command name="pm auth quorum-setup" summary="Split the recovery key into trustee shares">
+
+```sh
+pm auth quorum-setup [--threshold 2] [--shares 3] [--key <recovery key>]
+```
+
+Splits the recovery key with Shamir's secret sharing and prints each share (`QSHARE-<n>-<hex>`) once. Needs `pm auth email` first and write access.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--threshold` | `2` | Shares needed to recover; at least 2 |
+| `--shares` | `3` | Shares to create; at least the threshold |
+| `--key` | | The recovery key, when `pm` can't read it from the vault. Asked for if needed |
+
+</Command>
+
+<Command name="pm auth quorum-recover" summary="Set a new master password with trustee shares">
+
+```sh
+pm auth quorum-recover
+```
+
+Doesn't need the master password. Asks for the recovery email if one is set, then `threshold` shares and a new master password. No email code is sent. Resets the failed-attempt counter.
+
+</Command>
+
+## Touch ID
+
+These work on macOS only. Elsewhere they only report that Touch ID isn't available or isn't set up.
+
+<Command name="pm auth touchid setup" summary="Store the master password in the Keychain for Touch ID">
+
+```sh
+pm auth touchid setup
+```
+
+Unlocks the vault, asks for your fingerprint, then saves the master password in the login Keychain (service `APM Vault`, account `master-password`). Later unlocks try Touch ID first. Needs write access. The Keychain item itself isn't locked to your fingerprint; see [Touch ID](/docs/security/sessions-and-locking#touch-id).
+
+</Command>
+
+<Command name="pm auth touchid status" summary="Show whether Touch ID is set up">
+
+```sh
+pm auth touchid status
+```
+
+```text
+Touch ID is available but not configured. Run 'pm auth touchid setup'.
+```
+
+</Command>
+
+<Command name="pm auth touchid test" summary="Try a Touch ID prompt">
+
+```sh
+pm auth touchid test
+```
+
+</Command>
+
+<Command name="pm auth touchid remove" summary="Delete the Keychain item">
+
+```sh
+pm auth touchid remove
+```
+
+</Command>
+
+## Alerts
+
+<Command name="pm auth alerts" summary="Turn security alerts on or off">
+
+```sh
+pm auth alerts [--enable | --disable]
+```
+
+Without flags, prints whether alerts are on. Alerts are only recorded once an alert address is set, and `pm` can't set one: use **Settings → Alerts** in the desktop app. Even then, each alert is a line in `email.log` in the current folder, and no email is sent. See [Security alerts](/docs/cli/health-and-audit#security-alerts).
+
+| Flag | Meaning |
+|---|---|
+| `--enable` | Turn alerts on |
+| `--disable` | Turn alerts off |
+
+</Command>
+
+<Command name="pm auth level" summary="Set which events raise an alert">
+
+```sh
+pm auth level [1-3]
+```
+
+`1` critical events only, `2` also settings changes, `3` also item changes and exports. Without an argument, prints the current level. A vault that never had a level set shows `0`, which works like `1`.
+
+</Command>
+
+## Policies
+
+<Command name="pm policy load" summary="Activate a password policy">
+
+```sh
+pm policy load <name>
+```
+
+Reads the `.yaml` and `.yml` files in the `policies` folder next to the vault and activates the one whose `name` field equals `name`. The policy is copied into the vault. See [Password policies](/docs/cli/policies).
+
+</Command>
+
+<Command name="pm policy show" summary="Show the active policy">
+
+```sh
+pm policy show
+```
+
+Prints the policy's name, minimum length and uppercase, number and symbol requirements, or `No active policy.`
+
+</Command>
+
+<Command name="pm policy clear" summary="Stop enforcing a policy">
+
+```sh
+pm policy clear
+```
+
+</Command>
+
+<Command name="pm loaded" summary="Show the policies and .apmignore pm can see">
+
+```sh
+pm loaded
+```
+
+Lists the policy names in the vault's `policies` folder and the path of the `.apmignore` in effect, with how many rules each section has. Doesn't need the vault unlocked.
+
+</Command>
+
+## Reports and maintenance
+
+<Command name="pm health" summary="Score the vault's security">
+
+```sh
+pm health [--detailed]
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--detailed` | `false` | Also list the 10 secrets with the lowest trust scores |
+
+</Command>
+
+<Command name="pm trust" summary="List trust scores for the secrets APM tracks">
+
+```sh
+pm trust
+```
+
+Lowest score first, with its risk (`LOW`, `MEDIUM`, `HIGH` or `CRITICAL`) and the reasons. A secret gets a score once you add, change or open it, so new vaults list few or none.
+
+</Command>
+
+<Command name="pm cleanup" summary="Find and fix structural problems">
+
+```sh
+pm cleanup [--dry-run] [-y]
+```
+
+Reports empty names, empty authenticator secrets, items in spaces that no longer exist, leftover cloud tokens and more, then offers to fix what it safely can. Needs write access.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--dry-run` | `false` | Report only |
+| `-y`, `--yes` | `false` | Apply fixes without asking |
+
+</Command>
+
+<Command name="pm logs" summary="Show vault history, the audit log and lgit commits">
+
+```sh
+pm logs [--limit 200]
+```
+
+Three sections, newest first, each line marked `[VERIFIED]` or `[UNVERIFIED]`.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--limit` | `200` | Lines per section; `0` for all |
+
+</Command>
+
+## History (lgit)
+
+<Command name="pm lgit tree" summary="List history commits">
+
+```sh
+pm lgit tree [--limit 200]
+pm lgit log [--limit 200]
+```
+
+`pm lgit log` is the same command. Newest first: time (UTC), commit ID, action, data hash and verification. When older commits are left out by `--limit`, the oldest one shown reads `[UNVERIFIED]` because its parent isn't in the list; `pm lgit verify` checks the whole chain.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--limit` | `200` | Commits to show; `0` for all |
+
+</Command>
+
+<Command name="pm lgit status" summary="Compare the vault file with the latest commit">
+
+```sh
+pm lgit status
+```
+
+Prints the latest commit and whether the vault file matches it (`clean`) or not (`modified`).
+
+</Command>
+
+<Command name="pm lgit show" summary="Show one commit">
+
+```sh
+pm lgit show [commit-id|head]
+```
+
+Accepts a unique start of a commit ID. Defaults to `head`. Shows the vault path, hashes, snapshot file and verification.
+
+</Command>
+
+<Command name="pm lgit verify" summary="Check the history's signatures and chain">
+
+```sh
+pm lgit verify
+```
+
+```text
+Verified commits: 214/214
+LGit chain integrity is valid.
+```
+
+</Command>
+
+<Command name="pm lgit undo" summary="Restore the snapshot before the latest commit">
+
+```sh
+pm lgit undo [--steps 1]
+```
+
+Writes the second-newest snapshot to the current vault and records an `UNDO` commit. Because each undo is a commit, a second undo reverses the first. Use `pm lgit checkout` to go further back. History is shared by all vaults, so if you use more than one, check `pm lgit tree` first. Needs write access.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--steps` | `1` | Repeat the undo this many times. Each one reverses the one before, so an even number leaves the vault as it was |
+
+</Command>
+
+<Command name="pm lgit checkout" summary="Restore a chosen snapshot">
+
+```sh
+pm lgit checkout [commit-id|head]
+```
+
+Writes that commit's snapshot to the current vault and records a `CHECKOUT` commit. History is shared by all vaults, so check the commit's vault path with `pm lgit show` first. Needs write access.
+
+</Command>
+
+<Command name="pm lgit squash" summary="Keep only the newest commits">
+
+```sh
+pm lgit squash [--keep 1]
+```
+
+Removes all but the newest `--keep` commits from the history and deletes their snapshots, re-signs the chain and records a `SQUASH` commit. Needs write access.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--keep` | `1` | Commits to keep |
+
+</Command>
+
+<Command name="pm lgit prune" summary="Delete snapshot files no commit points to">
+
+```sh
+pm lgit prune
+```
+
+```text
+LGit prune complete. Removed=3, Kept=211
+```
+
+Needs write access.
+
+</Command>

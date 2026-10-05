@@ -1,0 +1,241 @@
+---
+title: Cloud sync
+description: Keep an encrypted copy of the vault on Google Drive, GitHub or Dropbox, restore it on another machine, and merge changes item by item.
+order: 11
+group: Guides
+---
+
+Cloud sync uploads your encrypted vault file to Google Drive, a GitHub repository or Dropbox. The provider stores ciphertext only: the vault is encrypted with your master password before it leaves your machine, and nothing is decrypted in the cloud. Sync is optional and off until you set it up.
+
+`pm` syncs the whole vault file, not individual items. Uploads replace the cloud copy. To bring cloud changes into a local vault item by item, use [`pm cloud diff`](#compare-and-merge).
+
+## Providers and modes
+
+| Provider | Mode | Where the file goes | You need |
+|---|---|---|---|
+| Google Drive | `APM_PUBLIC` | APM's shared Drive folder, under a random name, readable by anyone who has its file ID | Nothing; uses APM's built-in credentials |
+| Google Drive | Self-hosted | The root of your own Drive | A Google sign-in in your browser |
+| GitHub | Token | `vault.dat` in a repository you name (`owner/repo`). If it doesn't exist, `pm` creates it as a private repository in the token owner's account | A personal access token (classic or fine-grained) or an OAuth2 access token that can create and write to that repository |
+| Dropbox | `APM_PUBLIC` | APM's Dropbox app, as `/v_<name>.bin` | Nothing |
+| Dropbox | Self-hosted | Your own Dropbox app | A Dropbox app key and secret, then a browser sign-in |
+
+<Callout type="warning" title="What APM_PUBLIC means">
+In `APM_PUBLIC` mode your encrypted vault sits in storage APM shares between users, and on Google Drive the file is shared with "anyone with the link". Nobody can read it without your master password, so its safety rests entirely on that password and your [encryption profile](/docs/security/profiles). Everyone who runs `pm` has the same access to that storage, so someone else could also delete or replace your copy. If you'd rather the file never leave your own account, choose self-hosted or GitHub.
+</Callout>
+
+## Set up sync
+
+```sh title="Terminal"
+pm cloud init            # choose a provider
+pm cloud init gdrive     # or name it: gdrive, github, dropbox or all
+```
+
+`pm setup` offers the same choices in its cloud step.
+
+<Steps>
+
+### Choose a mode
+
+For Google Drive and Dropbox, pick `APM_PUBLIC` or self-hosted. For GitHub, choose a personal access token or an OAuth2 access token, paste it, and enter the repository as `owner/repo`.
+
+### Decide about the retrieval key
+
+Google Drive and Dropbox ask:
+
+```text
+Google Drive can store a one-way hash of your retrieval key in cloud metadata for key-based recovery.
+Allow key hash storage in cloud metadata? (y/n) [n]:
+```
+
+- **Yes:** enter your own retrieval key or leave it blank to generate one (two random words such as `SwiftFalcon`). Only its SHA-256 hash is stored with the file: in the Drive file's description, or as the Dropbox file name. On a new machine you can find the vault with the key. Generated keys come from a short word list (2,304 pairs), so in `APM_PUBLIC` another user can get the same key. On Dropbox the same key means the same file name, and the later upload replaces the earlier one. Type a long key of your own instead.
+- **No:** nothing about a key is stored. `pm` prints the Drive file ID or Dropbox path instead; keep that to find the vault later.
+
+### First upload
+
+`pm` uploads the vault and saves the provider settings, tokens included, inside the encrypted vault.
+
+```text
+Google Drive sync setup successful.
+Retrieval Key: SwiftFalcon
+Mode: APM_PUBLIC
+```
+
+</Steps>
+
+Store the retrieval key, file ID or repository name somewhere other than the vault. You need it, and your master password, to restore on a new machine.
+
+`pm cloud init` refuses to run again while sync is set up. Run [`pm cloud reset`](#reset) first to start over. If only Google Drive is set up and you said no to the retrieval key, `pm cloud reset` reports that sync isn't set up; use [`pm cloud delete`](#delete-the-cloud-copy) instead. The `--key` flag is accepted but not used; the key is always asked for interactively.
+
+## Upload changes
+
+```sh title="Terminal"
+pm cloud sync            # every provider you set up
+pm cloud sync github     # just one
+```
+
+```text
+[gdrive] Vault synced to cloud.
+[github] Vault synced to cloud.
+```
+
+Each upload applies your [`.apmignore`](#leave-items-out) first. The vault on disk is never changed by a sync.
+
+### Sync automatically
+
+```sh title="Terminal"
+pm cloud auto-sync --true
+```
+
+```text
+Auto-sync watcher started (Targets: [gdrive github]). Press Ctrl+C to stop.
+[14:02:11] Change detected, syncing to cloud...
+[gdrive] Auto-sync successful.
+[github] Auto-sync successful.
+```
+
+The watcher stays in the foreground and uploads whenever the vault file is written, at most once every 5 seconds. A write that comes less than 5 seconds after the last upload is skipped, and waits for the next change. It syncs Google Drive and GitHub; Dropbox is not included. With an `.apmignore` in effect, it uploads a filtered copy of the vault as it was when the watcher started, not the changed vault, so restart it after changes or use `pm cloud sync`. Without `--true` the command only prints its usage. The desktop app has its own automatic sync setting in **Settings → Sync**.
+
+## Restore on another machine
+
+`pm cloud get` downloads a vault. It does not need a local vault or a session, so it is how you set up a second computer.
+
+```sh title="Terminal"
+pm cloud get gdrive SwiftFalcon          # Drive, by retrieval key or file ID
+pm cloud get dropbox SwiftFalcon         # Dropbox, by retrieval key or /v_….bin path
+pm cloud get github alex/apm-vault       # GitHub, by repository
+```
+
+Leave out the arguments and `pm` asks for them. It then asks how to authenticate:
+
+| Provider | Choices |
+|---|---|
+| Google Drive | `APM_PUBLIC`, or OAuth2 self-hosted (signs in through your browser) |
+| Dropbox | `APM_PUBLIC`, or an OAuth2 access token (or token JSON) for your own app |
+| GitHub | A personal access token or an OAuth2 access token |
+
+`--auth-mode pat` or `--auth-mode oauth2` answers the first question, and `--token` (or its alias `--oauth2-token`) passes the token so it isn't asked.
+
+Finally `pm` asks for the master password of the downloaded vault and only saves it if it decrypts:
+
+```text
+Verify Master Password for downloaded vault:
+Vault retrieved and saved successfully.
+```
+
+A vault restored from GitHub keeps the token and repository, so `pm cloud sync` works on the new machine straight away.
+
+### When a local vault already exists
+
+If the downloaded vault differs from the one on disk, `pm` does not merge them:
+
+```text
+Conflict detected: local vault and downloaded cloud vault differ.
+APM does whole-vault conflict handling (no entry-level merge).
+1. Overwrite local vault with cloud copy
+2. Keep local vault and save cloud copy as conflict file
+3. Cancel
+```
+
+Option 2 saves the cloud copy next to your vault as `vault.dat.conflict.<provider>.<timestamp>`. Compare or import it later with `pm export compare` or `pm import`.
+
+## Compare and merge
+
+`pm cloud diff` downloads the latest cloud copy, decrypts it with your current master password and lists the differences item by item. Values are never shown, only names and which fields changed.
+
+```sh title="Terminal"
+pm cloud diff            # the provider you used last
+pm cloud diff github
+```
+
+```text
+Cloud diff found 3 change(s):
+ 1. [REMOVED] API Key "old-key" (space: Work)
+ 2. [MODIFIED] Password "GitHub" (space: default)
+    changed fields: password, website
+ 3. [ADDED] Password "Netflix" (space: default)
+Values are redacted; only identifiers and changed field names are shown.
+
+Choose merge mode:
+1. Merge all remote changes
+2. Select specific changes
+3. Cancel
+Selection (1/2/3):
+```
+
+| Kind | Meaning | Merging it |
+|---|---|---|
+| `ADDED` | In the cloud, not here | Adds it locally |
+| `MODIFIED` | In both, different | Takes the cloud version |
+| `REMOVED` | Here, not in the cloud | Deletes it locally |
+
+With option 2, type change numbers and ranges such as `1,3-5`, or `all`. Merging only changes the local vault; run `pm cloud sync` afterwards to upload the result.
+
+<Callout type="warning" title="REMOVED means delete">
+"Merge all" also deletes local items that the cloud copy doesn't have, including items you added since the last upload. Pick changes one by one when you have local work that isn't synced yet. `pm lgit undo` reverts a merge.
+</Callout>
+
+A read-only session shows the diff but can't merge.
+
+## Leave items out
+
+An `.apmignore` file controls what each upload contains: whole spaces, items by space, type and name, or rules for one provider only.
+
+```ini title=".apmignore"
+[spaces]
+private
+
+[entries]
+*:api-key:*test*
+
+[cloud-specific-ignore]
+github:*:ssh-key:*
+```
+
+`pm` looks for it in the current folder first, then next to the vault. `pm loaded` shows which file is in effect. Full syntax: [.apmignore reference](/docs/reference/apmignore).
+
+<Callout type="warning" title="GitHub setup with an .apmignore">
+When an `.apmignore` with rules is in effect, `pm cloud init github` encrypts its first upload with your GitHub token instead of your master password. Anyone with that token can open that copy and read the vault's data key, which also opens your later copies. A later `pm cloud sync github` replaces the file, but the first version stays in the repository's history. Set up GitHub with no `.apmignore` in effect (none in the current folder or next to the vault), then add the file. If it already happened, see [Someone who once had the data key](/docs/security/threat-model#someone-who-once-had-the-data-key). Google Drive and Dropbox setup, and every later sync, use the master password.
+</Callout>
+
+## Delete and reset
+
+### Delete the cloud copy
+
+```sh title="Terminal"
+pm cloud delete
+```
+
+Deletes the Google Drive file and forgets its file ID and retrieval key in the vault. It works for Google Drive only. If you set up Dropbox after Google Drive (for example with `pm cloud init all`), name the provider: `pm cloud delete gdrive`. To remove a GitHub or Dropbox copy, delete the repository or file with the provider.
+
+### Reset
+
+```sh title="Terminal"
+pm cloud reset
+```
+
+Asks for confirmation, then clears every cloud setting stored in the vault: retrieval key, file IDs, modes and tokens for all three providers. Cloud files are not deleted. Run `pm cloud init` again afterwards.
+
+## Where settings are kept
+
+Provider tokens, the repository, file IDs, modes and the retrieval key live inside the encrypted vault, so they are protected by your master password and travel with the vault. `pm cloud get` from GitHub adds the token to the downloaded vault for that reason. See [File locations](/docs/reference/file-locations).
+
+## Troubleshooting
+
+`pm cloud` prints these messages in red. Most of them still exit with status 0, so check the output in scripts.
+
+| Message | Cause and fix |
+|---|---|
+| `Cloud sync is already initialized.` | `pm cloud init` found existing settings. Run `pm cloud reset` first if you want to start over |
+| `Cloud sync not initialized. Run 'pm cloud init' first.` | `pm cloud sync` found no provider in the vault. Check you're using the right vault (`--vault`, `APM_VAULT_PATH`) |
+| `Cloud sync not initialized.` from `pm cloud auto-sync` | Auto-sync only covers Google Drive and GitHub. A vault that syncs only to Dropbox has nothing to watch; use `pm cloud sync dropbox` |
+| `Unsupported cloud provider '…'. Use gdrive, github, dropbox, or all.` | A typo in the provider name. The names are `gdrive`, `github`, `dropbox` and `all` |
+| `Missing GitHub repo. Use owner/repo.` | `pm cloud get github` needs the repository as `owner/repo` |
+| `A retrieval key or direct cloud file identifier is required.` | `pm cloud get` was given an empty key. Pass the retrieval key, Drive file ID or Dropbox path |
+| `Key resolution failed: no vault found with key '…'` | No Drive file matches the retrieval key. Keys are case-sensitive, and only work if you let `pm` store the key's hash with the file at setup. Otherwise use the file ID |
+| `Cloud Error: …` or `[provider] Cloud Error: …` | `pm` couldn't connect to the provider: the token was revoked or expired, the OAuth sign-in failed, or there is no network. For a self-hosted provider, run `pm cloud reset` and `pm cloud init` to sign in again |
+| `Download failed: …` | The provider refused the download, often because the file was deleted or the token lost access |
+| `Decryption failed. Vault not saved locally: …` | The master password you entered doesn't open the downloaded copy. Nothing on disk was changed |
+| `Failed to decrypt cloud vault with the current master password: …` | `pm cloud diff` can only compare a cloud copy that uses the same master password as the local vault. If you changed it on one side, sync from that side first |
+| `Failed to apply .apmignore for upload: …` or `[provider] Failed to apply .apmignore: …` | The `.apmignore` in effect has a malformed rule, for example `.apmignore line 4: entry rule must be 'space:type:name'`. Fix the line; `pm loaded` shows which file is used |
+| `Usage: pm cloud auto-sync --true` | Auto-sync starts only with `--true` |
+| `Vault is READ-ONLY. Diff shown, but merge is disabled.` | The session is read-only. Unlock with full access to merge |

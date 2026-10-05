@@ -1,0 +1,64 @@
+---
+title: Report a vulnerability
+description: How to tell the APM maintainers about a security problem without putting other users at risk.
+order: 8
+group: Help
+sidebarTitle: Report a vulnerability
+---
+
+APM is open source and maintained in the open on GitHub. It does not have a published security policy or a dedicated security email address yet, so reports go through the GitHub repositories. Please report privately first when you can.
+
+## Where to report
+
+| Part of APM | Repository |
+|---|---|
+| The engine, `pm`, the vault format, sync and the MCP server | [apms-org/cli](https://github.com/apms-org/cli) |
+| The desktop app | [apms-org/gui](https://github.com/apms-org/gui) |
+| The browser extension | [apms-org/extension](https://github.com/apms-org/extension) |
+
+<Steps>
+
+### Report privately if you can
+
+Open the repository's **Security** tab. If it offers **Report a vulnerability**, use it. Only the maintainers see that report.
+
+### Otherwise, ask for a private channel
+
+Open an issue in the [issue tracker](https://github.com/apms-org/cli/issues) that says you have a security report and asks how to send it privately. Do not put any details, steps or proof of concept in the issue.
+
+### Send the details
+
+Share the details once you have a private channel.
+
+</Steps>
+
+<Callout type="warning">
+Never attach a real `vault.dat`, a session file, `ephemeral_sessions.json`, an MCP token or anything else from your own APM folders. Reproduce the problem with a throwaway vault and a test password, and share that instead.
+</Callout>
+
+## What to include
+
+- The version: `pm --version`, and the desktop app or extension version if they are involved.
+- The vault's settings from `pm cinfo`. It reads only the header and prints the format, profile, key derivation settings and cipher, so it is safe to share.
+- Your operating system and how you installed APM.
+- Which surface is affected: `pm`, the desktop app, the browser extension, the MCP server, or sync.
+- Steps to reproduce, starting from a new vault. Keep the test away from your real one: point `pm` at a throwaway file with an absolute `APM_VAULT_PATH`, which moves the failed-attempt counter and access log to that file's folder. `--vault` leaves them in `~/.apm`, where test failures would add to your real count, so set `APM_STATE_DIR` to a throwaway folder as well.
+- What an attacker needs (a copy of the file, local access, a malicious web page, a malicious MCP client) and what they gain.
+- A proof of concept, if you have one.
+
+## What counts as a vulnerability
+
+Reports like these help most:
+
+- Reading vault contents, the data key or the master password without the master password or recovery key.
+- Changing `vault.dat` without the HMAC check catching it.
+- Getting past an auto-lock, a session limit, a scope or a binding.
+- An MCP client doing more than its token's scopes allow, or a write landing without approval.
+- A web page reaching the browser bridge, or the extension filling credentials on the wrong site.
+- Anything that sends secrets off your computer.
+
+Some limitations are already documented in [Threat model](/docs/security/threat-model#known-limitations). You are still welcome to report them if you see a fix or a worse consequence than described.
+
+## After you report
+
+There is no formal response timeline. Fixes ship in new releases. Keep `pm`, the desktop app and the extension current (see [Update](/docs/getting-started/installation#update): `pm update` only works on Windows for now), and check the [releases page](https://github.com/apms-org/cli/releases) for security notes.

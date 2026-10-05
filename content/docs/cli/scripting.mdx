@@ -1,0 +1,140 @@
+---
+title: Scripting and automation
+description: Use pm from scripts and CI - non-interactive behaviour, feeding prompts, scoped sessions, JSON output and how to detect failures.
+order: 17
+sidebarTitle: Scripting
+group: Guides
+---
+
+`pm` is built for people at a terminal, but it behaves predictably when its input isn't one. This page collects what changes, and the patterns that work in scripts and CI.
+
+## What changes without a terminal
+
+`pm` checks whether stdin is a terminal:
+
+| Command | On a terminal | Without one |
+|---|---|---|
+| `pm get` | Full-screen search | One match: prints the item. Several: prints a numbered list of names and types |
+| `pm totp` | Live view | Prints every code once |
+| Password prompts | Hidden input | Reads one line from stdin |
+| Other prompts | Read a line | Read a line from stdin |
+| Secure notes | Note editor | Read lines until an empty line |
+| `pm import` | Asks about conflicts and confirms | Uses the suggested actions and your `--on-conflict` / `--on-duplicate` policies |
+| `pm export` | Asks to encrypt and before overwriting | Writes a plain file unless you pass `-p`, and fails instead of overwriting |
+| `pm extension serve` | Asks to approve pairings | Denies pairing requests |
+| `pm extension link` | Waits for the browser | Registers and exits |
+
+Colors are turned off automatically when output isn't a terminal, and when `NO_COLOR` is set.
+
+To force the non-terminal behaviour in an interactive shell, redirect stdin:
+
+```sh title="Terminal"
+pm get github --show-pass < /dev/null
+```
+
+## Give scripts a session
+
+A script needs the vault unlocked without someone typing the password. Prefer, in order:
+
+1. **An ephemeral session.** Issue one interactively, hand only its ID to the job, and let it expire. It can be read-only and bound to an agent label. Sessions are stored in your APM config folder and bound to this computer by default, so the job must run on the same computer, as you. See [Ephemeral sessions](/docs/cli/sessions#ephemeral-sessions).
+
+   ```sh title="Terminal"
+   pm session issue --ttl 30m --scope read --agent ci
+   # in the job:
+   export APM_EPHEMERAL_ID=eps_…
+   export APM_EPHEMERAL_AGENT=ci
+   ```
+
+2. **Your existing session.** If you ran `pm unlock` in the same user account, scripts reuse it. Give a script its own session file with `APM_SESSION_ID` so it doesn't extend or end yours.
+
+3. **The password on stdin.** Prompts read a line from stdin when it isn't a terminal:
+
+   ```sh title="Terminal"
+   printf '%s\n' "$APM_MASTER_PASSWORD" | pm unlock --timeout 10m
+   ```
+
+   Only do this where the password comes from a secret store, never from a file in the repository or a command-line argument.
+
+Without any of these, a command that opens the vault asks for the master password (or Touch ID) and continues; it doesn't fail up front. A `read` ephemeral session or a read-only session lets commands read, and most commands refuse changes. Not all of them check: see [Known limitations](/docs/security/threat-model#known-limitations).
+
+### Commands that don't open the vault
+
+These work with the vault locked and never prompt:
+
+| Command | Reads |
+|---|---|
+| `pm info`, `pm cinfo` | The install and the vault header |
+| `pm gen` | Nothing |
+| `pm loaded` | The `policies` folder and `.apmignore` |
+| `pm lgit tree`, `log`, `status`, `show`, `verify` | The history files |
+| `pm session list`, `pm mcp list` | The session and token stores |
+| `pm extension token`, `pm extension status` | The pairing token, the linked browsers and the running bridge |
+| `pm cloud get` | The cloud copy; it asks for that copy's password instead |
+| `pm update`, `pm compromise` | Nothing; `pm compromise` asks you to type `DESTROY` |
+
+## Read secrets
+
+```sh title="Terminal"
+pm get "OpenAI" --show-pass < /dev/null
+```
+
+```text
+OpenAI
+API key · space: default
+
+  Service   openai
+  Key       sk-test-123
+```
+
+To put secrets into environment variables for a process, [`pm inject`](/docs/cli/inject) is cleaner than parsing that output:
+
+```sh title="Terminal"
+eval "$(pm inject --inject OpenAI,GitHub)"
+./run-tests.sh
+eval "$(pm inject kill)"
+```
+
+## Write items
+
+Prompts read their answers line by line, in the order `pm add` asks them (see the [item types table](/docs/cli/items#item-types)):
+
+```sh title="Terminal"
+printf '%s\n' "OpenAI" "openai" "$OPENAI_KEY" | pm add apikey
+```
+
+```text
+Label: Service: API Key: Entry saved.
+```
+
+For many items at once, write a CSV or an APM JSON file and import it with `pm import file.csv -y --on-conflict skip`.
+
+## JSON output
+
+These commands print machine-readable JSON with `--json`:
+
+| Command | Prints |
+|---|---|
+| `pm import <file> --dry-run --json` | The file's format, warnings and the full plan, row by row |
+| `pm import <file> --json -y` | The result: added, merged, replaced, skipped, passkeys added, errors |
+| `pm export --json` | The summary, output file and size |
+| `pm export --dry-run --json` | The summary and the output file it would write |
+| `pm export compare <file> --json` | The plan and the items only in the vault |
+
+## Detect failures
+
+Most `pm` commands print an error and still **exit with status 0**. Only some exit with 1 on failure, including `pm import`, `pm export`, `pm totp link` and `unlink`, `pm autolock` and most `pm extension` commands. Unknown commands and flags also exit 0. Check the output, or the state you expect, rather than relying on the exit status. The full list is in [Exit codes](/docs/reference/exit-codes).
+
+```sh title="Terminal"
+if ! pm get "$NAME" --show-pass < /dev/null | grep -q ' · space: '; then
+  echo "no single match for $NAME" >&2
+  exit 1
+fi
+```
+
+## Other tips
+
+- **Pick the vault explicitly** with `--vault` or `APM_VAULT_PATH`, so a script never opens the wrong one.
+- **Read the version** with `pm --version`, which prints only the number.
+- **No shell completion.** `pm` doesn't generate completion scripts.
+- **Don't run `pm lgit undo` in automation.** It writes the second-newest history snapshot over the current vault, whichever vault that snapshot came from. See [History and undo](/docs/cli/history).
+- **Stop `pm cloud auto-sync` when you don't need it.** It keeps the master password in memory for as long as it runs.

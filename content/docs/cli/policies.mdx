@@ -1,0 +1,90 @@
+---
+title: Password policies
+description: Write a YAML policy, load it into the vault, and have APM refuse login passwords that don't meet it.
+order: 14
+sidebarTitle: Policies
+group: Guides
+---
+
+A policy sets minimum rules for passwords: length, uppercase letters, digits and symbols. You write it as a YAML file, load it by name, and from then on APM refuses new login passwords that break it. The loaded policy is saved in the vault, so it applies wherever the vault is opened.
+
+## Write a policy
+
+Policies live in a `policies` folder next to the vault. `pm setup` creates it; with the default vault that is `~/.apm/policies`. Any `.yaml` or `.yml` file in that folder is read.
+
+```yaml title="~/.apm/policies/team.yaml"
+name: team-standard
+password_policy:
+  min_length: 14
+  require_uppercase: true
+  require_numbers: true
+  require_symbols: true
+rotation_policy:
+  rotate_every_days: 90
+  notify_before_days: 14
+```
+
+The `name` field, not the file name, is how you load it. The full list of keys is in the [policy file reference](/docs/reference/policies).
+
+## Load, check and clear
+
+```sh title="Terminal"
+pm loaded                     # which policies pm can see, and the .apmignore in use
+pm policy load team-standard  # make it the active policy
+pm policy show                # what the active policy requires
+pm policy clear               # stop enforcing
+```
+
+```text
+$ pm loaded
+Loaded state
+============
+
+[policies]
+dir=/Users/alex/.apm/policies
+- team-standard
+
+[.apmignore]
+(not found)
+
+$ pm policy show
+Active Policy: team-standard
+Min Password Length: 14
+Require Uppercase: true
+Require Numbers: true
+Require Symbols: true
+```
+
+`pm policy load` copies the policy into the vault. Editing the YAML file later doesn't change the active policy until you load it again. Only one policy is active at a time.
+
+## What is enforced
+
+| Where | Checked |
+|---|---|
+| `pm add password` | The new password |
+| `pm add wifi` | Not checked |
+| Editing a login in `pm get` | The password, if you changed it |
+| The desktop app | Passwords of new and edited logins and Wi-Fi items |
+| AI agents adding a login over MCP | The new password |
+| AI agents editing a login over MCP | Not checked |
+| `pm import` | Not checked |
+
+A password that breaks the policy is refused with the reason:
+
+```text
+$ pm add password
+Account Name: Router admin
+Username: admin
+Password (leave blank to generate):
+Error: password too short (min 14)
+```
+
+The checks are: at least `min_length` characters, counted in bytes (an accented letter or an emoji counts as 2 to 4); at least one uppercase letter; at least one digit; at least one punctuation or symbol character. `pm add password` and logins added over MCP are checked only when `min_length` is greater than 0, while the desktop app checks whenever a policy is active, so give every policy a `min_length`. Existing passwords are not re-checked when you load a policy; use [`pm health`](/docs/cli/health-and-audit) and the desktop app's Watchtower to find weak ones.
+
+<Callout type="note" title="Rotation and classification are not enforced yet">
+`rotation_policy` and `classification` are read and saved with the policy, and the desktop app shows the rotation period, but neither `pm` nor the app acts on them today. Keys `pm` doesn't know, such as `naming_convention`, are ignored.
+</Callout>
+
+## Use a policy with another vault
+
+The `policies` folder belongs to the vault next to it. With `--vault` or `APM_VAULT_PATH`, `pm` looks in the `policies` folder beside that vault. Copy or link the YAML file there if several vaults should share it.

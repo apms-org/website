@@ -1,0 +1,153 @@
+---
+title: Browser extension
+description: How the desktop app serves the APM for Chrome extension, how to approve a browser, and how to keep the extension working while the app is closed.
+order: 15
+group: Connections
+---
+
+APM for Chrome fills logins, one-time codes and passkeys from your vault. It never opens `vault.dat` and never holds your master password. Instead it asks the desktop app over a loopback bridge, and the app does the decrypting. When the app is closed, the extension can ask `pm` directly instead.
+
+Open **Settings → Browser extension** to see the bridge and manage connected browsers. The page sums it up as: "APM for Chrome fills logins, one-time codes and passkeys from this vault. It talks to this app over a loopback bridge, or to pm when the app is closed, and cannot decrypt anything on its own."
+
+## The browser bridge
+
+While APM is running, it serves the bridge on `127.0.0.1:41417`, on this computer only. To use another port, start APM with `APM_BRIDGE_PORT` in its environment, for example from a terminal, and give the extension the same port in its settings. The **Browser bridge** card shows the chain from the extension to the app to `vault.dat`:
+
+| Part | What it shows |
+|------|---------------|
+| **APM for Chrome** | **Active** when a browser contacted APM in the last two minutes, **Idle** after that, or **Not connected** if none ever has |
+| **APM** | **Running** or **Stopped** |
+| **vault.dat** | How many passkeys the vault holds, such as **12 passkeys** |
+
+The links between them are labelled **bearer token** (the browser proves itself with its pairing token) and **decrypts** (only the app opens the vault).
+
+The card's corner names the last browser that contacted APM and how long ago, for example **Chrome 129 on macOS · active now** or **Chrome 129 on macOS · active 5m ago**. Before any browser has connected it says **No browser connected yet**.
+
+The note under the card reads:
+
+- While the bridge runs: "Listening on 127.0.0.1:41417. Loopback only. A browser needs your approval here before it can read anything."
+- When it could not start: "Not running. Another app may be using port 41417. Quit it and restart APM." That other program can be `pm extension serve` running in a terminal. See [Troubleshooting](/docs/desktop/troubleshooting#the-browser-extension-cannot-connect).
+
+A browser can read nothing until you approve it here. Requests that do something, such as filling, revealing, unlocking, saving, reading codes or using a passkey, count as activity for auto-lock. The extension's own background checks do not: status polls, badge counts, its list of logins, website logos and pairing requests.
+
+<Callout type="warning" title="Closing the window on a Mac">
+On macOS, closing the window leaves APM running, so the bridge keeps serving and the extension keeps filling. Auto-lock keeps running while the window is closed, including for a vault you unlock from the browser: the idle limit, the maximum session and lock on sleep all still apply. Each request from the extension counts as activity, and so does closing the window, so the idle timer starts over then. To lock right away, use **APM → Lock Vault** (<Kbd>⌘</Kbd><Kbd>L</Kbd>) before you close the window, or quit APM.
+
+On Windows and Linux, closing the window quits APM and stops the bridge. To keep the extension working after you quit, link it to `pm` (below).
+</Callout>
+
+## Connect a browser
+
+There is no token to copy. The extension asks, and you confirm a code.
+
+<Steps>
+
+### Install the extension
+
+Install **APM for Chrome** in Chrome, Edge, Arc or Brave. See [Install the extension](/docs/extension/install).
+
+### Choose Connect in the extension
+
+Open it from the toolbar and choose **Connect**. It shows a 6-character code.
+
+### Approve it in APM
+
+APM shows a dialog that names the browser, such as **Connect Chrome 129 on macOS to APM?**, under it "The APM extension wants to fill logins, codes and passkeys from this vault.", then the code as two groups of three, such as **K7M-2QX**, and "Check that the extension shows the same code. Only connect browsers you use." Check that the codes match, then choose **Connect**. Choose **Deny** if you did not start this.
+
+</Steps>
+
+The dialog counts down from **Expires in 2:00** and turns to a warning colour in the last 15 seconds. Closing it with <Kbd>Esc</Kbd> or its close button denies the request. It appears in the APM window on top of whatever you are doing, even on the lock screen, so you can approve a browser while the vault is locked. While **Settings → Browser extension** is open, the request also shows inline in the **Connect a browser** card as "Chrome 129 on macOS wants to connect to this vault", with the same code, timer, **Deny** and **Connect**.
+
+When a request arrives, APM comes to the front, and if its window was closed it reopens with the request on screen. Answer it within the two minutes. Only one request waits at a time: a new one from any browser replaces the one on screen. APM accepts at most 5 requests a minute; after that the extension's popup says "Too many requests. Wait a minute and try again."
+
+The outcome shows as a message:
+
+| Message | When |
+|---------|------|
+| **Chrome 129 on macOS is connected**, "It can fill from this vault while it is unlocked." | You chose **Connect** |
+| **Connection denied**, "Chrome 129 on macOS was not connected." | You chose **Deny** or closed the dialog |
+| **Connection request expired**, "Choose Connect in the extension to try again." | Two minutes passed before you answered |
+
+Each answer is written to the audit log as `BRIDGE_PAIRED` or `BRIDGE_PAIR_DENIED`, with the browser's name. See [Pairing](/docs/extension/pairing) for the extension's side.
+
+## Use it without the app
+
+Link the browser to `pm` once and the extension keeps working while APM is closed.
+
+1. In a terminal, run `pm extension link`. It registers `pm` with the Chromium-based browsers it finds on this computer. The card says "Chrome, Edge, Arc and Brave on this Mac"; in fact `pm` can link Chrome, Chrome Beta, Chrome Canary, Chromium, Edge, Brave, Vivaldi and Arc on macOS, and fewer on Windows and Linux. See [Platform notes](/docs/extension/troubleshooting#platform-notes).
+2. If the extension is not connected yet, it shows a code and `pm` asks you to confirm it. You do this once.
+3. When the app is closed, the browser starts `pm` on its own. Unlock from the extension's toolbar popup. The vault still locks on your auto-lock settings.
+
+The card's footer shows the command, `pm extension link`, with a button to copy it. **Settings → Appearance → Show pm commands** hides these command chips. **Auto-lock settings** opens **Settings → Sessions**.
+
+## Manual pairing
+
+If a browser cannot connect with a code, enter the pairing token in the extension's options instead. The **Manual pairing** card shows the token masked: a row of dots and its last 6 characters. The eye button reveals it and the copy button copies it.
+
+**Rotate** replaces the token. APM asks "Rotate the pairing token?" and explains "Every browser using the old token is disconnected until you connect it again." Choose **Rotate token** to go ahead; APM confirms with **Pairing token rotated** and writes `BRIDGE_TOKEN_ROTATED` to the audit log. Each browser notices on its next request and asks to connect again.
+
+The same token is shared by the app, `pm extension serve` and a linked `pm`. From a terminal, `pm extension token --show` prints it and `pm extension rotate` replaces it. See [Pairing](/docs/extension/pairing#pair-with-a-token-instead).
+
+## Saved passkeys
+
+The **Saved passkeys** card lists every passkey in the vault, most recently used first, under the note "The private key is stored encrypted inside the item it belongs to." Each row shows the site, the passkey's label if it has one, and a line such as:
+
+```text
+you@example.com · in GitHub · used 3h · 14 sign-ins
+```
+
+"No user name" stands in when the site gave none. The time is short: `now`, `5m`, `3h`, a weekday such as `Tue`, or a date such as `Oct 3`, and "used never" means it was never used to sign in. With more than four passkeys, a **Filter passkeys** field appears; it matches the site, user name, item name and label. With none, the card says "No passkeys yet. Create one on any site with the extension installed."
+
+Each row's menu has:
+
+| Action | What happens |
+|--------|--------------|
+| **Rename** | Opens **Rename passkey**, "A label to tell your passkeys apart, like the device you made it on." Type up to 120 characters and choose **Save**. **Save** stays off while the field is empty, so this dialog cannot clear a label. You see **Passkey renamed** |
+| **Copy credential ID** | Copies the passkey's credential ID. You see **Credential ID copied** |
+| **Remove** | Asks "Remove the github.com passkey?" and warns "You will not be able to sign in to github.com with it. Remove it from the site's security settings too." Choose **Remove passkey**. You see **Passkey removed** |
+
+Click the item name in a row to open that item in the vault. See [Passkeys](/docs/desktop/passkeys#see-every-passkey).
+
+## The extension and your session
+
+- Unlocking from the extension unlocks the app too, and APM shows **Unlocked from the browser**, with "With Touch ID" when you used Touch ID.
+- Locking from the extension locks the app. The lock screen then says **Locked from the browser**.
+- A Touch ID unlock that the extension asks for shows the macOS Touch ID dialog for APM, with the reason "unlock your vault for the browser extension".
+- Wrong passwords typed in the extension count toward the same limits as the lock screen: a 30-second pause after every third, and no more attempts after six until you recover the vault. See [Failed attempts](/docs/security/sessions-and-locking#failed-attempts).
+- When the vault is locked, the extension can only show that it is locked and offer to unlock.
+
+## Install from the app
+
+The **Install the extension** card ("Chrome, Edge, Arc and Brave. Build it from the APM repository, then load it unpacked.") lists the steps:
+
+1. Build it: `cd extension && npm install && npm run build`.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Choose **Load unpacked** and pick the `extension/dist` folder.
+4. Pin **APM for Chrome** to the toolbar, then connect it.
+
+The extension lives in its own repository and works in other Chromium browsers too. See [Install the extension](/docs/extension/install) for where to get it and what it needs.
+
+## In the terminal
+
+`pm extension serve` runs the same bridge without the desktop app, and `pm extension link` lets the browser start `pm` when the app is closed. `pm extension status` shows which browsers are linked, whether the app or `pm extension serve` is answering, and whether your pairing token matches. `pm extension token` prints the token and `pm extension rotate` replaces it. `APM_BRIDGE_PORT` changes the port for both the app and `pm`. See [Pairing](/docs/extension/pairing) and the [CLI reference](/docs/cli/commands).
+
+With the app open and unlocked, `pm extension status` ends like this:
+
+```text title="Output"
+Right now:       the extension uses the APM app
+Listening:       127.0.0.1:41417
+Version:         12.0.0 (bridge API 2)
+Vault:           unlocked, 214 items
+Token:           3f9c1a (fingerprint)
+```
+
+## If something goes wrong
+
+| What you see | What to do |
+|--------------|------------|
+| "Not running. Another app may be using port 41417. Quit it and restart APM." | Find what holds the port: `pm extension status` says "something other than APM is listening" for another program, or "the extension uses 'pm extension serve'" for a terminal. Stop it, then quit and reopen APM |
+| No dialog when you choose **Connect** in the extension | Open the APM window. The request lasts two minutes, then choose **Connect** in the extension again |
+| The extension asks to connect again | The token was rotated, or the browser chose **Forget this browser**. Approve the new code |
+| The extension says APM is locked | Unlock in the app or from the popup |
+
+More fixes are in [Extension troubleshooting](/docs/extension/troubleshooting).

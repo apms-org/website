@@ -1,0 +1,41 @@
+---
+title: Reference
+description: Environment variables, file locations, configuration file formats, vault settings, exit codes, answers to common questions and a glossary.
+order: 0
+sidebarTitle: Overview
+---
+
+Look things up here when you know what you're after: a variable name, where a file lives, the syntax of a configuration file, or what a term means. Task-by-task guides are in [Command line](/docs/cli), [Desktop app](/docs/desktop), [Browser extension](/docs/extension) and [AI agents](/docs/agents). The full command list is in the [command reference](/docs/cli/commands).
+
+## Configuration
+
+<Cards>
+  <Card title="Environment variables" href="/docs/reference/environment-variables" icon="variable">Every variable pm reads, and the ones it sets.</Card>
+  <Card title="File locations" href="/docs/reference/file-locations" icon="folder-tree">The vault, sessions, history, logs and extension files on each platform.</Card>
+  <Card title="Policy files" href="/docs/reference/policies" icon="file-check">The YAML schema for password policies.</Card>
+  <Card title=".apmignore" href="/docs/reference/apmignore" icon="file-x">Leave spaces and items out of cloud uploads.</Card>
+  <Card title=".apminject" href="/docs/reference/apminject" icon="file-code">Map vault items to environment variable names.</Card>
+  <Card title="Vault settings" href="/docs/reference/vault-settings" icon="sliders-horizontal">Auto-lock, clipboard and other settings stored in the vault.</Card>
+  <Card title="Exit codes" href="/docs/reference/exit-codes" icon="hash">Which commands report failure through their exit status.</Card>
+</Cards>
+
+## Help
+
+<Cards>
+  <Card title="FAQ" href="/docs/reference/faq" icon="circle-question-mark">Short answers about the app, pm, the extension, sync and security.</Card>
+  <Card title="Glossary" href="/docs/reference/glossary" icon="book-a">What APM's terms mean.</Card>
+</Cards>
+
+## Defaults at a glance
+
+| Setting | Default |
+|---|---|
+| Vault file | `~/.apm/vault.dat` (or a `vault.dat` next to `pm`) |
+| Encryption profile | Recommended by `pm setup` for your machine; `standard` otherwise |
+| Auto-lock | 15 minutes idle, 1 hour maximum, lock on sleep |
+| Extension bridge | `127.0.0.1:41417` |
+| Ephemeral session lifetime | 15 minutes, read-only |
+| Generated password | 16 characters with `pm gen`, 20 in the app's generator |
+| One-time codes | 6 digits, 30 seconds, SHA-1 |
+| Recovery codes | 10 |
+| Trustee shares | 2 of 3 |

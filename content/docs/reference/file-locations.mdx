@@ -1,0 +1,266 @@
+---
+title: File locations
+description: Where the vault, sessions, history, logs, extension links and caches are kept on macOS, Windows and Linux.
+order: 2
+group: Configuration
+---
+
+APM keeps everything on your computer. The vault is one encrypted file; everything else is either settings that can be recreated or records of what happened. The desktop app runs `pm` as its engine, so the app and `pm` use the same files.
+
+| Place | What lives there |
+|---|---|
+| [The vault folder](#the-vault-folder) | `vault.dat`, the `policies` folder and usually `.apmignore` |
+| [The APM config folder](#the-apm-config-folder) | Session key, history, audit log, pairing token, extension links, MCP tokens, logo cache |
+| [The state folder](#the-state-folder) | The failed-unlock counter and the access log |
+| [The temp folder](#temporary-files) | Encrypted session files and short-lived copies |
+| [The desktop app's folder](#the-desktop-app) | The app's own settings, such as which vault it opens |
+
+## The vault folder
+
+The vault is `~/.apm/vault.dat` unless something else is chosen. `pm` picks the vault in this order: `--vault`, then [`APM_VAULT_PATH`](/docs/reference/environment-variables#vault-file), then a `vault.dat` next to the `pm` executable, then `~/.apm/vault.dat`. See [Where the vault lives](/docs/cli/vault-basics#where-the-vault-lives).
+
+| File | Contents |
+|---|---|
+| `vault.dat` | Every item, space, setting, cloud token, recovery setting and the active policy, encrypted with your master password. The only file you need to back up |
+| `policies/` | Password policy files (`.yaml`, `.yml`). Created by `pm setup` and by the app's setup. See [Policy files](/docs/reference/policies) |
+| `.apmignore` | Rules for leaving items out of cloud uploads. A `.apmignore` in the current folder takes precedence. See [.apmignore](/docs/reference/apmignore) |
+| `vault.dat.conflict.<provider>.<timestamp>` | A cloud download saved beside your vault by `pm cloud get` when you chose to keep both, for example `vault.dat.conflict.gdrive.20261005-141502` |
+
+`pm` writes `vault.dat` with mode `0600` and creates its folder with mode `0700`.
+
+## The APM config folder
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab value="macOS">
+
+```text
+~/Library/Application Support/apm
+```
+
+</Tab>
+<Tab value="Windows">
+
+```text
+%AppData%\apm
+```
+
+That is usually `C:\Users\<you>\AppData\Roaming\apm`.
+
+</Tab>
+<Tab value="Linux">
+
+```text
+$XDG_CONFIG_HOME/apm
+```
+
+That is `~/.config/apm` when `XDG_CONFIG_HOME` isn't set.
+
+</Tab>
+</Tabs>
+
+Files here are created as needed with mode `0600`, in a folder with mode `0700`. This folder is shared by every vault you open on this account.
+
+### Sessions
+
+| File | Contents |
+|---|---|
+| `session.key` | A random key that encrypts the session files in the temp folder. Deleting it ends every session |
+| `ephemeral_sessions.json` | [Ephemeral sessions](/docs/cli/sessions#ephemeral-sessions) from `pm session issue`: ID, scope, bindings, expiry and, in plain text, the master password. Expired sessions are removed the next time the file is read |
+| `inject_session` | The active [`pm inject`](/docs/cli/inject) session: its ID and the variable names it set, never their values. [`APM_DATA_DIR`](/docs/reference/environment-variables#inject-session-folder) moves it |
+
+### History and audit
+
+| File | Contents |
+|---|---|
+| `lgit.jsonl` | The [history](/docs/cli/history) commits, one JSON object per line: time, action, vault path, hashes and signature |
+| `lgit_snapshots/` | One encrypted copy of the vault per commit, named `<time>-<hash>.vault`. These are what `pm lgit undo` and `pm lgit checkout` restore |
+| `lgit_signing.key` | The key that signs history commits |
+| `lgit_notes.json` | Short descriptions the desktop app records for its history entries, such as `Restored …`, shown in its History view |
+| `audit.json` | The audit log shown by `pm logs`: events with details, user (your home folder's name) and host, chained and signed. It never records item secrets, but `pm cloud get` writes the retrieval key or file ID it was given into it |
+| `audit_signing.key` | The key that signs the audit log |
+
+History and the audit log are kept for every vault together. Snapshots are encrypted with the master password the vault had at the time, so after you change your master password, older snapshots still open with the old one. Each one is a full copy. Use [`pm lgit squash` and `pm lgit prune`](/docs/cli/history#keep-history-small) to remove old ones.
+
+<Callout type="warning" title="Signing keys live next to what they sign">
+The signing keys are random keys stored in the same folder as the logs. Verification proves the files weren't changed by something without access to this folder; it can't stop someone who can read and write your config folder.
+</Callout>
+
+### Browser extension
+
+| File | Contents |
+|---|---|
+| `bridge_token` | The pairing token that browsers present to the bridge. `pm extension rotate` replaces it |
+| `native_host.json` | Written by `pm extension link`: the vault path, the `pm` binary, the linked browsers and extension IDs, and the date |
+| `extension_link.json` | A pairing request waiting for you to confirm its code, while `pm extension link` waits |
+| `extension_seen.json` | When the extension last connected through native messaging, and from which browser |
+| `icons/` | Cached website logos: a `.img` and a `.json` file per site, named by the SHA-256 of the host. Up to 2,000 sites; the oldest are removed first. Logos are refreshed after 30 days and failed lookups retried after 3 days. Delete the folder, or use **Clear icon cache** in the app, to empty it |
+| `native-messaging/dev.apm.bridge.json` | Windows only: the native messaging manifest that the registry points to |
+
+`pm extension link` also writes a manifest named `dev.apm.bridge.json` where each browser looks for one:
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab value="macOS">
+
+| Browser | Manifest |
+|---|---|
+| Chrome | `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/` |
+| Chrome Beta | `~/Library/Application Support/Google/Chrome Beta/NativeMessagingHosts/` |
+| Chrome Canary | `~/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts/` |
+| Chromium | `~/Library/Application Support/Chromium/NativeMessagingHosts/` |
+| Edge | `~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/` |
+| Brave | `~/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/` |
+| Vivaldi | `~/Library/Application Support/Vivaldi/NativeMessagingHosts/` |
+| Arc | `~/Library/Application Support/Arc/User Data/NativeMessagingHosts/` |
+
+</Tab>
+<Tab value="Windows">
+
+The manifest is `%AppData%\apm\native-messaging\dev.apm.bridge.json`, and each browser gets a registry key under `HKEY_CURRENT_USER` whose default value points to it:
+
+| Browser | Registry key |
+|---|---|
+| Chrome | `HKCU\Software\Google\Chrome\NativeMessagingHosts\dev.apm.bridge` |
+| Chromium | `HKCU\Software\Chromium\NativeMessagingHosts\dev.apm.bridge` |
+| Edge | `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\dev.apm.bridge` |
+| Brave | `HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\dev.apm.bridge` |
+| Vivaldi | `HKCU\Software\Vivaldi\NativeMessagingHosts\dev.apm.bridge` |
+
+</Tab>
+<Tab value="Linux">
+
+| Browser | Manifest |
+|---|---|
+| Chrome | `~/.config/google-chrome/NativeMessagingHosts/` |
+| Chrome Beta | `~/.config/google-chrome-beta/NativeMessagingHosts/` |
+| Chrome Canary | `~/.config/google-chrome-unstable/NativeMessagingHosts/` |
+| Chromium | `~/.config/chromium/NativeMessagingHosts/` |
+| Edge | `~/.config/microsoft-edge/NativeMessagingHosts/` |
+| Brave | `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/` |
+| Vivaldi | `~/.config/vivaldi/NativeMessagingHosts/` |
+
+`~/.config` is `$XDG_CONFIG_HOME` when that is set.
+
+</Tab>
+</Tabs>
+
+`pm extension unlink` removes the manifests and registry keys, along with `native_host.json`, `extension_link.json` and `extension_seen.json`. The pairing token stays. See [Browser extension](/docs/cli/browser-extension).
+
+### AI agents
+
+| File | Contents |
+|---|---|
+| `mcp_auth.json` | MCP access tokens in plain text, with their name, allowed tools, expiry and use count. Manage them with [`pm mcp`](/docs/cli/commands-sync#pm-mcp-token) |
+| `mcp_transactions.json` | Changes an agent has asked for: the tool, its arguments in plain text (including any password or key it wants to save), a preview and the status. An approved request also gets a receipt; a rejected one is marked `aborted`. Each request is removed the first time the file is read after it expires, 15 minutes after it was made, whatever its status |
+
+See [AI agents](/docs/agents) for what these tokens allow.
+
+## The state folder
+
+Two small files record unlock attempts. They live in `~/.apm`, or in the folder of [`APM_VAULT_PATH`](/docs/reference/environment-variables#vault-file) if you set it to an absolute path, unless [`APM_STATE_DIR`](/docs/reference/environment-variables#state-folder) says otherwise. `--vault` doesn't move them. The desktop app, `pm extension serve` and the native host use the folder of the vault they open, so with the default vault they share these files with `pm` in a terminal.
+
+| File | Contents |
+|---|---|
+| `.apm_lock` | The number of failed unlock attempts in a row. See [Failed attempts](/docs/cli/sessions#failed-attempts) |
+| `apm_audit.log` | One line each time `pm` asks for the master password, and one per successful unlock and per wrong password: Unix time, a hash of host and user name, and the event, used to spot unusual activity |
+
+```text title="apm_audit.log"
+1791209719|9096ad63872edccd9e91a18a6999b6af641dcb60e96827f0f1cee0a0d3224010|ATTEMPT
+1791209719|9096ad63872edccd9e91a18a6999b6af641dcb60e96827f0f1cee0a0d3224010|UNLOCK
+```
+
+If `pm` can't write to the state folder, failed attempts go uncounted without any message. A `.apm_lock` that an older `pm` left next to the executable still counts: unless `APM_STATE_DIR` is set, `pm` in a terminal reads it and uses the higher number.
+
+## Temporary files
+
+These go in the system temp folder: `$TMPDIR` on macOS, `/tmp` (or `$TMPDIR`) on Linux, `%TEMP%` on Windows.
+
+| File | Lifetime |
+|---|---|
+| `pm_session_global.json` | The shared session, encrypted with `session.key`. Removed by `pm lock`, by locking the desktop app, or the next time `pm` finds it expired |
+| `pm_session_<id>.json` | A [per-shell session](/docs/cli/sessions#per-shell-sessions) for `APM_SESSION_ID=<id>` |
+| `apm-cloud-upload-*.dat` | An encrypted, `.apmignore`-filtered copy of the vault during a cloud upload. Removed when the upload ends |
+| A document's or media item's own file name | Written when you open a document, photo, audio or video item from `pm get`. Removed about 5 seconds after the viewer starts |
+| `apm_mcp_*.enc` | An item an AI agent requested, encrypted with a one-time key. Removed once the agent decrypts it, or after 5 minutes |
+| `apm-touchid-*/` | A helper for the Touch ID prompt on macOS, removed after use |
+
+<Callout type="note" title="Not encrypted">
+Apart from the history snapshots, nothing in the config folder is encrypted. The logo cache's `.json` files name each site you have a logo for. `mcp_auth.json`, `ephemeral_sessions.json` and `bridge_token` hold credentials, and `mcp_transactions.json` can hold a password or key an agent asked to save. They rely on the folder's permissions, so keep your user account to yourself.
+</Callout>
+
+## Project folders
+
+Two files can also live in your own project folders:
+
+| File | Where `pm` looks |
+|---|---|
+| `.apminject` | The current folder, then each parent folder up to the root. See [.apminject](/docs/reference/apminject) |
+| `.apmignore` | The current folder, before the vault's folder. See [.apmignore](/docs/reference/apmignore) |
+
+## Alerts
+
+`email.log` is written in the **current folder** of whichever process raises a [security alert](/docs/cli/health-and-audit#security-alerts): one line per alert with the time, level, event and the masked alert address. For the desktop app, that is the vault's folder: its engine switches to it when it starts. Alerts are not emailed.
+
+## The desktop app
+
+The app keeps a few files of its own, separate from `pm`'s:
+
+| OS | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/APM Desktop` |
+| Windows | `%AppData%\APM Desktop` |
+| Linux | `~/.config/APM Desktop` |
+
+`config.json` there records the vault you chose in the app, and the app's display preferences, such as theme and density, are kept in the same folder. [`APM_USER_DATA_DIR`](/docs/reference/environment-variables#app-data-folder) moves it. Settings that belong to the vault, such as auto-lock and clipboard clearing, are stored inside the vault; see [Vault settings](/docs/reference/vault-settings).
+
+## Next to pm
+
+| File | When |
+|---|---|
+| `vault.dat` | Only if you put it there, for a portable setup. `pm` then uses it before `~/.apm/vault.dat` |
+| `pm.old` (`pm.exe.old`) | The previous binary, left by `pm update`. Safe to delete |
+| `apm.new` | The download in progress during `pm update` |
+| `credentials.json`, `token.json` | Optional. Override the built-in Google Drive client credentials and token when syncing in `APM_PUBLIC` mode |
+
+## macOS Keychain
+
+`pm auth touchid setup` stores the master password in your login Keychain as a generic password with the service **APM Vault** and the account **master-password**. `pm auth touchid remove` deletes it, and `pm auth change` updates it. Keychain Access shows it under that name.
+
+## In the cloud
+
+| Provider | Where the copy lives |
+|---|---|
+| Google Drive | A file named `v_<random>.bin`, in APM's shared folder (`APM_PUBLIC`) or the root of your own Drive (self-hosted) |
+| Dropbox | `/v_<hash>.bin`, where the hash comes from your retrieval key, or a random name when there is no key |
+| GitHub | `vault.dat` at the top of the repository you chose |
+
+Every copy is encrypted with your master password before it leaves your computer, with one exception caused by a bug: when `pm cloud init github` or `pm setup` sets up GitHub sync while an `.apmignore` with any rules is in effect, that first copy is encrypted with your GitHub token instead. Run `pm cloud sync github` afterwards to replace it. The tokens and IDs for these copies are stored inside `vault.dat`. See [Cloud sync](/docs/cli/cloud-sync).
+
+## Team edition
+
+`pm-team` keeps `team_vault.dat` and `pm_team_session.json` next to the `pm-team` binary. See [Team edition](/docs/cli/team-edition#where-its-data-lives).
+
+## Back up and move
+
+<Steps>
+
+### Back up the vault
+
+Copy `vault.dat` somewhere safe, or use [`pm export`](/docs/cli/import-export#export) or [cloud sync](/docs/cli/cloud-sync). The vault holds every item and setting; nothing else is needed to open it on another computer.
+
+### Copy it to the new computer
+
+Put `vault.dat` in `~/.apm/` (or point `APM_VAULT_PATH` at it) and run `pm unlock`.
+
+### Set up what stays behind
+
+History, the audit log, MCP tokens, the pairing token and browser links belong to the old computer. On the new one, pair the browser again and create new MCP tokens. History starts fresh.
+
+</Steps>
+
+## Remove everything
+
+To remove APM completely, delete the `pm` binary, the vault folder (`~/.apm` by default), the APM config folder, and `.apm_lock` and `apm_audit.log` if they sit outside the vault folder: in `APM_STATE_DIR`, or next to the `pm` binary from an older version. Run `pm extension unlink` and `pm auth touchid remove` first so no browser manifest or Keychain item is left behind.
+
+<Callout type="danger" title="This can't be undone">
+Without `vault.dat`, a backup or a cloud copy, your items are gone. There is no server copy and no way to recover them.
+</Callout>

@@ -1,0 +1,117 @@
+---
+title: Glossary
+description: What APM's terms mean, from vault and space to ephemeral session, lgit and pairing token.
+order: 9
+group: Help
+---
+
+The terms used across APM's app, `pm`, the browser extension and these docs, grouped by topic.
+
+## Vault and items
+
+| Term | Meaning |
+|---|---|
+| **APM** | The password manager: the desktop app, the `pm` command line, the browser extension and the AI agent server. |
+| **pm** | APM's command-line program. The desktop app runs it in the background as its engine. |
+| **Vault** | The single encrypted file, `vault.dat` by default, that holds all your items and settings. See [Vault basics](/docs/cli/vault-basics). |
+| **Item** | One thing stored in the vault, such as a login, an API key or a Wi-Fi network. Older docs call it an entry. |
+| **Item type** | The kind of item, which decides its fields. APM has 25. See [Item types](/docs/cli/items#item-types). |
+| **Space** | A named group of items inside one vault, such as `Work` or `Personal`. Commands act on the current space. See [Spaces](/docs/cli/spaces). |
+| **Default space** | The space items belong to when no other is chosen. Called `default` in `pm`. |
+| **Passkey** | A WebAuthn credential for a website, saved by the browser extension inside a login item. |
+| **Trash** | Where the desktop app keeps deleted items until you empty it. `pm` deletes immediately. |
+
+## Master password and encryption
+
+| Term | Meaning |
+|---|---|
+| **Master password** | The one password that opens the vault. It isn't stored in the vault. A session keeps it encrypted on disk, an ephemeral session keeps it in a file only your account can read, and Touch ID keeps it in the macOS Keychain. |
+| **Data key** | A random key, one per vault, that encrypts the vault's contents. Your master password protects it. See [Encryption](/docs/security/encryption). |
+| **Key slot** | The part of the vault file that holds the data key, sealed with keys derived from the master password. The recovery slot holds a second copy, sealed with a key derived from the recovery key. |
+| **KDF** | Key derivation function: the slow function that turns your master password into keys. APM uses Argon2id, or PBKDF2 for the `legacy` profile. |
+| **Encryption profile** | A preset of KDF cost, cipher and nonce and salt sizes: `standard`, `hardened`, `paranoid`, `legacy` or a custom one. See [Encryption profiles](/docs/security/profiles). |
+| **Cipher** | The algorithm that encrypts the vault: AES-256-GCM or XChaCha20-Poly1305. |
+
+## Unlocking and sessions
+
+| Term | Meaning |
+|---|---|
+| **Unlock** | Proving the master password (or Touch ID) so APM can open the vault. |
+| **Session** | The record that keeps the vault unlocked between commands, so you don't type the password each time. It is shared by `pm` and the desktop app. See [Sessions](/docs/cli/sessions). |
+| **Auto-lock** | The rules that end a session: after a period of inactivity, after a maximum length, and when the computer sleeps. See [Vault settings](/docs/reference/vault-settings). |
+| **Read-only session** | A session that can read items but not change the vault. Set with `pm mode readonly`. |
+| **Ephemeral session** | A short-lived, separately revocable session for a script, CI job or agent, identified by an `eps_…` ID. See [Ephemeral sessions](/docs/cli/sessions#ephemeral-sessions). |
+| **Binding** | A restriction on an ephemeral session: to this computer and user, to a process, or to an agent label. |
+| **Decoy vault** | A read-only vault of made-up logins that `pm` shows instead of yours after too many failed unlock attempts. |
+
+## Recovery
+
+| Term | Meaning |
+|---|---|
+| **Recovery email** | The address that receives the codes needed to recover the vault. Set with `pm auth email`. |
+| **Recovery key** | A key shown once when you set a recovery email. With an emailed code, it lets you set a new master password. |
+| **Recovery codes** | One-time codes, such as `3FA91C-7D2E`, used as an extra factor during recovery. |
+| **Recovery passkey** | A passkey registered for the vault's recovery, used as an extra factor. Different from website passkeys. |
+| **Trustee share** | One piece of the recovery key, split with Shamir's secret sharing and given to someone you trust. A **quorum** of shares (2 of 3 by default) recovers the vault. See [Recovery](/docs/cli/recovery). |
+
+## Sync
+
+| Term | Meaning |
+|---|---|
+| **Cloud sync** | Uploading an encrypted copy of the vault to Google Drive, GitHub or Dropbox. See [Cloud sync](/docs/cli/cloud-sync). |
+| **APM_PUBLIC** | A sync mode for Google Drive and Dropbox that uses APM's own storage and credentials, so you need no account setup. |
+| **Self-hosted** | A sync mode that uses your own Google Drive or Dropbox account. |
+| **Retrieval key** | A word pair such as `SwiftFalcon`, or a key you choose, that finds your vault in the cloud on a new computer. Only its hash is stored with the file, and only if you allow it at setup. |
+| **Conflict copy** | A downloaded vault saved beside yours as `vault.dat.conflict.<provider>.<time>` instead of replacing it. |
+
+## History, logs and reports
+
+| Term | Meaning |
+|---|---|
+| **lgit** | APM's built-in history: a signed chain of commits, each with an encrypted snapshot of the vault. See [History](/docs/cli/history). |
+| **Commit** | One entry in the history, recorded when the vault is saved, undone or restored. |
+| **Snapshot** | The full encrypted copy of the vault stored with a commit. |
+| **Audit log** | The signed record of what `pm` and the app did, such as unlocks, imports and settings changes, without item secrets. Shown by `pm logs`. |
+| **Telemetry** | Per-item usage records stored in the vault: who created, changed and last used an item, and when. Nothing is sent anywhere. |
+| **Health score** | A 0 to 100 score for the whole vault from `pm health`. See [Health and audit](/docs/cli/health-and-audit). |
+| **Trust score** | A 0 to 100 score for one secret, based on whether it was exposed, how long ago it was rotated, how often it is used and how privileged it is. Shown by `pm trust`. |
+| **Watchtower** | The desktop app's view of weak, reused, old and exposed passwords, and of items that expire soon. |
+| **Security alert** | A note written to `email.log` when a watched event happens. Set with `pm auth alerts` and `pm auth level`. |
+
+## Configuration files
+
+| Term | Meaning |
+|---|---|
+| **Policy** | A YAML file of password rules, loaded with `pm policy load`. See [Policy files](/docs/reference/policies). |
+| **.apmignore** | A file of rules that leave spaces and items out of cloud uploads. See [.apmignore](/docs/reference/apmignore). |
+| **.apminject** | A project file that lists which items `pm inject` puts into which environment variables. See [.apminject](/docs/reference/apminject). |
+| **Inject session** | The set of environment variables one `pm inject` put into your shell, removed together by `pm inject kill`. |
+| **APM config folder** | The per-user folder for the session key, history, logs and tokens. See [File locations](/docs/reference/file-locations#the-apm-config-folder). |
+| **State folder** | The folder that holds the failed-attempt counter and access log. |
+
+## Browser extension
+
+| Term | Meaning |
+|---|---|
+| **Bridge** | The local service on `127.0.0.1:41417` that the browser extension talks to. The desktop app runs it, or `pm extension serve`. |
+| **Native messaging host** | `pm` started by the browser itself, registered as `dev.apm.bridge` by `pm extension link`, so the extension works without the app. |
+| **Pairing** | Connecting a browser to APM by confirming a short code on both sides. See [Pairing](/docs/extension/pairing). |
+| **Pairing token** | The secret a paired browser presents to the bridge. `pm extension rotate` replaces it and unpairs every browser. |
+
+## AI agents
+
+| Term | Meaning |
+|---|---|
+| **MCP** | Model Context Protocol, the standard AI clients use to call tools. APM's server is `pm mcp serve`. See [AI agents](/docs/agents). |
+| **MCP token** | An access token for one AI client, with an expiry and a list of allowed tools. Created with `pm mcp token`. |
+| **Permission** | One tool an MCP token may use, such as reading items or asking to add one. See [Scopes and approval](/docs/agents/scopes-and-approval). |
+| **Transaction** | A change an agent has asked for, identified by a `tx_…` ID. It touches the vault only after you approve it in the desktop app, and expires after 15 minutes. |
+| **Receipt** | The `rcpt_…` ID recorded when an approved change is applied. |
+
+## Team edition
+
+| Term | Meaning |
+|---|---|
+| **Team edition** | `pm-team`, a separate, experimental program for a shared organization vault. See [Team edition](/docs/cli/team-edition). |
+| **Department** | A group of users and shared items inside the team vault. |
+| **Role** | A user's set of permissions in the team vault: `ADMIN`, `MANAGER`, `USER`, `AUDITOR` or `SECURITY`. |

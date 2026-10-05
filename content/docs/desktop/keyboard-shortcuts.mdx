@@ -1,0 +1,201 @@
+---
+title: Keyboard shortcuts
+description: Every key the desktop app listens for, and every entry in the menu bar.
+order: 19
+group: Settings and help
+---
+
+Almost everything in APM has a key. Press <Kbd>⌘</Kbd><Kbd>/</Kbd> (or **Help → Keyboard Shortcuts**) to see the main ones inside the app. The command menu (<Kbd>⌘</Kbd><Kbd>K</Kbd>) finds the rest.
+
+The tables use macOS keys. On Windows and Linux:
+
+| macOS | Windows and Linux |
+|---|---|
+| <Kbd>⌘</Kbd> | <Kbd>Ctrl</Kbd> |
+| <Kbd>⌥</Kbd> | <Kbd>Alt</Kbd> |
+| <Kbd>⇧</Kbd> | <Kbd>Shift</Kbd> |
+| <Kbd>⌫</Kbd> | <Kbd>Backspace</Kbd> |
+| <Kbd>↵</Kbd> | <Kbd>Enter</Kbd> |
+
+These shortcuts work while the vault is unlocked. While a dialog is open, only <Kbd>⌘</Kbd><Kbd>K</Kbd> and the dialog's own keys work.
+
+Two platform details:
+
+- The in-app list that <Kbd>⌘</Kbd><Kbd>/</Kbd> opens uses Mac symbols on every platform. On Windows and Linux, read <Kbd>⌘</Kbd> there as <Kbd>Ctrl</Kbd>.
+- On a Mac, the app's own shortcuts also answer to <Kbd>Ctrl</Kbd> in place of <Kbd>⌘</Kbd>, so <Kbd>Ctrl</Kbd><Kbd>K</Kbd> opens the command menu too. Menu-bar entries need <Kbd>⌘</Kbd>.
+
+The in-app list ("Every action in APM has a key. The command menu finds the rest.") has four groups: **Vault**, **Selected item**, **List** and **App**. The tables below cover everything in it, and more.
+
+## Anywhere in the app
+
+| Keys | Action |
+|---|---|
+| <Kbd>⌘</Kbd><Kbd>K</Kbd> | Open or close the command menu |
+| <Kbd>⌘</Kbd><Kbd>N</Kbd> | New item (not while the vault is read-only) |
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd> | New space |
+| <Kbd>⌘</Kbd><Kbd>G</Kbd> | Password generator |
+| <Kbd>⌘</Kbd><Kbd>Z</Kbd> | Undo the last change to the vault (when you are not typing in a field, and not while the vault is read-only). The toast says **Undone** |
+| <Kbd>⌘</Kbd><Kbd>L</Kbd> | Lock the vault |
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>B</Kbd> | Show or hide the sidebar |
+| <Kbd>⌘</Kbd><Kbd>,</Kbd> | Settings |
+| <Kbd>⌘</Kbd><Kbd>/</Kbd> | Keyboard shortcuts |
+
+## Go to a view
+
+| Keys | Action |
+|---|---|
+| <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>1</Kbd> | Vault (All items) |
+| <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>2</Kbd> | Authenticator |
+| <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>3</Kbd> | Watchtower |
+| <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>4</Kbd> | History |
+| <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>5</Kbd> | Settings |
+| <Kbd>⌘</Kbd><Kbd>1</Kbd> | All items |
+| <Kbd>⌘</Kbd><Kbd>2</Kbd> | Logins |
+| <Kbd>⌘</Kbd><Kbd>3</Kbd> | Authenticator items (in the list) |
+| <Kbd>⌘</Kbd><Kbd>4</Kbd> | Tokens |
+| <Kbd>⌘</Kbd><Kbd>5</Kbd> | API keys |
+| <Kbd>⌘</Kbd><Kbd>6</Kbd> | SSH keys |
+| <Kbd>⌘</Kbd><Kbd>7</Kbd> | Secure notes |
+| <Kbd>⌘</Kbd><Kbd>8</Kbd> | Cloud credentials |
+| <Kbd>⌘</Kbd><Kbd>9</Kbd> | Banking |
+
+## The selected item
+
+These work in the vault view when an item is selected.
+
+| Keys | Action |
+|---|---|
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd> | Copy the main secret (a login's password, an API key's key and so on) |
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>U</Kbd> | Copy the username |
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>T</Kbd> | Copy the one-time code |
+| <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>O</Kbd> | Open the website in your browser |
+| <Kbd>⌘</Kbd><Kbd>E</Kbd> | Edit |
+| <Kbd>⌘</Kbd><Kbd>⌫</Kbd> | Delete (move to Trash). In Trash, delete permanently. |
+| <Kbd>Space</Kbd> | Quick Look the item under the pointer, or the selected one |
+
+When there is nothing to act on, APM says so: **Nothing to copy**, **No username on this item**, **No one-time code for this item** or **No website on this item**. <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>O</Kbd> opens a login's website, or the first of its other websites, and a Docker registry's address.
+
+## The item list
+
+| Keys | Action |
+|---|---|
+| <Kbd>⌘</Kbd><Kbd>F</Kbd> | Jump to the list's search field |
+| <Kbd>↵</Kbd> (in the search field) | Move to the selected item's first field |
+| <Kbd>Esc</Kbd> (in the search field) | Empty the search field |
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd> | Previous or next item |
+| <Kbd>⇧</Kbd><Kbd>↑</Kbd> <Kbd>⇧</Kbd><Kbd>↓</Kbd> | Extend the selection |
+| <Kbd>⌘</Kbd>-click | Add an item to the selection, or remove it |
+| <Kbd>⇧</Kbd>-click | Select a range |
+| <Kbd>⌘</Kbd><Kbd>A</Kbd> | Select every item in the list |
+| <Kbd>Esc</Kbd> | Clear a multiple selection |
+| Double-click | Edit the item |
+| Right-click | The item menu, or the selection menu |
+
+## Editing
+
+| Where | Keys | Action |
+|---|---|---|
+| Editing an item | <Kbd>⌘</Kbd><Kbd>S</Kbd> | Save |
+| Editing an item | <Kbd>Esc</Kbd> | Cancel (asks first if you made changes). With a menu or the generator open, <Kbd>Esc</Kbd> closes that first |
+| Renaming a passkey on a login | <Kbd>Esc</Kbd> | Stop renaming |
+| New item dialog | <Kbd>⌘</Kbd><Kbd>↵</Kbd> | Save the item |
+| Note editor | <Kbd>⌘</Kbd><Kbd>S</Kbd> | Save the note |
+| Note editor | <Kbd>Tab</Kbd> | Insert two spaces |
+
+## Other screens
+
+| Where | Keys | Action |
+|---|---|---|
+| Lock screen | <Kbd>↵</Kbd> | Unlock with the password you typed |
+| Command menu | <Kbd>↑</Kbd> <Kbd>↓</Kbd> | Move through results |
+| Command menu | <Kbd>↵</Kbd> | Run the highlighted entry |
+| Command menu | <Kbd>Esc</Kbd> | Close |
+| Quick Look | <Kbd>↑</Kbd> <Kbd>↓</Kbd> | Show the previous or next item |
+| Quick Look | <Kbd>Space</Kbd> or <Kbd>Esc</Kbd> | Close |
+| Authenticator page | <Kbd>1</Kbd> to <Kbd>9</Kbd> | Copy the code in that position |
+| Generator in a field | <Kbd>R</Kbd> | Generate another value (when the cursor is not in a text field) |
+| Generator in a field | <Kbd>Esc</Kbd> | Close |
+| Right-click menu | <Kbd>Esc</Kbd> | Close |
+| Six-digit code boxes | <Kbd>←</Kbd> <Kbd>→</Kbd> | Move between boxes. Typing a digit moves to the next box, <Kbd>⌫</Kbd> in an empty box goes back, and pasting a code fills every box |
+| Menus and dialogs | <Kbd>Esc</Kbd> | Close |
+
+The **Password generator** window shows <Kbd>R</Kbd> on its **Generate another** button, but the key only works in the generator inside a field.
+
+## The menu bar
+
+<Tabs items={["macOS", "Windows and Linux"]}>
+<Tab>
+
+**APM**
+
+| Entry | Keys |
+|---|---|
+| **About APM** | Shows the app's name, version and copyright |
+| **Settings...** | <Kbd>⌘</Kbd><Kbd>,</Kbd> |
+| **Lock Vault** | <Kbd>⌘</Kbd><Kbd>L</Kbd> |
+| **Services**, **Hide APM**, **Hide Others**, **Show All** | The usual macOS keys |
+| **Quit APM** | <Kbd>⌘</Kbd><Kbd>Q</Kbd> |
+
+**File**
+
+| Entry | Keys |
+|---|---|
+| **New Item** | <Kbd>⌘</Kbd><Kbd>N</Kbd> |
+| **New Space...** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd> |
+| **Import...** | |
+| **Export...** | |
+| **Close Window** | <Kbd>⌘</Kbd><Kbd>W</Kbd> |
+
+</Tab>
+<Tab>
+
+**File**
+
+| Entry | Keys |
+|---|---|
+| **New Item** | <Kbd>Ctrl</Kbd><Kbd>N</Kbd> |
+| **New Space...** | <Kbd>Ctrl</Kbd><Kbd>Shift</Kbd><Kbd>N</Kbd> |
+| **Import...** | |
+| **Export...** | |
+| **Settings** | <Kbd>Ctrl</Kbd><Kbd>,</Kbd> |
+| **Lock Vault** | <Kbd>Ctrl</Kbd><Kbd>L</Kbd> |
+| **Exit** | |
+
+**Help** also has **About APM** at the end.
+
+</Tab>
+</Tabs>
+
+**Edit** has the usual **Undo**, **Redo**, **Cut**, **Copy**, **Paste**, **Delete** and **Select All** for text (plus **Paste and Match Style** on macOS), and:
+
+| Entry | Keys |
+|---|---|
+| **Copy Password** (the selected item's main secret) | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd> |
+| **Copy Username** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>U</Kbd> |
+| **Find** | <Kbd>⌘</Kbd><Kbd>F</Kbd>. From another view, it goes back to the item list first |
+
+**View**
+
+| Entry | Keys |
+|---|---|
+| **Search...** (command menu) | <Kbd>⌘</Kbd><Kbd>K</Kbd> |
+| **Vault** | <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>1</Kbd> |
+| **Authenticator** | <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>2</Kbd> |
+| **Watchtower** | <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>3</Kbd> |
+| **History** | <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>4</Kbd> |
+| **Toggle Sidebar** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>B</Kbd> |
+| **Password Generator...** | <Kbd>⌘</Kbd><Kbd>G</Kbd> |
+| **Actual Size**, **Zoom In**, **Zoom Out** | <Kbd>⌘</Kbd><Kbd>0</Kbd>, <Kbd>⌘</Kbd><Kbd>+</Kbd>, <Kbd>⌘</Kbd><Kbd>-</Kbd> |
+| **Toggle Full Screen** | |
+
+**Window** (macOS only) has the usual window entries.
+
+**Help**
+
+| Entry | Keys |
+|---|---|
+| **APM Documentation** | Opens the docs in your browser |
+| **Keyboard Shortcuts** | <Kbd>⌘</Kbd><Kbd>/</Kbd> |
+| **Report an Issue** | Opens the issue tracker in your browser |
+
+Menu entries that need an unlocked vault are disabled while it is locked. **Copy Password** and **Copy Username** also need a selected item.

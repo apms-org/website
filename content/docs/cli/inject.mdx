@@ -1,0 +1,196 @@
+---
+title: Inject secrets into your shell
+description: Load vault items into environment variables for one shell, from the command line or a .apminject file, and wipe them when you are done.
+order: 12
+sidebarTitle: Inject into the shell
+group: Guides
+---
+
+Many tools read secrets from environment variables: `OPENAI_API_KEY`, `GITHUB_TOKEN`, `AWS_SECRET_ACCESS_KEY`. `pm inject` turns vault items into those variables for the current shell, without writing them to a `.env` file. It prints shell commands that set the variables; your shell runs them with `eval`. `pm inject kill` prints the commands that remove them again.
+
+## Quick start
+
+<Steps>
+
+### Unlock first
+
+```sh title="Terminal"
+pm unlock
+```
+
+`pm inject` prints the commands your shell will run. Without a session it would print the password prompt into that output too, so start a session first.
+
+### Inject
+
+<Tabs items={["bash and zsh", "fish", "PowerShell"]}>
+<Tab>
+
+```sh title="Terminal"
+eval "$(pm inject --inject GitHub,OpenAI)"
+```
+
+</Tab>
+<Tab>
+
+```sh title="Terminal"
+eval (pm inject --inject GitHub,OpenAI)
+```
+
+</Tab>
+<Tab>
+
+```powershell title="PowerShell"
+pm inject --inject GitHub,OpenAI | Invoke-Expression
+```
+
+</Tab>
+</Tabs>
+
+`pm` reports on stderr what it set:
+
+```text
+✓ Injected 2 vars into session [21f9a5bbdfbd8c0c]
+  GITHUB, OPENAI
+```
+
+### Remove them
+
+<Tabs items={["bash and zsh", "fish", "PowerShell"]}>
+<Tab>
+
+```sh title="Terminal"
+eval "$(pm inject kill)"
+```
+
+</Tab>
+<Tab>
+
+```sh title="Terminal"
+eval (pm inject kill)
+```
+
+</Tab>
+<Tab>
+
+```powershell title="PowerShell"
+pm inject kill | Invoke-Expression
+```
+
+</Tab>
+</Tabs>
+
+```text
+✓ Session [21f9a5bbdfbd8c0c] killed. 2 vars wiped. (active 12m4s)
+```
+
+</Steps>
+
+## What gets injected
+
+Names are matched exactly (case-sensitive) against items in the current [space](/docs/cli/spaces). In the Default space, items of most types in other spaces match too; only cloud credentials, Docker registries and SSH configs must be in Default. If any name is missing, nothing is injected and `pm` lists the missing ones.
+
+| Item type | Value injected |
+|---|---|
+| Login | The password |
+| Authenticator code | The setup key (secret), not a current code |
+| Token | The token |
+| Secure note | The note text |
+| API key | The key |
+| SSH key | The private key |
+| Wi-Fi | The password |
+| Recovery codes | All codes, one per line |
+| Certificate | The private key |
+| Cloud credentials | The secret key |
+| Docker registry | The token |
+| SSH config | The private key |
+
+Other types can't be injected. When names repeat across types, the first match in the order above wins.
+
+### Variable names
+
+By default the variable name comes from the item name: letters and digits are uppercased, every run of other characters becomes one `_`, leading and trailing underscores are dropped, and a name that starts with a digit gets a leading `_`.
+
+| Item name | Variable |
+|---|---|
+| `github` | `GITHUB` |
+| `aws-prod` | `AWS_PROD` |
+| `OpenAI token` | `OPENAI_TOKEN` |
+| `2fa backup` | `_2FA_BACKUP` |
+
+To choose the variable name, use a `.apminject` file.
+
+`pm` also sets `APM_INJECT_SESSION` to the session ID.
+
+## Per-project `.apminject` files
+
+Without `--inject`, `pm inject` looks for a `.apminject` file in the current folder, then in each parent folder up to the root, and injects what it lists. It is YAML:
+
+```yaml title=".apminject"
+inject:
+  - entry: OpenAI
+    as: OPENAI_API_KEY
+  - entry: GitHub
+    as: GITHUB_TOKEN
+  - entry: aws-prod
+```
+
+`as` is optional. A plain list (without `inject:`) and an `entries:` key work too. See the [.apminject reference](/docs/reference/apminject).
+
+```sh title="Terminal"
+cd ~/code/my-app
+eval "$(pm inject)"
+```
+
+```text
+✓ Injected 3 vars into session [a1abe2f7189deeee]
+  OPENAI_API_KEY, GITHUB_TOKEN, AWS_PROD
+```
+
+The file holds item names, not secrets, so it can live in the repository if the names themselves aren't sensitive.
+
+## One session at a time
+
+`pm` tracks one inject session per user: its ID, the variable names, the time and the parent shell's process ID. While one is active, `pm inject` refuses to start another:
+
+```text
+Error: inject session already active [21f9a5bbdfbd8c0c]. Run 'pm inject kill' first
+```
+
+The record is `inject_session` in your APM config folder, or in `APM_DATA_DIR` when that is set. It holds no secret values. If you closed the shell without killing the session, run `pm inject kill` once to clear the record; the variables died with the shell.
+
+## Skip the eval
+
+`pm inject setup-shell` adds a small `inject` function to your shell's startup file so you can type `inject` instead of `eval "$(pm inject ...)"`:
+
+| Shell | File | Function |
+|---|---|---|
+| bash | `~/.bashrc` | `inject() { eval $(pm inject "$@"); }` |
+| zsh | `~/.zshrc` | the same |
+| fish | `~/.config/fish/config.fish` | `function inject; eval (pm inject $argv); end` |
+| PowerShell | The file in the `PROFILE` environment variable | `function inject { Invoke-Expression (pm inject $args) }` |
+
+Open a new shell, then:
+
+```sh title="Terminal"
+inject --inject GitHub
+inject kill
+```
+
+`pm inject` and `pm inject kill` detect the shell from `SHELL`, and use PowerShell syntax when `SHELL` is empty and `PSModulePath` is set, as in PowerShell on Windows. If `SHELL` names a shell `pm` doesn't know, it warns and uses bash syntax. `setup-shell` only looks at `SHELL`, so in PowerShell, where `SHELL` is usually empty, it warns and writes the bash function to `~/.bashrc`. When `SHELL` does name `pwsh` or `powershell`, it writes to the file in the `PROFILE` environment variable, which PowerShell doesn't set by itself (`$PROFILE` is a PowerShell variable). Otherwise, paste the function into `$PROFILE` yourself. Running `setup-shell` twice does not add the function twice.
+
+<Callout type="tip" title="Multi-line values in bash and zsh">
+The bash and zsh helpers run `eval $(...)` without quotes, so the shell joins the lines of a multi-line value (an SSH key, a note) with spaces and squeezes repeated spaces. For those, use `eval "$(pm inject --inject deploy-key)"` with the quotes.
+</Callout>
+
+In PowerShell, a value that contains a single quote is quoted the bash way (`'\''`), which PowerShell can't parse, so injecting it fails.
+
+## Security notes
+
+- Injected values live in the shell's environment until you kill the session or close the shell, and every program you start from that shell inherits them.
+- Prefer a dedicated shell for sensitive work, and run `pm inject kill` when the task is done.
+- `pm inject` logs `INJECT_START` and `INJECT_KILL` to the audit log with item names, never values.
+- The values are printed to stdout for your shell to read. Don't redirect that output to a file.
+
+<Callout type="danger" title="Only inject from .apminject files you trust">
+`pm inject` uses the nearest `.apminject` in the current folder or any parent, including one that arrived with a repository you cloned. The `as` names are written into the shell commands without being checked, so a crafted `as` value can run any command when you `eval` the output, and again when you `eval` the output of `pm inject kill`. The file also chooses which of your items are injected. Read a project's `.apminject` before running `pm inject` in it, or pass `--inject` with the names you want.
+</Callout>

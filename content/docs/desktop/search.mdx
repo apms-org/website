@@ -1,0 +1,134 @@
+---
+title: Search and the command menu
+description: Search the item list, sort and filter it, and use the ⌘K command menu to jump to any item, action or setting.
+order: 5
+sidebarTitle: Search
+group: Using the app
+---
+
+There are two ways to find things. The search field above the list filters the current view. The command menu (<Kbd>⌘</Kbd><Kbd>K</Kbd>) searches every item, action and settings page at once.
+
+On Windows and Linux, press <Kbd>Ctrl</Kbd> where this page says <Kbd>⌘</Kbd>, and <Kbd>Alt</Kbd> for <Kbd>⌥</Kbd>.
+
+## Search the list
+
+Press <Kbd>⌘</Kbd><Kbd>F</Kbd> (or choose **Edit → Find**) to jump to the search field above the list. Its placeholder says what it searches, for example "Search logins, 12 items", or "Search 42 items" in **All items**.
+
+Search looks at each item's name, subtitle (such as the username), type, website, other websites, service and space. Upper and lower case do not matter. Results are ranked:
+
+1. Names that match exactly.
+2. Names that start with what you typed.
+3. Items with the text anywhere in those fields.
+4. Names that contain your letters in order, such as `gthb` for GitHub.
+
+Matches appear under **Best matches**. With nothing found, you see **No matches for** your text, "Search looks at names, usernames, websites, types and spaces.", and a **Clear search** button.
+
+Press <Kbd>↵</Kbd> in the search field to move focus to the first field of the selected item. Use <Kbd>↑</Kbd> and <Kbd>↓</Kbd> to move through the results while you type. <Kbd>Esc</Kbd> empties the search field, and so does the `×` at its end.
+
+Search runs inside the current view and space. To search everything, pick **All items** and **All spaces** first, or use the command menu.
+
+<Callout type="note" title="Searching for two words">
+Once you have selected an item, <Kbd>Space</Kbd> in the search field opens [Quick Look](/docs/desktop/items#quick-look) for it instead of typing a space. The same happens while the pointer rests on an item in the list. To find a name with a space in it, search for one of its words, such as `bank` for "My Bank".
+</Callout>
+
+## Sort the list
+
+Click the **Sort** button (the up and down arrows) above the list and pick an order under **Sort by**. Each order groups the list differently:
+
+| Sort by | Groups |
+|---|---|
+| **Last used** (default) | **Today**, **This week**, **This month**, **Earlier** |
+| **Name** | First letter, with `#` for names that do not start with a letter |
+| **Date added** | **Today**, **This week**, **This month**, **Earlier** |
+| **Type** | One group per type, such as **Logins** or **API keys** |
+
+**This week** covers the six days before today, and **This month** the 30 days before today. Items you have never used fall under **Earlier** when you sort by **Last used**. Each group heading shows how many items it holds.
+
+The sort order is remembered on this computer. Trash is always sorted by when items were deleted, under **Deleted items**. While you search, results are ranked instead, under **Best matches**.
+
+## Filter by view, type and space
+
+The sidebar's **Library** and **Types** entries change what the list shows.
+
+- **Library** has **All items**, **Favorites**, **Authenticator**, **Watchtower** and **History**. The first three show counts for the current space; the **Authenticator** count includes logins with a code of their own. **Watchtower** shows how many problems it found in the whole vault, in red when one is serious.
+- **Types** shows up to nine types you have items of. **N more types** expands it to all 25, with the empty ones dimmed; **Show fewer** collapses it again.
+
+You can also press <Kbd>⌘</Kbd> and a number:
+
+| Keys | View |
+|---|---|
+| <Kbd>⌘</Kbd><Kbd>1</Kbd> | All items |
+| <Kbd>⌘</Kbd><Kbd>2</Kbd> | Logins |
+| <Kbd>⌘</Kbd><Kbd>3</Kbd> | Authenticator items |
+| <Kbd>⌘</Kbd><Kbd>4</Kbd> | Tokens |
+| <Kbd>⌘</Kbd><Kbd>5</Kbd> | API keys |
+| <Kbd>⌘</Kbd><Kbd>6</Kbd> | SSH keys |
+| <Kbd>⌘</Kbd><Kbd>7</Kbd> | Secure notes |
+| <Kbd>⌘</Kbd><Kbd>8</Kbd> | Cloud credentials |
+| <Kbd>⌘</Kbd><Kbd>9</Kbd> | Banking |
+
+<Kbd>⌘</Kbd><Kbd>3</Kbd> lists Authenticator items in the item list. The **Authenticator** page (<Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>2</Kbd>) shows live codes instead. See [Authenticator](/docs/desktop/authenticator).
+
+The space switcher at the top of the sidebar limits every view, count and search to one space. See [Spaces](/docs/desktop/spaces).
+
+### Empty lists
+
+| What you see | Why |
+|---|---|
+| **Your vault is empty**: "Everything you save shows up here." | There are no items at all. **New item** starts one |
+| **Nothing in Work yet** | The space picked in the sidebar has no items |
+| **No logins**, or **No logins in Work**, with the type's description | That type has no items, in this space. **New login** (or the type) starts one |
+| **No favorites yet**: "Star an item to pin it here and to the top of the command menu." | Nothing is starred |
+| **Trash is empty**: "Deleted items wait here until you empty it." | Trash is empty |
+
+With items in the list but none selected, the pane on the right says **Nothing selected**: "Choose an item on the left, or press ⌘K to jump to one."
+
+## The command menu
+
+Press <Kbd>⌘</Kbd><Kbd>K</Kbd>, click **Search** in the sidebar, or choose **View → Search...**. The command menu opens over the window with the prompt "Search items, actions and settings". <Kbd>⌘</Kbd><Kbd>K</Kbd> works even while a dialog is open, and pressing it again closes the menu.
+
+Type to search. Use <Kbd>↑</Kbd> and <Kbd>↓</Kbd> to move, <Kbd>↵</Kbd> to run the highlighted entry, and <Kbd>Esc</Kbd> to close. Moving the pointer over an entry highlights it, and a click runs it. The footer shows the keys: **Navigate** and **Open**. With nothing found, it says **No results for** your text.
+
+Results come in groups:
+
+| Group | What it holds | Shown before you type |
+|---|---|---|
+| **Items** | Every item, favorites first, then by last use. Shows the subtitle or type. Choosing one opens it in **All items**. | 5 |
+| **Actions** | Things you can do (see below) | 5 |
+| **Copy** | **Copy password: GitHub** and so on, for the main secret of up to 60 items. The clipboard clears as usual. | 5 |
+| **Go to** | **All items**, **Favorites**, **Authenticator**, **Watchtower**, **History**, **Trash**, and each type's list (such as **Logins** or **SSH keys**) | 4 |
+| **Settings** | **Settings: General**, **Settings: Security** and so on, one per settings page | 5 |
+
+While you type, each group shows its best matches: up to 8 items, 6 actions, 5 copy entries, 6 places and 5 settings pages. An entry ranks highest when its name starts with your text, then when its name or details contain your text, then when they contain your letters in order. The details are an item's subtitle (such as its username or website), its type and its space; an action's keywords; and, for each type in **Go to**, the word "type" and the type's name.
+
+The command menu always searches every space, whatever the sidebar shows. See [Spaces](/docs/desktop/spaces#switch-spaces).
+
+### Actions
+
+| Action | Shortcut |
+|---|---|
+| **New item** | <Kbd>⌘</Kbd><Kbd>N</Kbd> |
+| **New login**, **New api key** and so on, one per type | |
+| **Generate password** | <Kbd>⌘</Kbd><Kbd>G</Kbd> |
+| **New space** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd> |
+| **Sync now** | |
+| **Import items** | |
+| **Export items** | |
+| **Undo last change** | <Kbd>⌘</Kbd><Kbd>Z</Kbd> |
+| **Switch theme** | |
+| **Keyboard shortcuts** | <Kbd>⌘</Kbd><Kbd>/</Kbd> |
+| **Lock vault** | <Kbd>⌘</Kbd><Kbd>L</Kbd> |
+
+Type words like "add", "create" or a type's plural name to find the **New** actions. For example "create ssh" finds **New ssh key** and **New ssh host**.
+
+- **Sync now** syncs with every connected provider and says **Synced to 1 provider** (or the number of providers), or **No sync providers connected**. A failed sync also ends with **No sync providers connected**, so if you have providers, check **Settings → Sync** for what went wrong.
+- **Undo last change** puts the vault back as it was before the last change, and says **Undone**: "Vault restored to the previous version." See [History and undo](/docs/desktop/history).
+- **Switch theme** changes to the light theme when the app is dark, and to the dark theme otherwise. It replaces **System** or a custom theme with the fixed one.
+
+### Settings pages
+
+The **Settings** group has one entry for each page: **General**, **Security**, **Recovery**, **Sessions**, **Appearance**, **Spaces**, **Sync**, **Browser extension**, **AI access**, **Import and export**, **Developer**, **Maintenance**, **Alerts** and **About**. Type "settings" and part of the name, such as "settings sync". See the [Settings reference](/docs/desktop/settings).
+
+<Callout type="tip">
+The fastest way to copy a password without touching the mouse: <Kbd>⌘</Kbd><Kbd>K</Kbd>, type "copy" and part of the name, then <Kbd>↵</Kbd>.
+</Callout>

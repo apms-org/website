@@ -1,0 +1,181 @@
+---
+title: Privacy and permissions
+description: What APM for Chrome can see, what it sends to APM and nowhere else, what it stores, and why it asks for each browser permission.
+order: 8
+group: Reference
+---
+
+APM for Chrome is a thin client. It has no vault, no key and no server of its own. It reads forms on the pages you visit so it can fill them, and it asks APM on your computer for everything else.
+
+## Where data goes
+
+The extension talks to exactly two places, both on your computer:
+
+- APM's bridge at `http://127.0.0.1:41417` (or the port you set), served by the desktop app or `pm extension serve`.
+- `pm`, started by the browser through native messaging, after you run `pm extension link`.
+
+It sends no analytics and calls no server of its own. Its interface, fonts and scripts are bundled inside it, so nothing is fetched from the network. Website logos in the popup and menus are fetched by APM (the desktop app or `pm extension serve`) from each site itself, never through a third-party favicon service, and the extension keeps a local copy. Switching off **Show website icons** in the desktop app's **Settings**, **Appearance** stops APM fetching new logos; logos already cached keep showing. Setting `APM_ICONS_OFFLINE` in APM's environment does the same. APM fetches logos only while the vault is unlocked. See [No website logos](/docs/reference/environment-variables#no-website-logos).
+
+## What the extension and APM exchange
+
+| When | The extension sends | APM sends back |
+|------|---------------------|----------------|
+| Every request | The pairing token and a client name such as "Chrome 129 on macOS" | — |
+| Checking status | Nothing else | Whether the vault exists and is unlocked, its name and item count, the APM version, Touch ID availability, the clipboard timeout and your spaces |
+| Listing items | Nothing else | For each item: name, type, subtitle, username, space, favorite, websites, created, changed and last-used times, passkey count, and password health (weak, reused with which items). **No secret values** |
+| Opening an item | The item's ID | Its fields, with the secret fields (passwords, keys, tokens, card numbers, note text and similar) blanked and only their length kept. A login's two-factor setup key, notes and custom fields, hidden ones included, are not blanked |
+| Revealing or copying a secret | The item's ID and one field name | That one value |
+| Filling a login | The item's ID | The username, the password and, if the login has one, the current one-time code |
+| Showing codes | The item's ID, or nothing for the **Codes** tab | The current and next code for each authenticator, and for each login with its own two-factor key |
+| Unlocking | Your master password | The new status. The extension does not keep the password |
+| Saving or updating a login | The new login's fields, or the new password | The saved item |
+| A passkey request | The page's origin, the relying party ID, a hash of the client data and the site's user details | For a new passkey, the public key and authenticator data. For a sign-in, the signature. Never the private key |
+
+APM records every reveal, secret copy and fill as the item's last use. Opening an item's details and showing or copying one-time codes are not recorded. Pairing approvals and denials go to APM's audit log. Changes made from the browser, such as a saved login or an updated password, are vault changes like any other, with history you can undo in the desktop app.
+
+What the browser leaves in APM's audit log:
+
+| Event | When |
+|-------|------|
+| `BRIDGE_PAIRED`, `BRIDGE_PAIR_DENIED` | You confirm or deny a pairing code. The browser's name is recorded |
+| `VAULT_UNLOCKED` | You unlock from the popup or a passkey sheet ("Desktop unlock via password" or "via Touch ID") |
+| `UNLOCK_FAILED` | A wrong master password from the popup |
+| `VAULT_LOCKED` | You lock from the popup or with the shortcut ("Locked from the browser"), or the bridge locks on its own |
+| `PASSKEY_SAVED`, `PASSKEY_RENAMED`, `PASSKEY_DELETED` | A passkey is created, renamed or removed |
+
+Unlocking from the browser also starts a `pm` session, the same as unlocking in the app, so `pm` in a terminal opens without asking until the vault locks.
+
+## What the extension reads on pages
+
+The extension's scripts run on every `http://` and `https://` page, in every frame, because a login form can be anywhere. On each page they:
+
+- Look at input fields to decide which are usernames, passwords and one-time codes. They read field names, labels, placeholders and nearby button and heading text, not page content in general.
+- When you submit a form with a password, send the username and password to the extension's background, so it can tell whether to offer a save or an update. To decide, the background asks APM for the saved password of the matching login and compares the two. That counts as a use of the login, like a reveal.
+- Wrap the page's WebAuthn calls, so APM can answer passkey requests.
+
+Nothing from a page is sent anywhere but APM.
+
+Everything the extension draws on a page (the field menu, field icons, save and update prompts, passkey sheets and notices) lives in closed shadow roots, and the menus and prompts are extension pages in frames. The page cannot read their contents, and APM never asks for your master password inside a web page.
+
+## What the extension stores
+
+In the browser's local extension storage, which stays until you remove the extension:
+
+- The pairing token, when you paired, and the bridge port if you changed it.
+- Your extension settings, excluded sites, generator settings and the space you last chose in the popup.
+- The sites where APM created a passkey in this browser, so it can offer them while the vault is locked.
+- A cache of website logos, up to about 1.5 MB.
+
+In session storage, which lives in memory only and is gone when the browser quits:
+
+- A pairing request that is waiting for you to confirm.
+- A login waiting for you to answer a save or update prompt, including the password you typed.
+- A secret you copied, until APM clears it from the clipboard.
+
+While the vault is unlocked, the extension keeps the item list (which has no secret values) in memory, refreshing it at most every 15 seconds, and drops it as soon as it sees the vault locked: at once when the browser started `pm`, otherwise at its next status check, within a minute. Secrets you reveal are fetched each time and not kept.
+
+The exact keys, for anyone inspecting the extension's storage:
+
+| Key | Storage | Holds |
+|-----|---------|-------|
+| `apm.token` | Local | The pairing token |
+| `apm.paired` | Local | When this browser paired |
+| `apm.port` | Local | The bridge port, only if you changed it |
+| `apm.settings` | Local | Your settings from the settings page |
+| `apm.excluded` | Local | Excluded and paused sites, each with its rule |
+| `apm.gen` | Local | Generator settings |
+| `apm.space` | Local | The space last chosen in the popup |
+| `apm.rpHints` | Local | Up to 500 sites where APM created a passkey in this browser |
+| `apm.icons` | Local | Website logos, about 1.5 MB at most. A site with no logo is asked about again after 6 hours |
+| `apm.pairing` | Session | A pairing request waiting for your answer |
+| `apm.cand.<tab>` | Session | A login waiting for its save or update prompt, including the password you typed |
+| `apm.clip` | Session | What was last copied and when to clear it |
+
+## How the bridge keeps other software out
+
+- It listens on `127.0.0.1` only, so nothing outside your computer can reach it.
+- It answers only requests addressed to `127.0.0.1` or `localhost` on its port, which blocks DNS rebinding from web pages.
+- It rejects any request that carries a web page's origin. Requests from a browser extension, or with no origin at all (such as `pm extension status`), are let through to the token check.
+- Every request except pairing and the version check (`/api/info`) must carry the pairing token, which APM compares in constant time. One token is shared by every paired browser; rotating it with `pm extension rotate` disconnects all of them.
+- `pm`, when started through native messaging, can be started only by the extension IDs listed in its manifest: the APM extension, plus any you added with `pm extension link --id`.
+
+The token lets the holder read your vault while it is unlocked. It is stored in your APM config folder as `bridge_token`, with owner-only permissions on macOS and Linux.
+
+You can see these checks from a terminal. Only `/api/info` answers without a token:
+
+```sh title="Terminal"
+curl -s http://127.0.0.1:41417/api/info
+```
+
+```json title="Output"
+{"api":2,"mode":"app","name":"APM","ok":true,"unlocked":true,"version":"12.0.0"}
+```
+
+`mode` is `app` for the desktop app, `serve` for `pm extension serve` and `native` for `pm` started by the browser. The same request with a web page's `Origin` header, or sent to another host name, is refused, and anything else without the token is turned away:
+
+```json title="Output"
+{"code":"forbidden_origin","error":"Only the APM browser extension can call this bridge.","ok":false}
+{"code":"forbidden_host","error":"This bridge only answers requests sent to 127.0.0.1 or localhost.","ok":false}
+{"code":"unauthorized","error":"This browser is not paired with APM, or its pairing token is out of date. Pair it again.","ok":false}
+```
+
+### The bridge's endpoints
+
+The extension sends JSON bodies of at most 1 MiB, the token in an `x-apm-token` header and its name in `x-apm-client`. Over native messaging the same requests travel as length-prefixed JSON messages, and the browser starts `pm` with the extension's origin as its argument.
+
+| Endpoint | Token | What it does |
+|----------|-------|--------------|
+| `GET /api/info` | No | Name, version, API version (2), mode and whether the vault is unlocked |
+| `POST /api/pair/start`, `GET /api/pair/poll` | No | Start a pairing request and wait for its answer |
+| `GET /api/status` | Yes | Unlocked, read-only, item count, vault name, spaces, Touch ID, clipboard timeout and failed-attempt state |
+| `POST /api/unlock`, `POST /api/unlock/touchid`, `POST /api/lock` | Yes | Unlock with a password or Touch ID, or lock |
+| `GET /api/items`, `GET /api/items/:id` | Yes | The item list, or one item with its secret fields blanked. A login's two-factor key, notes and custom fields are not blanked |
+| `POST /api/items/:id/reveal` | Yes | One field's value, recorded as a use |
+| `POST /api/items`, `/api/items/:id/update`, `/trash`, `/favorite` | Yes | Add, change, trash or favorite an item |
+| `POST /api/fill` | Yes | A login's username, password and current code, recorded as a use |
+| `GET /api/totp`, `GET /api/totp/:id` | Yes | Current and next codes |
+| `GET /api/passkeys`, `POST /api/passkeys/create`, `/assert`, `/rename`, `/remove` | Yes | List, create, sign with, rename or remove passkeys |
+| `POST /api/icons` | Yes | Website logos for up to 300 sites at a time |
+
+The item, fill, code, passkey and logo endpoints need an unlocked vault, and changes need a vault you can write to. Errors come back as `{"ok": false, "code": …, "error": …}`:
+
+| HTTP status | Codes |
+|-------------|-------|
+| 400 | `invalid`, `not_login`, `touchid_unavailable`, `touchid_failed` |
+| 401 | `unauthorized`, `wrong_password` |
+| 403 | `forbidden_origin`, `forbidden_host`, `rp_mismatch`, `pair_denied` |
+| 404 | `not_found`, `no_vault` |
+| 409 | `exists` |
+| 410 | `pair_expired` |
+| 423 | `locked`, `readonly`, `vault_newer`, `breach_lock` |
+| 429 | `cooldown` |
+| 500 | `internal` |
+
+## Permissions
+
+These are every permission in the extension's manifest, and why each is there.
+
+| Permission | Why |
+|------------|-----|
+| `storage` | Keeps the pairing token, your settings, excluded sites and the logo cache, and holds pending prompts in memory |
+| `activeTab` | Lets the toolbar popup and keyboard shortcuts work on the page you are on |
+| `contextMenus` | Adds **APM** to the right-click menu on text fields |
+| `offscreen` | A service worker cannot use the clipboard, so the extension copies from a hidden offscreen page |
+| `clipboardWrite` | Copies passwords, usernames and codes you ask for |
+| `clipboardRead` | Before clearing the clipboard, checks that it still holds what APM copied, so it leaves alone something you copied since. If the check can't read the clipboard, APM clears it anyway |
+| `alarms` | Checks once a minute whether APM is running and locked, and clears the clipboard on time |
+| `nativeMessaging` | Starts `pm` when the app is closed, after `pm extension link` |
+| Host `http://127.0.0.1/*` | Talks to APM's bridge on this computer. No other host is contacted |
+| Content scripts on all sites | Find login forms so APM can fill them, and answer passkey requests. One small script runs in the page's own JavaScript world to wrap `navigator.credentials`; the rest run isolated from the page |
+| Web-accessible `inline.html` and `prompt.html` | The field menu and the prompts are these extension pages, framed into the site |
+| Commands | The keyboard shortcuts |
+
+The extension requires Chrome 116 or later. It does not ask for access to your tabs list, cookies, history, downloads or network requests.
+
+<Callout type="note" title="Sites can tell APM is installed">
+Because the menu and prompt pages must be loadable from any site, a page can detect that the APM extension is installed. It cannot read anything from it.
+</Callout>
+
+## Locking
+
+The extension never stays unlocked on its own. It follows APM: when APM locks, from the app or the browser, on its auto-lock policy, or when the computer sleeps, the extension is locked. `pm lock` in a terminal ends only the terminal's session. It doesn't lock the app or a running bridge. Background checks such as status, badge counts and logos do not count as activity, so an idle browser does not keep the vault open. **Lock APM when Chrome closes** in the settings locks the vault when the last browser window closes. See [Security profiles](/docs/security/profiles) and [Encryption](/docs/security/encryption) for how the vault itself is protected.

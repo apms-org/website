@@ -1,0 +1,189 @@
+---
+title: Recipes
+description: Practical ways to use APM with an AI agent, each with the smallest set of tools it needs.
+order: 4
+group: Reference
+---
+
+Each recipe lists the tools to grant when you create the token. Create a separate token per recipe or per client, so each one carries only what it needs. How to create tokens and add them to a client is in [Setup](/docs/agents/setup).
+
+## A names-only helper
+
+**Tools:** `list_vault`
+
+The agent can see which items you have, by name and type, and nothing else. Good for questions like "Do I have a login for Linear?" or "Which API keys are in my vault?".
+
+```json title="Call"
+{ "name": "list_vault", "arguments": {} }
+```
+
+Don't add `search_vault` to this token. It returns matching items in full, passwords included.
+
+## 2FA codes while you sign in
+
+**Tools:** `list_vault`, `get_totp`
+
+Ask for a code by item name, for example "Get my GitHub code":
+
+```json title="Call"
+{ "name": "get_totp", "arguments": { "name": "GitHub" } }
+```
+
+```text title="Result"
+TOTP Code for GitHub: 492039
+```
+
+The code is valid for the rest of its 30-second window. `get_totp` works for authenticator items and for logins that store a 2FA key. These calls aren't written to the audit log, so give the token a short expiry, such as one week.
+
+## Save a new secret with your approval
+
+**Tools:** `list_vault`, `add_entry`
+
+Keep the desktop app unlocked. When you create an API key somewhere and ask the agent to store it, it calls `add_entry`:
+
+```json title="Call"
+{
+  "name": "add_entry",
+  "arguments": {
+    "type": "api_key",
+    "name": "Postmark server token",
+    "service": "Postmark",
+    "key": "a3f8c2d1-7e4b-4f9a-b6c5-2d8e1f0a9b37",
+    "space": "work"
+  }
+}
+```
+
+Nothing is saved yet. The app shows the request in **Settings → AI access**, with the key masked. Check the name, type and space, then choose **Approve**. The item is added and the change is recorded in lgit history.
+
+The agent can't approve the request itself. It can call `tx_list` to see whether you approved it.
+
+## Rotate a password
+
+**Tools:** `list_vault`, `generate_password`, `edit_entry`
+
+<Steps>
+
+### Generate the new password
+
+```json title="Call"
+{ "name": "generate_password", "arguments": { "length": 24 } }
+```
+
+### Change it on the website
+
+Sign in and set the new password there first, so the vault never holds a password the site doesn't accept.
+
+### Store it in APM
+
+```json title="Call"
+{
+  "name": "edit_entry",
+  "arguments": { "type": "password", "name": "Linear", "password": "the generated password" }
+}
+```
+
+The reply says the request is waiting for approval and gives its ID.
+
+### Approve in the desktop app
+
+Approve the request in **Settings → AI access**. Approving there records an lgit commit, so the previous password can still be recovered from history.
+
+</Steps>
+
+The new password passes through the agent's context, as does anything a tool returns. If that matters for this account, rotate it yourself in the app or with `pm`.
+
+## Give an agent a short-lived session
+
+**Tools:** whatever the task needs, on a token that expires soon
+
+By default the server uses your own session, which stays open as long as you or the agent keep using it. For a one-off task you can hand the agent a separate session that ends on its own.
+
+<Steps>
+
+### Create a token that expires
+
+Run `pm mcp token` and enter `60` at the expiry prompt for one hour.
+
+### Issue an ephemeral session
+
+```sh title="Terminal"
+pm session issue --scope read --ttl 1h --agent mcp
+```
+
+```text title="Output"
+Ephemeral session issued.
+ID:         eps_8c41d0f2a9b7e3c5d1f60a4b
+Scope:      read
+Expires:    2026-10-05T16:04:05Z
+Host bind:  enabled
+Agent bind: mcp
+
+Export this for consumers:
+  set APM_EPHEMERAL_ID=eps_8c41d0f2a9b7e3c5d1f60a4b
+  set APM_EPHEMERAL_AGENT=mcp
+```
+
+### Pass it to the server
+
+Add both values to the client's `env` block, next to the new token:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "apm_mcp_your_token"],
+      "env": {
+        "APM_EPHEMERAL_ID": "eps_8c41d0f2a9b7e3c5d1f60a4b",
+        "APM_EPHEMERAL_AGENT": "mcp"
+      }
+    }
+  }
+}
+```
+
+### Lock your own session
+
+```sh title="Terminal"
+pm lock
+```
+
+The server uses the ephemeral session only when there is no regular one. Unlocking the desktop app or running `pm unlock` starts a regular session, which then takes over.
+
+### End it
+
+The session stops working at its `--ttl`. To end it sooner:
+
+```sh title="Terminal"
+pm session revoke eps_8c41d0f2a9b7e3c5d1f60a4b
+```
+
+</Steps>
+
+<Callout type="warning">
+- `--scope read` limits what `pm` commands can do with the session, but not MCP: the token's tools decide. Give the token only the tools the task needs.
+- The session's record in `ephemeral_sessions.json`, in your APM config folder, holds your master password in plain text, readable by your user account. Revoking marks it unusable; the record is deleted once its expiry has passed. Keep `--ttl` short.
+- Leave out `--bind-pid`. It binds the session to the `pm session issue` process, which has exited by the time the server starts.
+</Callout>
+
+More on sessions in [Sessions and locking](/docs/security/sessions-and-locking).
+
+## See what an agent did
+
+```sh title="Terminal"
+pm logs
+```
+
+The audit section shows `MCP_` events with the token's name, such as `MCP_ENTRY_ACCESSED` when an item was opened with `get_entry` and `MCP_TX_REQUESTED` when it asked for a change and `MCP_ENTRY_ADDED` when you approved one. The vault history section shows the items that were added or deleted. `pm mcp list` shows when each token was created, how many times it started a server and when it expires. The full list of logged events is in [Scopes and approval](/docs/agents/scopes-and-approval#audit-log).
+
+To take back a change you approved in the app, use `pm lgit undo` or the History screen in the app. See the [command reference](/docs/cli/commands).
+
+## Cut off a client
+
+```sh title="Terminal"
+pm mcp revoke "Cursor"
+pm lock
+```
+
+Then quit the client. Revoking stops the token from starting a server again; locking stops a server that is already running from reaching the vault. Unlock again when you're ready; servers that other clients are still running pick up the new session on their next call. In the desktop app, **Revoke** next to the token in **Settings → AI access** does the first step.

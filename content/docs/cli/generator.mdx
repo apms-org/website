@@ -1,0 +1,61 @@
+---
+title: Password generator
+description: Generate random passwords with pm gen, and let pm add create one for a new login.
+order: 5
+sidebarTitle: Generator
+group: Guides
+---
+
+`pm gen` prints a random password. It does not need the vault, so it works before you unlock.
+
+```sh title="Terminal"
+pm gen
+```
+
+```text
+zT!#aOjD0lvLzSPV
+```
+
+## Length
+
+The default is 16 characters. Set another with `--length` or `-l`:
+
+```sh title="Terminal"
+pm gen -l 32
+```
+
+## Character set
+
+Each character is picked independently with a cryptographically secure random number generator from these 76 characters:
+
+```text
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+
+```
+
+There are no options to drop symbols or require each class. A short password may not contain every kind of character, so if a site or a [password policy](/docs/cli/policies) needs one of each, check the result or generate a longer one.
+
+## Use it in a pipeline
+
+`pm gen` prints only the password and a newline, so you can pipe it:
+
+```sh title="Terminal"
+pm gen -l 24 | pbcopy                 # macOS: copy it
+NEW_PASS="$(pm gen -l 24)"            # keep it in a variable
+```
+
+Each run is recorded in the audit log as `PASSWORD_GENERATED` with the length, never the password.
+
+## Generate while adding a login
+
+When `pm add password` asks for the password, leave it blank. `pm` generates a 16-character password from the same set and saves it without printing it. View or copy it later with `pm get`.
+
+```text
+$ pm add password
+Account Name: Netflix
+Username: me@example.com
+Password (leave blank to generate):
+Generated password created and saved.
+Entry saved.
+```
+
+The desktop app and the browser extension have password generators of their own. See [the generator in the desktop app](/docs/desktop/generator).

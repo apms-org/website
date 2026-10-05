@@ -1,0 +1,231 @@
+---
+title: Autofill
+description: The field menu, how APM matches logins to sites, one-time codes, password suggestions and shortcuts.
+order: 3
+group: Using it
+---
+
+APM fills only when you ask. Nothing is typed into a page when it loads. You pick a login from the menu under a field, from the toolbar popup, from the right-click menu or with a shortcut, and APM fills that form.
+
+## The field menu
+
+Focus a username, password or one-time code field and a small menu opens under it. On a sign-up or change-password form, the menu on the new password field offers a strong password instead.
+
+The menu opens on its own only when it has something for you:
+
+- **On a login field**, the logins saved for this site, and any passkeys the site offers to sign in with.
+- **On a one-time code field**, a code saved for this site.
+- **On a new password field**, a generated password, unless **Suggest strong passwords on sign-up forms** is off.
+- **While APM is locked**, a short notice on login forms: "APM is locked. Unlock from the toolbar to fill. APM never asks for your master password inside a web page." Choose **Unlock in the toolbar** to open the popup.
+
+To open the menu on any field, even with nothing to offer, click the APM icon at the right edge of the field, or right-click the field and choose **APM**.
+
+### What the menu shows
+
+| Part | What it is |
+|------|------------|
+| Header | The APM mark and the site's host name |
+| Logins | Up to 8 logins saved for this site. Each shows the username (or the item name when there is none), the item name, its space, and "code ready" when the login has a one-time code |
+| **Passkeys** | Passkeys for this site, when the site supports passkey autofill. See [Passkeys](/docs/extension/passkeys) |
+| "N more in the toolbar popup." | Shown when more than 8 logins match |
+| **Search the vault** | Opens the toolbar popup. Same as <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>A</Kbd> |
+
+Click a login to fill it. With the keyboard, focus stays in the page's field:
+
+| Keys | Action |
+|------|--------|
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd> | Move between logins |
+| <Kbd>↵</Kbd> | Fill the highlighted login |
+| <Kbd>Esc</Kbd> | Close the menu. It stays closed for that field until you click the field or its APM icon again |
+| <Kbd>Tab</Kbd> | Close the menu and move on |
+
+If the menu cannot help on a page, opening it by hand explains why: "APM isn't connected", "APM is locked", or "Not filling here" with the reason (see [Where APM does not fill](#where-apm-does-not-fill)).
+
+### The APM icon in fields
+
+A small APM mark sits at the right edge of each field APM recognizes. It is dimmed while the vault is locked. It is hidden when the extension is not paired or cannot reach APM, on sites where filling is paused, and when **Show the APM icon inside fields** is off. It is 20 pixels square, or 16 in fields shorter than 28 pixels, and it hides while its field is scrolled out of view.
+
+The menu is 328 pixels wide and opens 6 pixels below the field. When there is no room below, it opens above the field instead. Clicking anywhere else on the page closes it.
+
+## Which fields APM recognizes
+
+APM looks at visible, enabled, editable text inputs. It skips search boxes, hidden fields, checkboxes, date pickers and similar inputs. It keeps watching the page, so forms that appear later are picked up too.
+
+- **Password fields** are either a current password or a new one. APM goes by the field's `autocomplete` attribute first (`current-password`, `new-password`). Without one, two password fields in the same form mean a new password and its confirmation, unless one is labelled current or old. A field labelled new, confirm or repeat, or a form whose buttons or headings say sign up, register, create account, join or get started, also counts as new.
+- **Username fields** are the text or email field before the password in the same form, or a field marked `autocomplete="username"` or `webauthn`. A field marked `autocomplete="email"` counts only when the form also has a password field. On two-step sign-ins, a lone email or username field next to a Continue, Next or Sign in button counts too.
+- **One-time code fields** are marked `autocomplete="one-time-code"`, or are named or labelled like a code (OTP, 2FA, MFA, verification code, security code, passcode). A row of four or more one-character boxes counts as one code field.
+
+The details, for when a field is not picked up:
+
+| Check | Rule |
+|-------|------|
+| Input types skipped | `hidden`, `submit`, `button`, `checkbox`, `radio`, `file`, `image`, `reset`, `range`, `color`, `date`, `datetime-local`, `month`, `week`, `time` and `search`, and any disabled or read-only field |
+| Visible | At least 24 by 12 pixels, not hidden with `visibility` or `display`, and not almost transparent |
+| What a "form" is | The field's `<form>`. Without one, the nearest element with the role `dialog` or `form`, or whose class mentions login, signin, sign-in or auth, or whose ID mentions login or signin. Else the whole page |
+| Words that mark a username | user, login, e-mail or email, account, identifier, phone, mobile, handle, id. APM reads the field's name, ID, placeholder, `aria-label`, `autocomplete`, label and class |
+| Words that mark a new password | new, create, confirm, repeat, retype, again, sign up, register, choose, set password. Current, old or existing mark the current password |
+| Words that mark a code | one-time, OTP, TOTP, 2FA, MFA, two-factor, verification code, security code, authentication or authenticator code, passcode, code, token. The field must also be numeric or allow 4 to 10 characters, and its name or ID must not mention user, email, login or password |
+
+APM looks again about a third of a second after anything on the page changes, and once more about a second and a half after it first looks.
+
+## Fill a login
+
+1. Focus the username or password field.
+2. Choose a login in the menu.
+
+APM fills the username and password in the form that holds the field you focused, and moves the cursor to the password field. It does not submit the form. The filled fields flash briefly so you can see what changed.
+
+Other ways to fill the same login:
+
+- **Toolbar popup**: on the **This site** tab, choose **Fill** next to a login. The popup closes after filling.
+- **Shortcut**: <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>F</Kbd> fills the best login for the page into the form you used last, or the first login form on the page.
+- **Right-click** a field, choose **APM**, then **Fill a login**.
+
+Each fill counts as a use of the item. APM records it as the item's last use, which the popup's **Vault** tab sorts by.
+
+APM sets each value the way the page expects from typing: it fires key, input and change events, so sites built with JavaScript frameworks see the new values. If the form has only a password field, or only a username field, APM fills the one it has.
+
+When you fill from the popup or with the shortcut rather than from a field, APM picks where to fill: first a frame where you focused a field in the last minute, then one with a password field, then one with a username field, preferring the page itself over frames inside it. Within that frame it uses the field you focused or right-clicked last, else the first password or username field. If the page has no login form APM knows of, it looks again before giving up.
+
+## How APM matches logins to a site
+
+A login can hold several websites: its **Website** and any **Other websites**. APM offers the login on a page that matches any of them. The rule comes from **Match websites by** in the extension's [settings](/docs/extension/options#autofill).
+
+| Setting | A saved website matches a page when |
+|---------|-------------------------------------|
+| **Base domain** (default) | Both are on the same registrable domain. `accounts.google.com` and `mail.google.com` both match `google.com` |
+| **Exact host** | The host names are the same, ignoring a leading `www.` |
+| **Starts with URL** | The page's address starts with the saved address. A saved address with no path also matches every page on the same host |
+
+Details that apply to every setting:
+
+- A website saved without a scheme, such as `github.com`, is read as `https://github.com`.
+- If both the saved website and the page name a port and the ports differ, they do not match.
+- With **Base domain**, IP addresses and `localhost` must match exactly, port included. Two-part country endings such as `co.uk` or `com.au` are respected, so `a.co.uk` and `b.co.uk` are different sites. So are subdomains of shared hosting such as `github.io`, `vercel.app`, `netlify.app` and `pages.dev`: `alice.github.io` and `bob.github.io` never share logins.
+
+When several logins match, APM lists them in this order: the login you filled last in this tab (within 15 minutes), then the closest match (same host and path before same domain), then favorites, then the most recently used, then by name.
+
+Some examples, with a login saved for `https://github.com`:
+
+| Page | Base domain | Exact host | Starts with URL |
+|------|-------------|------------|-----------------|
+| `https://github.com/login` | Yes | Yes | Yes |
+| `https://www.github.com/login` | Yes | Yes | Yes |
+| `https://gist.github.com/` | Yes | No | No |
+| `https://github.com:8443/` | Yes | Yes | Yes |
+| `https://alice.github.io/` | No | No | No |
+
+A leading `www.`, or `www` and one digit such as `www2.`, is ignored when hosts are compared. Ports are compared only when both the saved website and the page name one. With **Starts with URL**, a saved address that has a path, such as `https://github.com/orgs/acme`, matches only pages whose address starts with it, scheme included.
+
+<Callout type="note" title="Two-part endings come from a built-in list">
+**Base domain** knows common two-part endings such as `co.uk`, `com.au`, `co.jp` and `com.br`, and shared hosts such as `github.io`, `vercel.app`, `herokuapp.com` and `myshopify.com`, from a list built into the extension. For an ending that is not on the list, every site under it counts as one site: `shop.example.com.ve` and `bank.other.com.ve` would share logins. Use **Exact host** if you sign in to sites like that.
+</Callout>
+
+The toolbar badge shows how many logins match the current tab while the vault is unlocked.
+
+### Use a login on another site
+
+The field menu and the popup list only the logins saved for the site you are on. To use a login on another site, add that site to the login:
+
+- Open the popup on the site, choose **Use a saved login on** followed by the site's name, search for the login and pick it. APM adds the site to the login's websites.
+- Or open the login in the popup and, under **Websites**, choose **Add** followed by the site's name, or **Add** to type any address. See [Toolbar popup](/docs/extension/popup#item-details).
+
+APM never fills a login into a form on a site the login is not saved for without asking. If that would happen, for example when you choose **Fill** and the sign-in form sits in a frame from another domain, the popup asks first ("Fill Google on accounts.example.net?") and warns that the login is saved for a different website:
+
+- **Fill once** fills it this time only.
+- **Fill and remember** fills it and adds the site to the login's websites, so it matches from now on.
+- **Cancel** does nothing.
+
+## One-time codes
+
+APM fills time-based one-time codes (TOTP) the same way it fills logins.
+
+### Where a login's code comes from
+
+A login has a code when either of these is true:
+
+- The login itself holds a two-factor key (the **Two-factor code** field in the desktop app).
+- An Authenticator item is linked to it. APM looks for an Authenticator item linked to the exact host of the login's **Website**, then one linked to the same domain, then one with the same name, preferring items in the login's space.
+
+To link an Authenticator item to a site from the terminal, run `pm totp link <entry> <domain>`. See [`pm totp`](/docs/cli/commands).
+
+### After you fill a login
+
+When the login you fill has a code, APM copies the current code to the clipboard, so you can paste it on the next page. Turn this off with **Copy the one-time code after a login**. The clipboard clears itself after APM's clipboard timeout, 30 seconds unless you changed it in the desktop app, and only if it still holds the code.
+
+For 3 minutes after the fill, a code field in the same tab offers that login's code, with the note "Matched because you filled this login on" the site "a moment ago."
+
+### In a code field
+
+Focus the code field and the menu shows the code with a live countdown. Click it or press <Kbd>↵</Kbd> to fill it. Code fields split into one box per digit are filled box by box.
+
+Codes change every 30 seconds. APM sends the current code and the next one, and the countdown follows APM's clock rather than the browser's, so a code shown in the last seconds of its window switches to the next one on time.
+
+Without a recent fill, APM offers the best matching login that has a code, then an Authenticator item linked to the site. If there is none, opening the menu by hand says "No one-time code is saved for" the site, and suggests adding the setup key to an authenticator item in APM.
+
+You can also copy codes from the popup: from a login on the **This site** tab, or from the **Codes** tab. The **Copy the one-time code for this page** shortcut has no default key; set one at `chrome://extensions/shortcuts`.
+
+## Suggest a strong password
+
+On a sign-up or change-password form, the menu on the new password field shows **Use a strong password** with a generated password and its strength.
+
+- **Generate another** makes a new one.
+- **Options** opens the generator: **Random**, **Passphrase** or **PIN**, with your settings from the popup's **Generator** tab. **Avoid look-alikes** isn't shown here. Change it in the popup.
+- **Fill password** fills it into every new password field in the form, so the confirmation field matches.
+
+The password is made in the browser with `crypto.getRandomValues`. Nothing leaves the browser until you submit the form, and then APM offers to save the login. See [Saving and updating](/docs/extension/saving-and-updating).
+
+<Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>G</Kbd> does the same in one step: it generates a password with your generator settings, fills it and copies it, and shows "Filled a strong password. Copied too. APM offers to save it when you submit."
+
+## Right-click menu
+
+Right-click any text field and choose **APM**:
+
+- **Fill a login**
+- **Fill a one-time code**
+- **Suggest a strong password**
+
+Each opens the field menu on that field, even where it would not open on its own.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>A</Kbd> | Open APM (the toolbar popup) |
+| <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>F</Kbd> | Fill the best login for this page |
+| <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>G</Kbd> | Generate and fill a strong password |
+| <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>L</Kbd> | Lock the vault |
+| Not set | Copy the one-time code for this page |
+
+On macOS, <Kbd>Alt</Kbd> is the <Kbd>⌥</Kbd> Option key. The browser owns extension shortcuts: change or add them at `chrome://extensions/shortcuts`. The extension's settings page lists the current ones under **Shortcuts**.
+
+When a shortcut runs, a small notice appears in the top right corner of the page for a few seconds:
+
+| Shortcut | Notice when it works | Notices when it cannot |
+|----------|----------------------|------------------------|
+| Fill the best login | None, unless the login has a one-time code: then "Filled" and the username, with "One-time code copied" | "APM is locked" or, before pairing, "Connect APM first", each with "Open APM from the toolbar."; "No saved logins match this page."; "There is no login form on this page." |
+| Generate and fill | "Filled a strong password", "Copied too. APM offers to save it when you submit." | "Click a password field on the page first." |
+| Copy the one-time code | "Copied one-time code" and the login's name | "APM is locked"; "No one-time code is saved for this site." |
+| Lock the vault | "APM locked", "Unlock it from the toolbar." | — |
+
+A shortcut that fills a login can also stop with the messages in [Filling does nothing](/docs/extension/troubleshooting#filling-does-nothing).
+
+## Where APM does not fill
+
+| Situation | Why | Change it |
+|-----------|-----|-----------|
+| An `http://` page | Unencrypted pages can be read on the network. `localhost`, `127.0.0.1` and `*.localhost` are always allowed | Turn off **Never fill on http:// pages** |
+| A form in a frame from another site | A frame from another site could be hidden over the real form. "Another site" means a different base domain from the page in the address bar | Turn on **Fill inside frames from other sites** |
+| A site you paused or excluded | You chose **Pause APM on** this site in the popup, or added it to **Excluded sites** with **Never fill** or **Never fill or save** | Choose **Resume** in the popup, or edit **Excluded sites** |
+| A browser page, a `file://` page or the extension store | The extension only runs on `http://` and `https://` pages | — |
+
+The first three settings are in the extension's [settings](/docs/extension/options).
+
+When you open the menu by hand in one of these places, it says **Not filling here** with the reason:
+
+| Reason | What the menu says |
+|--------|--------------------|
+| `http://` page | "example.com is not encrypted, so APM does not fill here. You can change this in the extension settings." |
+| Frame from another site | "This form is inside a frame from another site. Filling there is off in the extension settings." |
+| Paused or excluded | "APM is paused on example.com. Resume it from the toolbar popup." |
+| Anything else | "APM can't fill on this page." |

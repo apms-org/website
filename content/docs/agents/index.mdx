@@ -1,0 +1,83 @@
+---
+title: AI agents and MCP
+description: APM ships an MCP server so AI assistants can use your vault through tools you pick, with a token you can revoke.
+order: 0
+sidebarTitle: Overview
+---
+
+APM includes a Model Context Protocol (MCP) server inside `pm`. An AI client such as Claude Desktop, Claude Code, Cursor, VS Code or Cline starts `pm mcp serve` as a child process and calls APM's tools to list items, read a one-time code or add a new secret. Each client gets its own token, and the token decides which tools it may call.
+
+## What MCP is
+
+MCP is an open protocol that lets an AI application call tools provided by another program. The application (the *client*) starts the program (the *server*), asks it which tools it has, and calls them with JSON arguments. The model never touches your files directly; it only sees what the tools return.
+
+APM's server speaks MCP over **stdio**: the client writes requests to `pm`'s standard input and reads replies from its standard output. Nothing listens on a network port. It identifies itself to the client as `APM-Server` version `1.3.0`.
+
+## Why APM ships a server
+
+Agents are useful for chores like "fill in the 2FA code for GitHub", "store this API key I just created" or "do I have a login for Linear?". Without a server you would paste secrets into the chat. With it:
+
+- The agent asks for one thing at a time, through a named tool.
+- You decide which tools a client gets when you create its token.
+- Adds, edits and deletes wait as requests that you approve or reject in the desktop app.
+- Opening an item with `get_entry` and most changes to the vault are written to the audit log.
+
+## How it fits together
+
+```text title="Request path"
+AI client (Claude Desktop, Cursor, ...)
+   │  starts:  pm mcp serve --token apm_mcp_...
+   │  talks:   JSON-RPC over stdin/stdout
+   ▼
+pm mcp serve
+   │  at start:  token exists and has not expired
+   │  each call: is this tool on the token's list?
+   ▼
+your unlocked pm session  (pm unlock, or unlocking the desktop app)
+   │
+   ▼
+~/.apm/vault.dat
+```
+
+The server never asks for your master password. It uses the session you already opened with `pm unlock` or by unlocking the desktop app. When the vault locks, every tool that needs the vault fails until you unlock again. See [Scopes and approval](/docs/agents/scopes-and-approval#vault-access-needs-an-unlocked-session).
+
+## What an agent can do
+
+The server has 17 tools. The desktop app groups them like this:
+
+| Group | Tools | What it allows |
+|-------|-------|----------------|
+| Read | `list_vault`, `search_vault` | List item names; search item contents |
+| Secrets | `get_entry`, `decrypt_entry`, `get_totp` | Read an item's full contents; get a current 2FA code |
+| Write | `add_entry`, `edit_entry`, `delete_entry`, `manage_spaces`, `cloud_sync` | Ask to add, edit and delete items; manage spaces; push the encrypted vault to sync |
+| Admin | `manage_profiles`, `cloud_config`, `get_history`, `get_audit_logs` | Change the encryption profile and sync credentials; read history and the audit log |
+| Utility | `generate_password`, `tx_list`, `tx_abort` | Password generation, pending requests |
+
+Every tool and its arguments are in the [tool reference](/docs/agents/tools).
+
+## What an agent can't do
+
+- **Call a tool its token doesn't list.** It gets `Denied`.
+- **Unlock the vault.** No tool uses or returns your master password. If the vault is locked, the agent waits for you.
+- **Change items on its own.** Adds, edits and deletes happen only after you approve them in the desktop app.
+- **Reach APM over the network.** The server only talks to the client that started it.
+- **Change your master password, recovery setup or browser pairing, or export the vault to a readable file.** There are no tools for these.
+
+<Callout type="warning" title="Know the limits before you grant access">
+- `search_vault` returns the full contents of matching items, passwords included. Treat it as a secrets tool.
+- `manage_spaces`, `cloud_sync`, `manage_profiles` and `cloud_config` apply at once, without asking you. Grant them only to clients you trust with that change.
+- A revoked or expired token keeps working until the client restarts the server. Run `pm lock` to cut off vault access at once.
+
+[Scopes and approval](/docs/agents/scopes-and-approval) explains each of these.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Set up a client" href="/docs/agents/setup" icon="plug">Create a token and add APM to Claude, Cursor, VS Code or Cline.</Card>
+  <Card title="Scopes and approval" href="/docs/agents/scopes-and-approval" icon="shield-check">How tokens, permissions, sessions and approval work.</Card>
+  <Card title="Tool reference" href="/docs/agents/tools" icon="wrench">Every tool, its arguments and what it returns.</Card>
+  <Card title="Recipes" href="/docs/agents/recipes" icon="book-open">Practical workflows, from 2FA codes to rotating a password.</Card>
+  <Card title="Troubleshooting" href="/docs/agents/troubleshooting" icon="life-buoy">Error messages and what to do about them.</Card>
+  <Card title="Threat model" href="/docs/security/threat-model" icon="shield">What APM protects against, including agent access.</Card>
+</Cards>

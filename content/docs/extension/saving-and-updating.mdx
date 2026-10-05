@@ -1,0 +1,134 @@
+---
+title: Saving and updating logins
+description: How APM offers to save a new login or update a changed password after you sign in, and how to save one from the popup.
+order: 4
+sidebarTitle: Saving and updating
+group: Using it
+---
+
+When you sign in or sign up with a password APM does not have, it offers to save it. When you sign in with a new password for a login it already has, it offers to update it. The offer is a small prompt in the top right corner of the page, and nothing is saved until you choose **Save** or **Update**.
+
+## When APM offers
+
+APM watches for a form being sent: a submit, <Kbd>↵</Kbd> in a password or login field, or a click on a button such as Sign in, Log in, Continue, Next, Register, Create, Verify, Save, Change, Update or Reset. It decides right away what to offer, and shows the prompt just under a second later.
+
+It offers nothing when:
+
+- The vault is locked.
+- The form had no password, or a password longer than 512 characters.
+- **Offer to save new logins** and **Offer to update changed passwords** are both off.
+- The site is in **Excluded sites** with **Never save** or **Never fill or save**, or you paused APM on it from the popup.
+- You just filled a login from APM and submitted it unchanged.
+
+Otherwise APM looks for a login saved for this site that the form belongs to:
+
+1. If the form had a username, the login for this site with that username (ignoring case).
+2. If it had no username but was a change-password form, and exactly one login is saved for this site, that login.
+3. If it had no username, the login you filled in this tab in the last 15 minutes.
+
+If it finds one and the password differs from the saved one, it offers an **update**. If the password is the same, it stays quiet. If it finds none, it offers to **save** a new login, but only when the form had a username.
+
+### Which password and username it takes
+
+| Form | Password APM takes |
+|------|--------------------|
+| One password field | That password |
+| A current password and one or more new ones | The first new one. The form counts as a change of password, which matters when it has no username (rule 2 above) |
+| Two or more new password fields, with no current one | The last one, normally the confirmation |
+
+The username is the field APM matched to that password: the last field before it in the same form, or one marked `autocomplete="username"` or `email`. APM trims spaces around it and keeps at most 256 characters. Hidden username fields are not read.
+
+Pressing <Kbd>↵</Kbd> or clicking the same button twice sends the same sign-in once: APM ignores a repeat of the same username and password within a second and a half.
+
+### Sign-ins split over two pages
+
+Some sites ask for the username on one page and the password on the next. APM sees only the password page, so it has no username to save a new login with. It can still offer an **update**, for the login you filled in this tab in the last 15 minutes. To save a new login for a site like that, use **Save a login for** in the popup.
+
+## The save prompt
+
+The prompt is titled "Save login for" followed by the site, with "You just signed in. APM can fill it next time."
+
+| Field | What it holds |
+|-------|---------------|
+| **Name** | A name made from the site's domain: `accounts.google.com` becomes "Google". If that space already has a login with the name, APM adds the username, as in "Google (you@example.com)" |
+| **Space** | The space from **Save new logins to** in the extension's settings, or Default |
+| **Username** | The username from the form. You can edit it |
+| **Password** | The password from the form, masked. Use the eye button to reveal it |
+
+If the name is still taken in that space, the prompt warns you before you save ("Default already has a login called Google."). Choose **Save** to add the login. It is saved with the site's host as its website, for example `accounts.google.com`, without the page's path, and a notice confirms it: "Saved Google to Default. APM fills it next time you sign in."
+
+The name comes from the first part of the site's registrable domain, with a capital letter: `accounts.google.com` gives "Google", `github.com` gives "Github" and `bbc.co.uk` gives "Bbc". Change it in the **Name** field before you save.
+
+| Message in the prompt | What to do |
+|-----------------------|------------|
+| "Give the login a name." | The **Name** field is empty. Type a name |
+| "A login called Google already exists in Default. Pick another name." | APM refused a duplicate name in that space. Change the name or the space |
+| "This prompt expired." | The prompt waited too long, or the tab moved on. Save the login from the popup |
+| "APM is locked. Unlock it from the toolbar." | The vault locked while the prompt was open. Unlock, then save from the popup |
+| "This APM session is read-only." | The vault is unlocked read-only. See [Unlocking from the browser fails](/docs/extension/troubleshooting#unlocking-from-the-browser-fails) |
+| "This vault was updated by a newer pm. Update APM to edit it." | The vault was saved by a newer version of APM. Update the app and `pm` |
+
+## The update prompt
+
+The prompt is titled "Update the password for" followed by the username, with the login's name and space underneath. It compares the two passwords without showing either:
+
+- **Saved**: the current password, with a **Reused on** badge naming the other item (or how many) when other items share it, or **Weak** when it is easy to guess.
+- **New**: the password you just used, with its strength: **Very weak**, **Weak**, **Fair**, **Strong** or **Very strong**.
+
+Below them, APM says how long ago the login last changed ("The saved password was set 3 days ago."). It goes by the login's last change, not the password's, so editing anything else on the login resets it. Choose **Update** to replace the password. Only the password changes. The old one stays in the item's history, and the change is recorded as "Changed the password on" the site "from the browser", so you can see it and undo it in the desktop app's history. A notice confirms it: "Updated GitHub", "The old password stays in the item's history."
+
+The strength labels come from an estimate of how many guesses the password would take:
+
+| Label | Estimated strength |
+|-------|--------------------|
+| **Very weak** | Under 28 bits |
+| **Weak** | 28 to 39 bits |
+| **Fair** | 40 to 59 bits |
+| **Strong** | 60 to 79 bits |
+| **Very strong** | 80 bits or more |
+
+The estimate counts the kinds of characters used and the length, and marks down common words such as "password", years, repeated characters and the "Name123!" pattern. **Weak** next to the saved password means it is shorter than 8 characters or in the bottom two bands.
+
+## Not now and Never
+
+Both prompts have a **Not now** menu:
+
+- **Not now** closes the prompt and forgets the password it was holding.
+- **Never for** followed by the site adds the site's domain to **Excluded sites** with the rule **Never save**. APM confirms with "APM won't offer to save on" the site, and you can undo it in the extension's settings under **Excluded sites**. Filling still works there.
+
+Closing the prompt with its close button or <Kbd>Esc</Kbd> does the same as **Not now**.
+
+A waiting offer is dropped when you close the tab.
+
+<Callout type="tip">
+The prompt appears about a second after you submit. If the next page is still loading at that moment, it can be missed. Save the login from the popup instead, as below.
+</Callout>
+
+## Save a login from the popup
+
+You can save a login yourself at any time.
+
+1. Open the popup on the site. Choose **New login** (the plus button at the top), or **Save a login for** followed by the site on the **This site** tab.
+2. Check the form:
+   - **Name** starts as a name made from the site.
+   - **Websites** starts with the site. Choose **Add another website** to add more, or the cross next to one to remove it.
+   - **Username** is taken from the page's username field when it has one.
+   - **Password** starts as a new password from your generator settings. Reveal it with the eye button, or make another with the dice button. The strength meter updates as you type.
+   - **Space** starts as the space selected in the popup, or **Save new logins to** when the popup shows all spaces.
+3. Choose **Save login**.
+
+If the space already has a login with that name, APM says "A login called" followed by the name "already exists". Choose another name.
+
+## Settings that control this
+
+All three are in the extension's settings, under **Autofill**, **Saving**:
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Offer to save new logins** | On | Show the save prompt |
+| **Offer to update changed passwords** | On | Show the update prompt. The old password stays in the item's history |
+| **Save new logins to** | Default | The space new logins go to. You can change it in each prompt |
+
+## What happens to the password you typed
+
+When you submit a form, the extension's content script on the page sends the username and password to the extension's background, which compares them with your vault through APM. While a prompt is waiting, the password is held in the extension's session storage, which lives in memory only. It is dropped when you save, update, choose **Not now** or **Never**, close the prompt, or close the tab. See [Privacy and permissions](/docs/extension/privacy-and-permissions).

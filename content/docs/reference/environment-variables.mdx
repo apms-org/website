@@ -1,0 +1,163 @@
+---
+title: Environment variables
+description: Every environment variable pm reads or sets, what it changes, and its default.
+order: 1
+group: Configuration
+---
+
+`pm` needs no environment variables. These change where it looks for things and how it behaves. The desktop app runs `pm` as its engine, so the ones marked "app too" also apply to the app when it is started with them.
+
+## Summary
+
+| Variable | Default | Changes |
+|---|---|---|
+| [`APM_VAULT_PATH`](#vault-file) | `vault.dat` next to `pm`, else `~/.apm/vault.dat` | Which vault file to open (app too) |
+| [`APM_SESSION_ID`](#per-shell-session) | unset (one shared session) | Gives this shell its own session file |
+| [`APM_EPHEMERAL_ID`](#ephemeral-session-id) | unset | Unlocks with an ephemeral session |
+| [`APM_EPHEMERAL_AGENT`](#ephemeral-session-agent) | unset | The agent label an ephemeral session is bound to |
+| [`APM_BRIDGE_PORT`](#bridge-port) | `41417` | Port of the browser extension bridge (app too) |
+| [`APM_ICONS_OFFLINE`](#no-website-logos) | unset | Stops all website logo downloads (app too) |
+| [`APM_STATE_DIR`](#state-folder) | `~/.apm`, or the folder of `APM_VAULT_PATH` | Where the failed-attempt counter and access log are kept |
+| [`APM_DATA_DIR`](#inject-session-folder) | the APM config folder | Where `pm inject` keeps its session record |
+| [`APM_DESKTOP_NO_TOUCHID`](#turn-off-touch-id) | unset | Turns Touch ID off for `pm` and the app's engine |
+| [`APM_ACTOR`](#actor-name) | `User` | The name recorded in item telemetry |
+| [`APM_CONTEXT`](#context) | unset | `mcp` marks activity as an AI agent's |
+| [`APM_PM_PATH`](#engine-binary) | the `pm` inside the app | Which `pm` the desktop app runs as its engine (app only) |
+| [`APM_USER_DATA_DIR`](#app-data-folder) | `<appData>/APM Desktop` | Where the desktop app keeps its own settings (app only) |
+
+## Vault and sessions
+
+### Vault file
+
+`APM_VAULT_PATH` sets the vault file to open. `pm` picks the vault in this order:
+
+1. `--vault` / `-v` on the command line.
+2. `APM_VAULT_PATH`. An absolute path is used as is. A relative path is relative to the folder that holds the `pm` executable, not the current folder.
+3. `vault.dat` in the folder that holds `pm`, if it exists.
+4. `~/.apm/vault.dat`.
+
+```sh title="Terminal"
+export APM_VAULT_PATH="$HOME/work/vault.dat"
+pm unlock
+```
+
+The policies folder and the default `.apmignore` location follow the vault: both are looked up next to it.
+
+The desktop app resolves the vault itself and passes it to its engine with `--vault`. It uses the vault you last chose in the app first, then `APM_VAULT_PATH` (a relative path is taken relative to the folder of the `pm` on your `PATH`, or your home folder), then a `vault.dat` next to the `pm` on your `PATH`, then `~/Desktop/apm/vault.dat` if it exists (`pm` itself never looks there), then `~/.apm/vault.dat`.
+
+When the browser starts `pm` through native messaging, it usually doesn't pass your shell's variables. The host then uses the vault recorded by `pm extension link` in `native_host.json`, and only uses `APM_VAULT_PATH` when the browser's own environment has it.
+
+### Per-shell session
+
+`APM_SESSION_ID` gives a shell its own session. Without it, every shell shares one session file, `pm_session_global.json` in your temp folder. With it, the session file is `pm_session_<id>.json`, so each value is an independent session with its own unlock and lock. Only letters and digits are kept from the value; if none are left, `unknown` is used.
+
+```sh title="Terminal"
+APM_SESSION_ID=ci pm unlock --timeout 10m
+```
+
+The desktop app and the browser normally run without it, so they share the global session.
+
+### Ephemeral session ID
+
+`APM_EPHEMERAL_ID` holds the ID (`eps_…`) of an [ephemeral session](/docs/cli/sessions#ephemeral-sessions) from `pm session issue`. When set and valid, `pm` unlocks with it before trying the regular session. A `read` session opens the vault read-only. If the session has expired, was revoked, or its host, process or agent binding doesn't match, `pm` ignores it and falls back to the normal unlock. The MCP server uses it too, but only when no regular session is open.
+
+### Ephemeral session agent
+
+`APM_EPHEMERAL_AGENT` is the caller's agent label. It is required, and must match exactly, when the ephemeral session was issued with `--agent`.
+
+```sh title="Terminal"
+export APM_EPHEMERAL_ID=eps_b8cf56d8749aa7d29f0d2ed0
+export APM_EPHEMERAL_AGENT=ci
+```
+
+### Turn off Touch ID
+
+`APM_DESKTOP_NO_TOUCHID`: any non-empty value stops `pm` from trying Touch ID when it unlocks, and makes the desktop app's engine report Touch ID as unavailable. Useful for tests and for scripts that must not wait on a fingerprint prompt.
+
+## Browser extension
+
+### Bridge port
+
+`APM_BRIDGE_PORT` sets the loopback port of the extension bridge, from 1 to 65535; other values are ignored. The desktop app, `pm extension serve` and `pm extension status` read it, and so does `pm extension link` when it checks whether the app or `pm extension serve` is already running. `--port` overrides it for `pm extension serve` and `pm extension status`. Change the extension's port to match.
+
+### No website logos
+
+`APM_ICONS_OFFLINE`: any value other than empty, `0`, `false` or `off` stops the process from downloading website logos, whatever the vault's **Show website icons** setting says. Logos already cached are still shown. Use it in tests and CI so nothing reaches the network:
+
+```sh title="Terminal"
+APM_ICONS_OFFLINE=1 pm extension serve
+```
+
+## Files
+
+### State folder
+
+`APM_STATE_DIR` sets the folder for two files: `.apm_lock`, the failed unlock counter, and `apm_audit.log`, the access log. Without it, `pm` uses `~/.apm`, or the folder of `APM_VAULT_PATH` when that is an absolute path. `--vault` doesn't change it. The desktop app, `pm extension serve` and the native host set it to the folder of the vault they open when it isn't set, so with the default vault they share one counter with `pm` in a terminal.
+
+Without `APM_STATE_DIR`, `pm` also reads a `.apm_lock` that an older version left next to the `pm` executable, and uses the higher count. When it is set, that file is ignored.
+
+Set it to keep the counter and log apart from your real ones, for example when you test with a throwaway vault opened with `--vault`:
+
+```sh title="Terminal"
+export APM_STATE_DIR="$HOME/apm-test-state"
+```
+
+### Inject session folder
+
+`APM_DATA_DIR` sets the folder for `inject_session`, the record of the active `pm inject` session. Without it, `pm` uses the APM config folder.
+
+## Telemetry
+
+### Actor name
+
+`APM_ACTOR` is the name stored as "created by", "updated by" and "last accessed by" in each item's telemetry, shown by the **i** key in `pm get`. Defaults to `User`, or `AI` when `APM_CONTEXT` is `mcp`. An actor name that contains `ai` in any letter case, such as `AI` or `Craig`, marks new items as created by AI. It does not change the user name in the audit log, which is always the name of your home folder.
+
+### Context
+
+`APM_CONTEXT`: when it is `mcp`, activity is recorded as an AI agent's. The MCP server sets `APM_CONTEXT=mcp` and `APM_ACTOR=AI` for itself; you don't need to.
+
+## Desktop app
+
+These are read by the desktop app, not by `pm`. Set them in the environment the app starts from. On macOS, apps opened from the Dock or Finder don't see your shell's variables, so start the app's executable from a terminal.
+
+### Engine binary
+
+`APM_PM_PATH` is the path of the `pm` binary the app runs as its engine. Without it, the installed app runs the `pm` it ships with. Useful for testing a `pm` you built yourself. The `pm` command the app installs in `/usr/local/bin` still links to the app's own copy.
+
+```sh title="Terminal"
+APM_PM_PATH="$HOME/src/apm/CLI/pm" /Applications/APM.app/Contents/MacOS/APM
+```
+
+### App data folder
+
+`APM_USER_DATA_DIR` is the folder where the app keeps its own files, such as `config.json` with the vault path you chose. Without it, the folder is `APM Desktop` in your application data folder: `~/Library/Application Support/APM Desktop` on macOS, `%AppData%\APM Desktop` on Windows and `~/.config/APM Desktop` on Linux.
+
+## Variables pm sets
+
+| Variable | Set by | Where |
+|---|---|---|
+| `APM_INJECT_SESSION` | `pm inject` | Your shell, alongside the injected variables. Removed by `pm inject kill` |
+| `APM_CONTEXT=mcp`, `APM_ACTOR=AI` | `pm mcp serve` | Its own process |
+| `APM_STATE_DIR` | The desktop engine, `pm extension serve` and the native host | Their own process, set to the folder of the vault they open, when unset |
+
+## Internal variables
+
+The desktop app sets these for its engine. Don't set them yourself.
+
+| Variable | Purpose |
+|---|---|
+| `APM_DESKTOP=1` | Set on the engine's environment by the app. `pm` doesn't read it today |
+| `APM_DESKTOP_TOUCHID=app` | The app runs the Touch ID check itself, so macOS shows the prompt as coming from APM rather than from `osascript` |
+| `APM_TOUCHID_REASON` | Passes the prompt text to the macOS Touch ID helper |
+| `APM_DESKTOP_MAIL_DIR` | Test hook: the engine writes recovery emails as files in this folder instead of sending them |
+
+## Other variables pm reads
+
+| Variable | Used for |
+|---|---|
+| `SHELL`, `PSModulePath`, `ComSpec`, `PROFILE` | `pm inject` detects your shell and finds the PowerShell profile |
+| `NO_COLOR`, `TERM` | Turning colored output off |
+| `TMPDIR` (macOS, Linux), `TMP` or `TEMP` (Windows) | Where session files and temporary copies go |
+| `XDG_CONFIG_HOME` (Linux), `APPDATA` (Windows) | The APM config folder |
+| `LOCALAPPDATA` (Windows) | Finding browsers for `pm extension link` |
+| `USER`, `USERNAME` | Binding ephemeral sessions to this user and machine, and the device hash in `apm_audit.log` |

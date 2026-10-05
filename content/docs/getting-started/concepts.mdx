@@ -1,0 +1,148 @@
+---
+title: Core concepts
+description: The vault file, your master password, unlocking and sessions, spaces, history, security profiles, sync and recovery, in brief.
+order: 3
+sidebarTitle: Concepts
+group: Learn
+---
+
+A few ideas explain how every part of APM behaves. Each section here is short and links to the full page.
+
+## The vault file
+
+Everything you keep in APM lives in one encrypted file, `vault.dat`. By default it is `~/.apm/vault.dat`. `pm` uses a `vault.dat` next to itself instead when there is one, and `APM_VAULT_PATH` points it anywhere else. The desktop app can open a vault anywhere and remembers the path.
+
+The file holds every item, field and passkey, earlier versions of items, and vault-wide settings such as the auto-lock policy. The whole-vault history (lgit) and the audit log are kept in APM's data folder on each computer, not in the file. There is no APM account: the file is the vault. Copy it, back it up or carry it to another computer.
+
+The desktop app, `pm`, APM for Chrome and AI tools all work on this same file. The app and `pm` share one engine and one version, so they always read and write the vault, history and audit log the same way.
+
+<Callout type="warning">
+A vault written by a newer `pm` that changed the vault format opens read-only in an older one, with "This vault was updated by a newer version of pm. Update pm to edit it." Keep every copy of APM on the same version.
+</Callout>
+
+## How the pieces connect
+
+Every surface runs the same program, `pm`: the desktop app carries its own copy and starts it as its engine. Only `pm` ever opens `vault.dat`.
+
+```text title="How the pieces connect"
+Desktop app ── JSON-RPC over stdio ──► pm desktop (the app's engine) ──┐
+                                         ▲                             │
+                                         │ HTTP to 127.0.0.1:41417     │
+                                         │                             │
+APM for Chrome ──────────────────────────┤                             │
+                                         │ native messaging,           │
+                                         ▼ when the app is closed      │
+                                       pm, started by the browser ─────┤
+                                                                       │
+AI client ── MCP over stdio ──────────► pm mcp serve ──────────────────┤
+                                                                       │
+Terminal ─────────────────────────────► pm <command> ──────────────────┤
+                                                                       ▼
+                                                                   vault.dat
+```
+
+| Link | How it works | Who starts it |
+|------|--------------|---------------|
+| Desktop app and its engine | The app runs `pm desktop` with your vault's path and talks to it over its standard input and output | The app, when it opens |
+| Browser and the bridge | HTTP on `127.0.0.1:41417`, loopback only, with the pairing token on every request except pairing and the version check | The desktop app, or `pm extension serve` in a terminal |
+| Browser and `pm` | Chrome native messaging, host `dev.apm.bridge`, carrying the same requests | The browser, on demand, after `pm extension link` |
+| AI client and the MCP server | `pm mcp serve --token …` over standard input and output | The AI client |
+| Terminal | Each `pm` command opens the file itself | You |
+
+The extension tries the bridge first and falls back to native messaging. While it talks to `pm`, it checks for the app at most every 5 seconds and moves back to it as soon as it answers. See [How it reaches your vault](/docs/extension#how-it-reaches-your-vault).
+
+## Items and types
+
+An item is one secret with its own fields. APM has 25 types: logins, authenticators (one-time codes), secure notes, Wi-Fi networks, government IDs, medical records, travel, contacts, recovery codes, API keys, tokens, SSH keys and hosts, cloud credentials, Kubernetes, Docker registries, CI/CD secrets, certificates, cards and bank accounts, software licenses, legal contracts, documents, photos, audio and video.
+
+A login can hold a main website and other websites, a username and password, a two-factor key, notes, custom fields and passkeys.
+
+## Master password and keys
+
+Your master password is never written into the vault. If you turn on Touch ID, a copy is kept in the macOS Keychain, and while a `pm` session is open it is kept, encrypted, in a temporary session file. An ephemeral session from `pm session issue` keeps it in plain text in APM's data folder until the session expires. When you unlock, Argon2id turns it into three separate keys: one seals the vault's data key, one signs the whole file with HMAC-SHA256, and one checks the password before anything is decrypted. The vault body is encrypted with AES-256-GCM or XChaCha20-Poly1305. You choose it when you create the vault, and can change it later.
+
+Nobody can reset a forgotten master password, so set up [recovery](#recovery) early. See [Encryption](/docs/security/encryption).
+
+## Security profiles
+
+A profile sets how much memory and time Argon2id spends on each unlock. More makes every guess at your password slower and costlier, and unlocking a little slower too.
+
+| Profile | Memory | Passes | Threads | Suits |
+|---------|--------|--------|---------|-------|
+| `standard` | 64 MB | 3 | 2 | Any computer. Used when no profile is set |
+| `hardened` | 256 MB | 5 | 4 | 8 GB of memory and 4 cores |
+| `paranoid` | 512 MB | 6 | 4 | 16 GB of memory and 8 cores |
+| `legacy` | Minimal (8 KB) | 600,000 | 1 | Compatibility only |
+
+`pm` and the app label `legacy` as PBKDF2, but the engine derives its keys with Argon2id at 600,000 passes and almost no memory, so it is not memory-hard.
+
+You pick one when you create the vault; APM recommends one for your computer. Change it later with `pm profile set`, or in the desktop app's **Settings**, **Security**. See [Security profiles](/docs/security/profiles).
+
+## Unlocking, sessions and auto-lock
+
+What stays unlocked, and where, depends on the surface:
+
+- **`pm unlock`** starts a session for your terminal, so later `pm` commands do not ask for the password. The session keeps your master password, encrypted with a key stored in APM's data folder, in a temporary file until it ends.
+- **The desktop app** holds the key while it is unlocked. Unlocking in the app also starts a `pm` session, and the app opens unlocked when a `pm` session is already active.
+- **APM for Chrome** holds no keys. It asks the app, or `pm` when the app is closed, which holds them.
+
+| Surface | Where the unlock lives | It ends when |
+|---------|------------------------|--------------|
+| `pm unlock` | A session file in your temporary folder, `pm_session_global.json` (or one per shell with `APM_SESSION_ID`), holding the master password encrypted with `session.key` from APM's data folder | You run `pm lock`, the auto-lock policy ends it, or you lock from the app or the browser |
+| Desktop app | The engine's memory | You lock, the auto-lock policy locks it, or you quit the app |
+| `pm extension serve` | Its own memory | The vault locks, or you press <Kbd>Ctrl</Kbd><Kbd>C</Kbd> |
+| `pm` started by the browser | Its own memory | The vault locks. The browser then lets it exit 30 seconds after its last request |
+| APM for Chrome | Nothing but its pairing token | — |
+| MCP server | Your `pm` session, or an ephemeral session passed in `APM_EPHEMERAL_ID` | That session ends |
+
+Any `pm` command that has to ask for your master password also starts a session, so the next command does not ask again.
+
+One **auto-lock policy**, saved in the vault, applies everywhere: by default the vault locks after 15 minutes idle, after 1 hour at most, and when the computer sleeps. Change it with `pm autolock`, or in the app's **Settings**, **Sessions**. Locking from the app or the browser also ends the `pm` session.
+
+```sh title="Terminal"
+pm autolock
+```
+
+```text title="Output"
+Lock after inactivity:  15 minutes
+Maximum session:        1 hour
+Lock on sleep:          on
+Applies to the desktop app, pm sessions and the browser extension.
+```
+
+One platform difference: on Windows, a session started with `pm unlock` cannot tell that the computer slept, so it ends only on the idle and maximum limits. The desktop app and the bridge do lock on sleep there. See [Lock on sleep](/docs/security/sessions-and-locking#lock-on-sleep).
+
+Wrong master passwords are counted until the next successful unlock. In the desktop app and the browser, every third wrong password in a row brings a 30-second pause, and after six they refuse to unlock until you recover. `pm` handles a run of failures differently; see [Failed attempts](/docs/security/sessions-and-locking#failed-attempts).
+
+For scripts and AI tools, `pm session issue` creates a short-lived, scoped session bound to a host, process or agent name. See [Sessions](/docs/cli/sessions#ephemeral-sessions) and [AI agents](/docs/agents/setup).
+
+## Spaces
+
+Spaces are separate groups inside one vault, such as Personal, Work and Family. Every item belongs to one space, and every vault has a **Default** space. The desktop app, `pm` (`pm space create`, `pm space switch`, `pm space list`) and the extension's space switcher all show the same spaces.
+
+Spaces organize; they do not have separate passwords. Anyone who unlocks the vault sees every space.
+
+## History
+
+Changes to the vault are saved as commits in a signed history, called lgit. You can see it, verify it and roll it back:
+
+- In the desktop app, **History** lists changes with undo, and each item keeps its earlier versions. Deleted items go to **Trash** first.
+- In the terminal, `pm lgit log` shows the history, `pm lgit verify` checks every signature, and `pm lgit undo` takes the last change back.
+
+An import is one commit, so you can undo a whole import at once.
+
+## Sync
+
+Sync is optional and off until you turn it on. APM can keep a copy of the vault on Google Drive, GitHub or Dropbox: in your own account or, for Drive and Dropbox, in APM's shared storage. It uploads only the encrypted file, so the provider never sees your secrets. One exception affects GitHub with an `.apmignore` file, see [What gets uploaded](/docs/security/sync-security#what-gets-uploaded). Set it up during vault creation, in the app's **Settings**, **Sync**, or with `pm cloud init`, then `pm cloud sync`. A `.apmignore` file can keep chosen items out of a provider.
+
+## Recovery
+
+If you forget your master password, recovery is the only way back in. APM supports a recovery key with a code sent to your recovery email, one-time recovery codes, a passkey, and shares split between people you trust. Set them up in the app's **Settings**, **Recovery**, or with `pm auth`, before you need them.
+
+## The browser bridge
+
+APM for Chrome reaches the vault through a small bridge on your own computer: the desktop app (or `pm extension serve`) listens on `127.0.0.1:41417`, and when the app is closed the browser can start `pm` through native messaging. A browser must pair once by confirming a 6-character code. See [APM for Chrome](/docs/extension).
+
+## AI access
+
+AI tools connect through APM's MCP server, `pm mcp serve`. Each tool gets its own token with the MCP tools you allow (grouped in the app as Read, Secrets, Write, Admin and Utility), an optional expiry, and can be revoked with `pm mcp revoke`. Adds, edits and deletes of items wait as requests and only happen when you approve them in the desktop app. Tools that change spaces, profiles or cloud settings, or start a sync, act at once. See [Set up an AI client](/docs/agents/setup).

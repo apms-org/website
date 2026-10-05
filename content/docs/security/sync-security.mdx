@@ -1,0 +1,99 @@
+---
+title: Sync security
+description: What APM uploads when you sync, where each provider and mode puts it, and everything else that leaves your computer.
+order: 5
+group: Model
+sidebarTitle: Sync security
+---
+
+Sync is off until you turn it on. When it is on, APM uploads your encrypted `vault.dat` to Google Drive, Dropbox or a GitHub repository. Your master password and decrypted items are never uploaded. Where the file ends up, and who else could fetch a copy, depends on the provider and the mode you pick.
+
+## Providers and modes
+
+| Provider | Mode | Where the file goes | Whose account |
+|---|---|---|---|
+| Google Drive | **APM_PUBLIC** (the default in `pm`) | A folder in APM's Google Drive. The file itself is shared as "anyone with the link can view". | APM's, through credentials built into `pm` |
+| Google Drive | **Self-hosted** | The top of your own Drive, private | Yours. You sign in with Google, and APM can only see files it created. |
+| Dropbox | **APM_PUBLIC** (the default in `pm`) | APM's Dropbox | APM's, through a token built into `pm` |
+| Dropbox | **Self-hosted** | Your own Dropbox | Yours, through a Dropbox app key and secret you create |
+| GitHub | One mode | `vault.dat` in the repository you name. APM creates it as private if it does not exist. | Yours, through a personal access token or OAuth token |
+
+Set sync up with `pm cloud init` or in the desktop app under **Settings → Sync**. `pm cloud init` picks APM_PUBLIC unless you choose option 2, Self-Hosted. The desktop app preselects your own Drive or Dropbox app instead. See [Settings](/docs/desktop/settings) and [Commands](/docs/cli/commands).
+
+For Google Drive, `pm` asks:
+
+```text title="Terminal"
+Setting up Google Drive...
+Choose Sync Mode:
+1. APM_PUBLIC (Fast, no signup, shared storage)
+2. Self-Hosted (Secure, uses your own Drive, requires login)
+Selection (1/2): 2
+Google Drive can store a one-way hash of your retrieval key in cloud metadata for key-based recovery.
+Allow key hash storage in cloud metadata? (y/n) [n]: n
+```
+
+Any answer other than `2`, including just pressing <Kbd>↵</Kbd>, picks APM_PUBLIC. Dropbox asks the same two questions; for Self-Hosted it first says `Self-hosted setup requires a Dropbox App Key and Secret.` and asks for both. GitHub instead asks for a personal access token or an OAuth access token (typed without echo) and the repository as `owner/repo`.
+
+A successful setup ends with `Google Drive sync setup successful.` and the mode: `Mode: Self-Hosted (Owner: You)` or `Mode: APM_PUBLIC`. If you agreed to store the key hash, it shows `Retrieval Key: SwiftFox`; if not, `Retrieval key metadata was not stored by consent choice. Use File ID for recovery:` followed by the file ID.
+
+<Callout type="danger" title="Treat APM_PUBLIC uploads as public">
+In APM_PUBLIC mode your encrypted vault sits in a storage account APM runs, reached with credentials that ship inside every copy of `pm`. On Google Drive the file is also shared with anyone who has its link. Assume anyone can download it. Its safety then rests entirely on your master password and [security profile](/docs/security/profiles), and on the [cleartext header](/docs/security/vault-format#recovery-block) not giving anything away. Use Self-hosted or GitHub for a vault that matters.
+</Callout>
+
+## What gets uploaded
+
+- **The encrypted file, as it is on disk.** Sync uploads the same bytes as `vault.dat`, header included. If you use [`.apmignore`](/docs/reference/apmignore) to leave items out for a provider, APM builds a filtered copy, encrypts it with your master password the usual way, and uploads that instead. One exception: when an `.apmignore` file with rules is in use, the first upload that `pm cloud init github` makes encrypts the filtered copy with your GitHub token instead of your master password, so anyone with that token can open that copy and the data key inside it. Later `pm cloud sync github` uploads use your master password, but the first version stays in the repository history.
+- **The cleartext header.** The profile and the recovery block travel with the file: your recovery email's hash and hint, the alert email address if you set one, the hashes of recovery codes and trustee shares, and the recovery slot. Copies saved right after you created a recovery key also carry the masked recovery key. See [Recovery](/docs/security/recovery#after-you-create-a-recovery-key).
+- **Your sync tokens, encrypted.** The Google Drive, Dropbox and GitHub tokens are stored inside the encrypted body, so they are in the uploaded file too, readable only with your master password.
+
+File names reveal nothing about you:
+
+| Provider | Name |
+|---|---|
+| Google Drive | `v_` followed by 6 random hex characters, `.bin` |
+| Dropbox | `/v_` followed by the SHA-256 of your retrieval key, or 6 random hex characters, `.bin` |
+| GitHub | `vault.dat`, committed with the message `update vault` |
+
+### Retrieval keys
+
+For Google Drive and Dropbox, APM asks: **Allow key hash storage in cloud metadata?** If you say yes, it stores the SHA-256 of a retrieval key with the file: in the Drive file's description, or as the Dropbox file name. You use the retrieval key later to find the file with `pm cloud get`.
+
+A generated retrieval key is two words joined together, like `SwiftFox`. There are only 2,304 of them, so a retrieval key is a label for finding your file, not a secret. Pick your own with a custom value if you don't want it guessable. If you say no, keep the file ID or path that `pm` prints, because you need it to download the vault.
+
+### Old versions
+
+Each sync replaces the file, but providers can keep earlier versions. On GitHub, every sync is a new commit, so every uploaded version stays in the repository history. Each old version is encrypted under the master password and profile it was saved with. Changing your master password does not re-encrypt copies already uploaded.
+
+## Downloading a vault
+
+`pm cloud get` downloads the file and asks for its master password before it saves anything locally. A file that does not decrypt with that password is not written. The download does not trust the cloud copy any more than a local one: the same validator and HMAC checks run. See [Encryption](/docs/security/encryption#integrity).
+
+## Removing a cloud copy
+
+| Command | What it does |
+|---|---|
+| `pm cloud delete` | Deletes the Google Drive file and forgets its ID |
+| `pm cloud reset` | Forgets every sync token, file ID and retrieval key on this computer, after `Are you sure? (y/n):`. It does not delete anything in the cloud. |
+
+For Dropbox and GitHub, delete the file or repository in the provider's own interface. Remember that GitHub history and provider version history keep old copies until you remove them there.
+
+`pm cloud reset` looks only for a retrieval key, a GitHub token or a Dropbox token. If you set up only Google Drive and declined the retrieval key, it answers `Cloud sync is not initialized (no setup found).` and leaves the Drive token in the vault. Copies already uploaded keep the tokens they were saved with, encrypted inside them.
+
+## What leaves your computer
+
+| Feature | What is sent | Where |
+|---|---|---|
+| Cloud sync | The encrypted vault file | Google Drive, Dropbox or GitHub |
+| Self-hosted sign-in | An OAuth sign-in. For both Google Drive and Dropbox, APM listens on port 8080, on every network interface, for the sign-in callback for up to 5 minutes. | Google or Dropbox |
+| Recovery email | Your email address and a 6-digit code, and a setup alert | APM's mail service, over SMTP |
+| Website icons (desktop app) | An HTTPS request to each login's website for its icon | Those websites. Turn it off in **Settings → Appearance → Show website icons**, or set `APM_ICONS_OFFLINE=1`. |
+| `pm update` | A request for the latest release | GitHub |
+
+These stay on your computer:
+
+- The browser extension talks to the app or `pm` over `127.0.0.1` only. See [Browser extension](/docs/extension).
+- The MCP server talks to its client over standard input and output. It opens no network port. See [AI agents](/docs/agents).
+- Recovery passkey checks run on a page served from `localhost`.
+- Your master password, session files, ephemeral sessions, the audit log and lgit history are never uploaded.
+
+Neither `pm` nor the desktop app sends analytics or telemetry.

@@ -1,0 +1,104 @@
+---
+title: Policy files
+description: The YAML format of APM password policy files, every key they accept, and how each one is applied.
+order: 3
+sidebarTitle: Policy files
+group: Configuration
+---
+
+A policy file is a YAML file in the `policies` folder next to the vault. `pm policy load <name>` and the desktop app's policy picker read every `.yaml` and `.yml` file in that folder and activate the one whose `name` matches. How to use them is covered in [Password policies](/docs/cli/policies).
+
+## Example
+
+```yaml title="~/.apm/policies/team.yaml"
+name: team-standard
+
+password_policy:
+  min_length: 14
+  require_uppercase: true
+  require_numbers: true
+  require_symbols: true
+
+rotation_policy:
+  rotate_every_days: 90
+  notify_before_days: 14
+
+classification:
+  production:
+    max_access_level: admin
+    mfa_required: true
+```
+
+## Keys
+
+| Key | Type | Default | Applied |
+|---|---|---|---|
+| `name` | string | empty | Identifies the policy. `pm policy load` matches it exactly, case included |
+| `password_policy.min_length` | integer | `0` | Yes. Minimum length |
+| `password_policy.require_uppercase` | boolean | `false` | Yes. At least one uppercase letter |
+| `password_policy.require_numbers` | boolean | `false` | Yes. At least one digit |
+| `password_policy.require_symbols` | boolean | `false` | Yes. At least one punctuation or symbol character |
+| `rotation_policy.rotate_every_days` | integer | `0` | Shown by the desktop app; not enforced |
+| `rotation_policy.notify_before_days` | integer | `0` | Saved; not used |
+| `classification.<label>.max_access_level` | string | empty | Saved; not used |
+| `classification.<label>.mfa_required` | boolean | `false` | Saved; not used |
+
+`classification` is a map: each key under it is a label of your choosing, and each label holds an object with `max_access_level` and `mfa_required`.
+
+Keys APM doesn't know, such as `description` or `naming_convention`, are ignored.
+
+<Callout type="warning" title="Files that can't be read are skipped silently">
+A file that isn't valid YAML, or whose values have the wrong shape, is skipped without a message, and `pm policy load` then reports that the policy was not found. The most common case is the older classification format with plain values, such as `aws_root: critical`: it makes the whole file unreadable. If `pm loaded` doesn't list your policy, check the file's syntax and remove or convert the `classification` block.
+</Callout>
+
+## How the rules are checked
+
+Each rule is checked separately, and the first one that fails is reported:
+
+| Rule | Passes when the password | Error |
+|---|---|---|
+| `min_length` | Is at least this many bytes long. For plain ASCII passwords that is the number of characters; accented letters and other non-ASCII characters count as more than one | `password too short (min 14)` |
+| `require_uppercase` | Contains an uppercase letter in any alphabet | `password must contain an uppercase letter` |
+| `require_numbers` | Contains a digit | `password must contain a number` |
+| `require_symbols` | Contains a punctuation or symbol character, such as `!`, `-`, `_`, `@` or `€` | `password must contain a symbol` |
+
+`pm gen`, and `pm add` when you leave the password blank, pick each character at random from letters, digits and `!@#$%^&*()-_=+` without guaranteeing one of each kind. Under a policy that requires all of them, a generated password is occasionally refused; generate again. `pm add` always generates 16 characters, so under a `min_length` above 16 its generated password is always refused; type one, or generate a longer one with `pm gen -l`.
+
+<Callout type="warning" title="Set min_length in every policy">
+`pm` only checks a policy whose `min_length` is greater than `0`. A policy that sets only `require_*` keys is enforced by the desktop app but not by `pm`.
+</Callout>
+
+## Where a policy applies
+
+| Where | Checked |
+|---|---|
+| `pm add password` | Yes |
+| Changing a login's password in `pm get` | Yes |
+| Desktop app: adding or editing a login or Wi-Fi item | Yes, when the password field is part of the change |
+| Adding a Wi-Fi item with `pm add` | No |
+| AI agents adding a login, once you approve the request | Yes, if the policy sets `min_length` |
+| AI agents changing a login's password, once you approve the request | No |
+| `pm import` and imports in the desktop app | No |
+| Items already in the vault | No. Loading a policy doesn't re-check them |
+
+## The example in the repository
+
+The `pm` source has an example at `examples/policies/password_policy/password_policy.yml`. It loads, under the name `Secure Enterprise Policy` (`pm policy load "Secure Enterprise Policy"`), once the file itself is copied into your `policies` folder; `pm` doesn't look in subfolders. Its comments describe expiry warnings, MFA challenges and naming rules that APM doesn't implement: only the `password_policy` block has an effect.
+
+## Loading and storage
+
+- `pm policy load <name>` copies the whole policy into the vault. Later edits to the YAML file have no effect until you load it again.
+- Only one policy is active. Loading another replaces it; `pm policy clear` removes it.
+- If two files use the same `name`, the one whose file name sorts first wins.
+- The active policy travels with the vault, including in cloud copies and backups, so it applies on every computer that opens it.
+- `pm loaded` lists the names it can read from the `policies` folder of the vault in use.
+
+```text
+$ pm loaded
+Loaded state
+============
+
+[policies]
+dir=/Users/alex/.apm/policies
+- team-standard
+```

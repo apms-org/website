@@ -1,0 +1,208 @@
+---
+title: Toolbar popup
+description: Every screen and control in the APM popup, from unlocking to the vault, codes, generator and passkeys.
+order: 6
+sidebarTitle: Toolbar popup
+group: Using it
+---
+
+Click the APM icon in the toolbar, or press <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>A</Kbd>, to open the popup. It is where you unlock the vault, see the logins for the current site, browse the whole vault, copy one-time codes and generate passwords.
+
+## The toolbar icon
+
+The icon shows the state at a glance. Hover it to read the state in words.
+
+| Icon | Tooltip | Meaning |
+|------|---------|---------|
+| Locked | "APM · Connect to APM" | The extension is not paired yet |
+| Locked | "APM · Not connected" | Paired, but neither the app nor `pm` answers |
+| Locked | "APM · Locked" | Connected, and the vault is locked |
+| Normal | "APM" | Connected and unlocked |
+
+While the vault is unlocked, a badge on the icon shows how many logins match the current tab, using your **Match websites by** setting. Sites where you paused APM, or excluded with **Never fill** or **Never fill or save**, show no badge. The extension checks the state once a minute in the background, and at once when you open the popup.
+
+## Before the vault opens
+
+The popup shows one of these screens until it can show your vault.
+
+### Connect to APM
+
+The extension is not paired. If APM is running, the popup says "APM is running on this computer" (or "pm is linked on this computer"), shows a pairing code, and waits for you to confirm it. If not, it says "APM isn't connected. Open the app, or link this browser once." Until a code is on screen, it also lists the steps to connect, with the `pm extension link` command and a copy button.
+
+| Control | What it does |
+|---------|--------------|
+| **Connect** | Ask APM to pair and show a code |
+| **Cancel** | Stop waiting for the current code |
+| **Use a pairing token instead** | Show the **Pairing token** field, to paste a token from `pm extension token --show` or the desktop app |
+| **Connect with a code instead** | Go back to pairing with a code |
+
+The code is valid for 2 minutes; a countdown shows how long is left. See [Pairing](/docs/extension/pairing).
+
+### APM isn't connected
+
+The extension is paired, but nothing answers. If `pm` is linked, the popup says it did not answer and shows the error. Otherwise it suggests opening the app, or running `pm extension link`. Choose **Try again** after you start APM.
+
+### No vault yet
+
+APM is running but has no vault file. Create a vault in the desktop app or with `pm setup`, then choose **Check again**.
+
+### Unlock your vault
+
+The vault is locked: the screen says "Unlock your vault" and "Your vault is locked". Type your master password and press <Kbd>↵</Kbd>. While APM derives the key, the popup shows "Deriving key · Argon2id". On a Mac with Touch ID set up for APM, **Unlock with Touch ID** is offered too, and reads **Confirm Touch ID** while it waits for your finger.
+
+The note under the form says where your password goes: to the APM app over the paired loopback bridge, or to `pm` through native messaging. The extension never keeps it.
+
+| Message | Meaning |
+|---------|---------|
+| "Incorrect password. N attempts left before recovery is required." | Wrong password. After too many, the vault needs recovery |
+| "Too many attempts. Try again in N seconds." | APM is pausing after repeated wrong passwords |
+| "This vault is locked after repeated failed attempts. Use recovery in the APM app." | Unlock from the browser is blocked until you recover in the app |
+| "Touch ID was cancelled or did not match." | Try again, or type your password |
+
+## The header
+
+Once the vault is open, the header holds:
+
+- **Space switcher** (left, next to the APM mark): choose **All spaces**, **Default** or any of your spaces. Each shows its item count. The choice filters the **Vault** and **Codes** tabs, sets the space for new logins, and is remembered.
+- **New login** (the plus button): open the [new login](#new-login) form.
+- **Lock vault** (the lock button): lock APM. This locks the vault in the desktop app, in `pm` and in every paired browser, not just here.
+- **More** (the three dots):
+  - **Passkeys**: open the [passkey list](#passkeys).
+  - **Extension settings**: open the [settings page](/docs/extension/options).
+  - **Pause APM on** the current site, or **Resume APM on** it: stop or restart filling, passkeys and save prompts on the site's whole domain. A paused site appears in **Excluded sites** in the settings.
+  - **Lock vault** (<Kbd>⌥</Kbd><Kbd>⇧</Kbd><Kbd>L</Kbd>).
+
+## This site
+
+The first tab when the current tab is a website. Its label shows how many logins match.
+
+At the top, the site's host, a summary ("2 logins for this site", "Nothing saved for this site yet" or "APM is paused on this site") and a **New** button.
+
+Each matching login shows its username (or name), its name, space, and whether it has a passkey or is a favorite. Click it to open its [details](#item-details). On the right:
+
+| Control | What it does |
+|---------|--------------|
+| Copy username | Copy the username |
+| Copy password | Copy the password. It is cleared from the clipboard after APM's clipboard timeout |
+| **Fill** | Fill this login into the page and close the popup. Shown only when the page has a login form; the first login's button is highlighted |
+| One-time code | For logins with a code: the live code, and a button to copy it |
+
+Warnings appear above the list when they apply:
+
+- **Paused on this site**, with **Resume**: APM won't fill or offer to save here.
+- **Reused password**: a matching login shares its password with other items, which it names.
+- **Weak password**: a matching login has a password that is easy to guess. Change it on the site and APM offers to update the login.
+
+Below the list:
+
+- **Save a login for** the site: open the [new login](#new-login) form for it.
+- **Use a saved login on** the site: search your logins and pick one. APM adds this site to its websites, so it matches from now on.
+
+On a page that is not a website, such as a browser settings page, this tab says "No website in this tab" and the popup opens on **Vault** instead.
+
+## Vault
+
+Every item in the selected space, of every type, most recently used or changed first, grouped as **Today**, **This week**, **This month** and **Earlier**.
+
+- **Search**: matches names, subtitles, usernames, websites, item types and spaces.
+- **Type filter**: **All types**, **Favorites**, or any type you have, each with its count.
+
+Items with a weak or reused password carry a warning mark. Click an item to open its [details](#item-details). Attached files (documents, photos, audio, video) open only in the desktop app.
+
+## Codes
+
+Every one-time code in the selected space, with a live code and countdown. Codes for the current site come first, under "For" followed by the site; the rest are under **All codes**. Click a row to copy its code. Search matches names and websites.
+
+If you have no codes yet, add an authenticator in the desktop app with its setup key, or a two-factor key on a login, and it shows up here.
+
+## Generator
+
+Makes a password in the browser with `crypto.getRandomValues`. Nothing leaves the browser until you save a login.
+
+| Control | Options |
+|---------|---------|
+| Kind | **Random**, **Passphrase** or **PIN** |
+| Random | **Length** 8 to 64 (default 20), **A-Z**, **a-z**, **0-9**, **!@#$**, **Avoid look-alikes** (leaves out `I`, `l`, `1`, `O`, `0` and `o`) |
+| Passphrase | **Words** 3 to 10 (default 5), **Capitalize**, **Add a number**. Words are joined with hyphens |
+| PIN | **Digits** 4 to 12 (default 6) |
+
+The strength meter shows the estimated strength and how long an offline attack would take, such as "cracked in 3 hours offline", "cracked instantly offline" or "outlasts the universe offline". The estimate assumes an attacker who tries ten billion guesses a second and finds the password halfway through. **Generate another** makes a new value and **Copy** copies it (cleared after the clipboard timeout). On a page with a password field, **Fill on** followed by the site fills it into the page, copies it and closes the popup.
+
+How the values are made:
+
+- **Random** passwords take at least one character from each set you tick, then fill the rest from all of them and shuffle. The symbols are `!@#$%^&*()-_=+[]{};:,.?/~`. Untick every set and APM uses lowercase letters. The description of **Avoid look-alikes** also mentions quote marks, but the symbol set has none to begin with.
+- **Passphrases** pick words from a built-in list of 355 short English words, such as `Harbor-Lantern-Cedar7-Quill-Meadow`. **Add a number** puts one digit at the end of one word.
+- **PINs** are digits only.
+
+Every pick uses the browser's `crypto.getRandomValues`, without bias toward any character.
+
+Your choices are saved and used everywhere the extension generates a password: the field menu, the new login form and the <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>G</Kbd> shortcut.
+
+## Item details
+
+Opens when you click an item. The header has a back button, the item's name and an actions menu:
+
+- **Add to favorites** or **Remove from favorites**
+- **Move to another space**: pick a space under **Move to**
+- **Move to trash**: asks first. You can restore it from Trash in the desktop app
+
+Below the item's icon, name, space and type (with **Favorite**, **Reused** and **Weak** badges when they apply), each field is listed:
+
+- **Secret fields** (passwords, keys, card numbers) are masked. Use the eye button to reveal one, the copy button to copy it, or click the value to copy. Secrets are fetched from APM one field at a time, only when you reveal or copy them.
+- **Plain fields** have a copy button. Website fields are links.
+- **One-time code** shows the live code with a copy button.
+- **Passkey** rows show each passkey's label, user name and site.
+
+For logins, a **Websites** section lists every site the login fills on. Choose **Add** to type another, **Add** followed by the current site to add it in one click, or the cross next to a site to remove it. A login with no website fills nowhere.
+
+The footer shows when the item was changed, created and last used, as in "Changed 5 minutes ago · Created Oct 5, 2026 · Used just now". For logins, the bottom bar has **Copy password** and, when the login matches the page and the page has a form, **Fill on** followed by the site.
+
+**Move to trash** asks "Move GitHub to trash?" with "You can restore it from Trash in the APM app." Attached files are not shown. An item with nothing but a file, such as a photo, says that items with files open in the APM app.
+
+## New login
+
+Opened from the plus button, **New**, or **Save a login for** the site.
+
+| Field | Starts as |
+|-------|-----------|
+| **Name** | A name made from the site, such as "Github" for `github.com` |
+| **Websites** | The current site. **Add another website** adds a row |
+| **Username** | The username typed on the page, if any |
+| **Password** | A generated password. The eye reveals it and the dice button generates another. A strength meter sits below |
+| **Space** | The selected space, or **Save new logins to** from the settings |
+
+Choose **Save login**, or **Cancel** to go back.
+
+## Passkeys
+
+Opened from **More**, **Passkeys**. Lists every passkey in the vault, with its count in the header.
+
+Each row shows the site and label, the user name, the login it is saved in and its space, and when it was last used ("new" if never). Its menu has:
+
+- **Rename**: set a label, such as the device you made it on.
+- **Open** followed by the login's name: go to the login's details.
+- **Remove**: asks first, and reminds you that the site still trusts the passkey until you remove it there too.
+
+Search matches sites, user names, labels and login names. See [Passkeys](/docs/extension/passkeys).
+
+## Footer and notices
+
+The footer shows "Connected to APM" with the app's version, and the vault's name or item count.
+
+Short notices appear after an action, such as "Copied password". When you copy a secret, the notice counts down to when APM clears the clipboard. APM clears it only if it still holds what was copied.
+
+| Action | Notice |
+|--------|--------|
+| Copy a password, a secret field or a one-time code | "Copied password", "Copied one-time code" or "Copied GitHub code", with a countdown |
+| Copy a username or a plain field | "Copied username", without a countdown, because plain fields are not cleared |
+| Save a new login | "Saved GitHub to Default" |
+| Add or remove a favorite | "Added to favorites" or "Removed from favorites" |
+| Move an item | "Moved to Work" |
+| Move an item to trash | "Moved GitHub to trash" |
+| Add the current site to a login | "Added github.com", or "Already saved for this login" |
+| Pick a login with **Use a saved login on** | "GitHub now works on github.com" |
+| Remove a website | "Removed github.com" |
+| Pause or resume | "Paused APM on github.com" or "APM is back on github.com" |
+| Rename or remove a passkey | "Renamed passkey" or "Removed passkey for github.com" |
+
+A failed copy says "Chrome did not allow the copy. Try again." See [Copying fails](/docs/extension/troubleshooting#copying-fails).

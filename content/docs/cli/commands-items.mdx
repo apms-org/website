@@ -1,0 +1,264 @@
+---
+title: "Commands: items"
+description: Reference for pm add, get, gen, totp, space, inject, import and export, and where passkeys fit.
+order: 21
+sidebarTitle: Items
+group: Command reference
+---
+
+Commands that create, find and move items. Every command also takes the [global flags](/docs/cli/commands#global-flags). Guides: [Items](/docs/cli/items), [One-time codes](/docs/cli/totp), [Passkeys](/docs/cli/passkeys), [Spaces](/docs/cli/spaces), [Inject](/docs/cli/inject), [Import and export](/docs/cli/import-export).
+
+## Add and find
+
+<Command name="pm add" summary="Add an item to the current space">
+
+```sh
+pm add [type]
+```
+
+Without `type`, shows a category menu and then a type menu. `type` is a name or number from the [item types table](/docs/cli/items#item-types), for example `password`, `totp`, `note`, `apikey`, `ssh`, `wifi`, `cert`, `bank`, `doc`, `govid`, `k8s`, `docker`, `sshconfig`, `cicd`, `license`, `legal`, `photo`. Case, spaces, `-` and `_` are ignored. Then asks for the type's fields. Needs write access.
+
+A blank login password is replaced with a generated 16-character one. An active [password policy](/docs/cli/policies) applies to login passwords, and only when the policy sets a minimum length. `pm add` checks no other item type, and edits in `pm get` and imports aren't checked.
+
+```sh
+pm add
+pm add password
+pm add api-key
+```
+
+</Command>
+
+<Command name="pm get" summary="Search, view, copy, edit and delete items">
+
+```sh
+pm get [query] [--show-pass]
+```
+
+On a terminal, opens the interactive search with `query` filled in. Only the first argument is used, so quote queries with spaces. Results come from the current space, ranked by how well the name matches; a login also matches on its username, websites and passkey sites. See [Find items](/docs/cli/items#find-items) for the keys.
+
+Without a terminal, prints the item when exactly one matches, or a numbered list of matches.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--show-pass` | `false` | Print secret values instead of `********` |
+
+```sh
+pm get
+pm get github
+pm get "aws prod" --show-pass < /dev/null
+```
+
+</Command>
+
+<Command name="pm gen" summary="Print a random password">
+
+```sh
+pm gen [-l <length>]
+```
+
+Prints a password drawn from letters, digits and `!@#$%^&*()-_=+`. Doesn't need the vault.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-l`, `--length` | `16` | Number of characters |
+
+```sh
+pm gen -l 32
+```
+
+</Command>
+
+## One-time codes
+
+<Command name="pm totp" summary="Show live codes, or copy one">
+
+```sh
+pm totp [name]
+```
+
+Without a name, opens the live code view for the current space (on a terminal, with the keys in [One-time codes](/docs/cli/totp#see-live-codes)) or prints each code once. With a name, copies that code to the clipboard: an exact, case-insensitive match first, then the first name containing it. Includes codes stored in logins.
+
+```sh
+pm totp
+pm totp github
+```
+
+</Command>
+
+<Command name="pm totp link" summary="Link an authenticator code to a site for the browser extension">
+
+```sh
+pm totp link <entry> <domain>
+```
+
+`entry` is a standalone authenticator item, by exact name or a unique part of it. `domain` is reduced to a host (`https://www.github.com/x` becomes `github.com`) and must contain a dot or be `localhost`. A site links to one code; linking it again moves it. Exits with status 1 on failure.
+
+```sh
+pm totp link "GitHub 2FA" github.com
+```
+
+</Command>
+
+<Command name="pm totp unlink" summary="Remove a code's site links">
+
+```sh
+pm totp unlink <entry> [domain]
+```
+
+Removes every site linked to `entry`, or only `domain`. Exits with status 1 on failure.
+
+</Command>
+
+## Passkeys
+
+`pm` has no passkey commands; `pm passkeys` was removed. A login's passkeys show when you open the login with [`pm get`](#pm-get), never with their private keys, and its edit screen can rename a passkey or remove it. [`pm import`](#pm-import) and [`pm export`](#pm-export) carry passkeys. See [Passkeys](/docs/cli/passkeys).
+
+## Spaces
+
+<Command name="pm space create" summary="Create a space">
+
+```sh
+pm space create <name>
+```
+
+Adds a space to the vault. Names are case-sensitive; creating an existing name does nothing.
+
+</Command>
+
+<Command name="pm space switch" summary="Change the current space">
+
+```sh
+pm space switch <name>
+```
+
+Saves `name` as the current space for every later command. `default` switches back to the default space. An unknown name prints the available spaces.
+
+</Command>
+
+<Command name="pm space list" summary="List spaces and mark the current one">
+
+```sh
+pm space list
+```
+
+Marks the current space with `*`. The count after each name only counts items in the current space, so every other space shows 0:
+
+```text
+Available Spaces:
+* default (12 entries)
+  Work (0 entries)
+```
+
+</Command>
+
+## Inject
+
+<Command name="pm inject" summary="Print shell commands that put items into environment variables">
+
+```sh
+eval "$(pm inject [--inject <name,name,...>])"
+```
+
+Resolves each name in the current space and prints `export` lines (bash, zsh), `set -x` lines (fish) or `$env:` lines (PowerShell) for your shell to evaluate, plus `APM_INJECT_SESSION`. Without `--inject`, reads a `.apminject` file from the current folder or the nearest parent. A `.apminject` file can run commands in your shell through its `as:` names, so only use files you trust; see [Security notes](/docs/cli/inject#security-notes). Refuses while another inject session is active. Run `pm unlock` first so no prompt ends up in the output.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--inject` | | Comma-separated item names |
+
+</Command>
+
+<Command name="pm inject kill" summary="Print shell commands that remove the injected variables">
+
+```sh
+eval "$(pm inject kill)"
+```
+
+Prints the commands that remove every variable of the active inject session, `APM_INJECT_SESSION` included (`unset`, `set -e` in fish or `Remove-Item Env:` in PowerShell), and clears the session record.
+
+</Command>
+
+<Command name="pm inject setup-shell" summary="Add an inject function to your shell's startup file">
+
+```sh
+pm inject setup-shell
+```
+
+Appends an `inject` function to `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish` or your PowerShell profile, depending on `SHELL`. Does nothing if one is already there. When `SHELL` is unset or unknown, as it usually is on Windows, it writes `~/.bashrc`. PowerShell is only picked when `SHELL` names it, and `pm` then reads the profile path from the `PROFILE` environment variable, which PowerShell doesn't set on its own.
+
+</Command>
+
+## Import and export
+
+<Command name="pm import" summary="Import from another password manager or an export">
+
+```sh
+pm import <file> [flags]
+pm import --formats
+```
+
+Detects the format, compares every item with the vault, shows new items, conflicts, possible duplicates and items that can't be imported, then imports what you choose as one save. On a terminal its menus are arrow-key lists, and <Kbd>Esc</Kbd> cancels with `Import cancelled.` and no change. Exits with status 1 on failure. See [Import](/docs/cli/import-export#import).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--from` | `auto` | `auto`, `1password`, `bitwarden`, `keepass`, `cxf`, `apm` or `csv` |
+| `-p`, `--password` | | Password of an encrypted export |
+| `--space` | current space | Import into this space |
+| `--keep-spaces` | on for APM files | Turn folders, vaults or groups into spaces |
+| `--dry-run` | `false` | Compare and stop |
+| `--on-conflict` | suggested | `skip`, `merge`, `replace`, `keep-both` or `ask` |
+| `--on-duplicate` | suggested | `skip`, `merge`, `replace`, `keep-both` or `ask` |
+| `-y`, `--yes` | `false` | Don't ask |
+| `--show-secrets` | `false` | Show secret values in the comparison |
+| `--json` | `false` | Print the plan or the result as JSON |
+| `--formats` | `false` | List supported formats |
+
+```sh
+pm import bitwarden_export.json
+pm import export.1pux --dry-run
+pm import vault.json --on-conflict merge -y
+```
+
+</Command>
+
+<Command name="pm export" summary="Export the vault or part of it">
+
+```sh
+pm export [flags]
+```
+
+Writes `apm`, `cxf`, `bitwarden`, `csv` or `txt`. Never overwrites a file without `--force` or confirmation; writes files with mode `0600`. <Kbd>Esc</Kbd> at any of its questions cancels with `Export cancelled.` Exits with status 1 on failure. See [Export](/docs/cli/import-export#export).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-o`, `--output` | `apm-export-<date>.<ext>` (`.cxf.json` for `cxf`, `apm-bitwarden-export-<date>.json` for `bitwarden`) | Output file |
+| `-f`, `--format` | from the file name, else `apm` (`txt` with `--without-password` and no `-o`) | `apm`, `cxf`, `bitwarden`, `csv` or `txt` |
+| `-p`, `--password` | | Encrypt with this password (`apm`, `bitwarden`) |
+| `--encrypt` | `false` | Encrypt, asking for a password |
+| `--no-encrypt` | `false` | Write a plain file without asking |
+| `--type` | all | Item types, comma-separated |
+| `--space` | all | Spaces, comma-separated; `default` for the default space |
+| `--no-passkeys` | `false` | Leave passkeys out |
+| `--files` | `false` | Include documents and media (`apm`) |
+| `--without-password` | `false` | Leave secrets out (`csv`, `txt`) |
+| `--dry-run` | `false` | Show what would be exported |
+| `--force` | `false` | Overwrite the output file |
+| `--json` | `false` | Print the summary as JSON |
+| `--formats` | `false` | List supported formats |
+
+```sh
+pm export
+pm export --format cxf -o vault.cxf.json
+pm export --type password,totp --space Work --format csv
+```
+
+</Command>
+
+<Command name="pm export compare" summary="Compare the vault with an earlier export or backup">
+
+```sh
+pm export compare <file> [-p <password>] [--from auto] [--show-secrets] [--json]
+```
+
+Lists what is only in the file, what changed, what is the same and what is only in the vault. Never writes. Exits with status 1 on failure.
+
+</Command>

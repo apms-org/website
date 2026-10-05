@@ -1,0 +1,167 @@
+---
+title: Security profiles
+description: The Argon2id and cipher settings behind each profile, which one to pick, and how to change it.
+order: 2
+group: Model
+sidebarTitle: Profiles
+---
+
+A security profile decides how expensive it is to turn a password guess into keys. Every unlock pays that cost once. Someone who copied your `vault.dat` pays it for every guess. Higher profiles use more memory and more passes, which makes large-scale guessing on GPUs and custom hardware slower and more expensive.
+
+The profile is stored in the [vault header](/docs/security/vault-format#profile-block), so any copy of `pm` can open the vault without being told which profile you use.
+
+## Built-in profiles
+
+| Profile | Memory | Passes | Threads | Salt | Nonce | Cipher | Suggested for |
+|---|---|---|---|---|---|---|---|
+| `standard` | 64 MiB | 3 | 2 | 16 bytes | 12 bytes | AES-256-GCM | Any computer. The default. |
+| `hardened` | 256 MiB | 5 | 4 | 32 bytes | 12 bytes | AES-256-GCM | 8 GB of memory and 4 cores or more |
+| `paranoid` | 512 MiB | 6 | 4 | 32 bytes | 24 bytes | AES-256-GCM from `pm`, XChaCha20-Poly1305 from the desktop app | 16 GB of memory and 8 cores or more |
+
+All three derive keys with Argon2id. The memory figure is what each unlock, and each guess, has to allocate. The desktop app labels the unlock times "about 0.3s", "about 1s" and "about 2s"; the real time depends on your computer.
+
+`pm profile list` (or `pm profile ls`) prints the same table, with an asterisk next to the profile in use:
+
+```text title="Output"
+Available profiles
+==================
+* hardened  | KDF: argon2id, Time: 5, Memory: 256 MB, Threads: 4, Salt: 32, Nonce: 12
+    Cipher: AES-256-GCM
+  legacy  | KDF: pbkdf2, Time: 600000, Memory: 0 MB, Threads: 1, Salt: 16, Nonce: 12
+    Cipher: AES-256-GCM
+  paranoid  | KDF: argon2id, Time: 6, Memory: 512 MB, Threads: 4, Salt: 32, Nonce: 24
+    Cipher: AES-256-GCM
+  standard  | KDF: argon2id, Time: 3, Memory: 64 MB, Threads: 2, Salt: 16, Nonce: 12
+    Cipher: AES-256-GCM
+```
+
+`MB` there means MiB. With a custom profile in use, a last line adds it, marked `(custom active)`.
+
+The Paranoid cipher depends on where you set it. `pm profile set paranoid` uses AES-256-GCM with a 24-byte nonce, and `pm setup` offers AES-256-GCM as the default when it asks for a cipher. The desktop app pairs Paranoid with XChaCha20-Poly1305. Both are authenticated ciphers with 256-bit keys. `pm cinfo` shows which one your vault uses.
+
+<Callout type="warning" title="Don't use the legacy profile">
+`pm profile list` also shows `legacy`. It exists for compatibility. Its header says PBKDF2 with 600,000 iterations, but the engine always derives keys with Argon2id, so a legacy vault actually runs Argon2id with 600,000 passes over almost no memory. That is far weaker against GPUs than any other profile. The desktop app refuses to switch to it, and `pm health` takes 20 points off for it.
+</Callout>
+
+## Which profile to pick
+
+- **Standard** if you unlock on older or small machines, or run `pm` on a server or CI runner with little memory.
+- **Hardened** for most laptops and desktops made in the last several years.
+- **Paranoid** if every computer you unlock on has 16 GB of memory or more. A machine that cannot allocate 512 MiB will fail to unlock the vault.
+
+A profile is no substitute for a strong master password. It multiplies the cost of each guess. It does not reduce the number of guesses a weak password needs.
+
+When you create a vault, `pm setup` and the desktop app look at your memory and CPU cores and suggest a profile:
+
+| Detected | Suggestion |
+|---|---|
+| 16 GB of memory or more, and 8 cores or more | `paranoid` |
+| 8 GB of memory or more, and 4 cores or more | `hardened` |
+| Anything else | `standard` |
+| Memory unknown, 8 cores or more | `hardened` |
+| Memory unknown, fewer than 8 cores | `standard` |
+
+The two measure differently:
+
+| | Memory | Cores |
+|---|---|---|
+| `pm setup` | Asks the system: `sysctl hw.memsize` on macOS, `/proc/meminfo` on Linux, PowerShell (then `wmic`) on Windows | Every logical core |
+| Desktop app | What Chromium reports (`navigator.deviceMemory`), counted as at least 8 GB, or 16 GB when Chromium reports nothing. The "Memory unknown" rows don't apply. | `navigator.hardwareConcurrency`, or 8 when unknown |
+
+When `pm` cannot read the memory size, `pm setup` says so in its reason, for example `System recommended profile: hardened (10 CPU cores detected (RAM unavailable))`. Otherwise it reads like `paranoid (10 CPU cores and 16384 MB RAM detected)`.
+
+## See your profile
+
+Without unlocking, `pm cinfo` reads the header. With the vault unlocked, `pm profile current` shows the active parameters:
+
+```sh title="Terminal"
+pm profile current
+```
+
+```text
+Current profile
+===============
+Name:        hardened
+KDF:         argon2id
+Memory:      256 MB
+Time:        5
+Parallelism: 4
+Cipher:      AES-256-GCM
+SaltLen:     32
+NonceLen:    12
+```
+
+`pm profile status` is another name for `pm profile current`. In the desktop app, open **Settings → Security → Encryption profile**. See [Settings](/docs/desktop/settings).
+
+## Change your profile
+
+Changing the profile re-encrypts the vault right away with the new settings. Your items, recovery methods and data key stay the same. Only the key derivation, and possibly the cipher, change.
+
+<Tabs items={["pm", "Desktop app"]}>
+<Tab>
+
+```sh title="Terminal"
+pm profile set hardened
+```
+
+```text title="Output"
+Profile switched to hardened.
+```
+
+`pm profile set` takes `standard`, `hardened`, `paranoid` or `legacy`, in any case. It needs a full-access unlock and refuses in a read-only session with "Vault is READ-ONLY." Built-in profiles always use AES-256-GCM, so switching resets a custom cipher choice. Any other name changes nothing:
+
+```text title="Output"
+Error: unknown profile: bogus
+Available profiles: hardened, legacy, paranoid, standard
+```
+
+`pm` exits with status 0 even then, so check the output in scripts.
+
+</Tab>
+<Tab>
+
+Open **Settings → Security → Encryption profile** and pick a profile. The app shows the old and new settings and the expected unlock time, then re-encrypts. Keep the app open until it says **Vault re-encrypted**.
+
+Pick a cipher under **Settings → Security → Cipher**.
+
+</Tab>
+</Tabs>
+
+## Custom profiles
+
+You can set every parameter yourself.
+
+<Tabs items={["pm", "Desktop app"]}>
+<Tab>
+
+```sh title="Terminal"
+pm profile create work-laptop
+```
+
+`pm profile create <name>` walks through memory (MiB), passes, threads, salt length, cipher (`aes-gcm` or `xchacha20-poly1305`) and nonce length, explaining each one. `pm profile edit [name]` does the same starting from your current values. Choosing XChaCha20-Poly1305 always sets a 24-byte nonce. The profile is applied as soon as you finish.
+
+</Tab>
+<Tab>
+
+In **Settings → Security → Encryption profile**, choose **Custom profile…**. The dialog offers:
+
+| Setting | Range |
+|---|---|
+| Time cost | 1 to 10 passes |
+| Memory | 64 to 1024 MiB, in 64 MiB steps |
+| Parallelism | 1 to 8 threads |
+| Salt | 16 or 32 bytes |
+| Cipher | AES-256-GCM or XChaCha20-Poly1305 |
+
+It shows a rough unlock-time estimate, worked out from the time cost and memory, before you apply it. The app saves every custom profile under the name `custom`.
+
+</Tab>
+</Tabs>
+
+A custom profile's parameters are written into the header, so any `pm` can open the vault. The name is not registered anywhere else: to change a custom profile later, run `pm profile edit` again rather than `pm profile set`.
+
+## What a profile does not change
+
+- **Your recovery key.** It is always stretched with Argon2id at 2 passes, 64 MiB and 2 threads. See [Recovery](/docs/security/recovery).
+- **The session file.** It is encrypted with Standard settings and a random local key. See [Sessions and locking](/docs/security/sessions-and-locking).
+- **Old copies.** lgit snapshots, backups and cloud copies made before the change keep the profile they were written with.

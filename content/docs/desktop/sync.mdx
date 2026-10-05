@@ -1,0 +1,140 @@
+---
+title: Cloud sync
+description: Keep an encrypted copy of the vault on GitHub, Google Drive or Dropbox, compare it with this computer, and choose what stays local with .apmignore.
+order: 14
+group: Connections
+---
+
+Sync uploads the sealed vault file to a provider you choose. The vault is encrypted on this computer before upload, so providers store ciphertext and never see your master password or your items. You can connect GitHub, Google Drive and Dropbox, one or all three. Each gets the same encrypted file.
+
+Open **Settings → Sync**, or click the sync status at the bottom of the sidebar.
+
+## The sync status
+
+The top of the page and the sidebar show where you stand:
+
+| State | Settings → Sync | Sidebar |
+|---|---|---|
+| No provider connected | **Local only**, "Connect a provider to keep a copy off this Mac." | **Local only** |
+| Connected, never synced from here | **Connected**, "Not synced from this Mac yet · GitHub" | **Synced** to GitHub |
+| Uploading | **Syncing…** | **Syncing** |
+| Synced | **Up to date**, "Last synced 5 minutes ago · GitHub and Google Drive" | **Synced** to GitHub, or to 2 places, with how long ago |
+| A provider's last sync failed | That provider shows **Last sync failed**, with the error next to it | **Sync failed** to GitHub, or to 2 places |
+
+Each provider row shows **Synced** and how long ago, **Connected**, or **Last sync failed**, and where the file is: the repository, or "Your Drive", "APM public bucket", "Your Dropbox app" or "APM public app" with the start of the file's ID.
+
+The texts say "this Mac" on every system.
+
+## Connect a provider
+
+Choose **Connect** next to a provider in the **Providers** card. **Connect** is disabled in a read-only session.
+
+<Tabs items={["GitHub", "Google Drive", "Dropbox"]}>
+<Tab>
+
+Every sync is a commit to a private repository you own.
+
+1. Create a private repository, for example `you/apm-vault`.
+2. Create a fine-grained personal access token with **Contents: read and write** on that repository only.
+3. In APM, enter the **Repository** (`owner/repo`) and the **Personal access token**. **Connect and upload** stays disabled until the repository looks like `owner/repo` and the token is longer than 8 characters.
+4. Choose **Connect and upload**.
+
+APM stores the vault as `vault.dat` at the top of the repository, and each sync is a commit with the message "update vault". If the repository does not exist yet, APM tries to create it, private, under the token's account, with the description "APM Secure Vault Storage".
+
+</Tab>
+<Tab>
+
+Pick where the file goes:
+
+- **My Google Drive**: your own Drive. Choose **Sign in and upload**, sign in in your browser and allow access. APM only sees the file it creates. The file goes in the top folder of My Drive.
+- **APM public**: APM's shared Drive account. The access to it ships inside every copy of `pm`, and the file is shared with anyone who has its link, so treat the encrypted file as public. Your retrieval key is how you find it again. Your master password is what keeps it closed.
+
+The file gets a meaningless name such as `v_3fa91c.bin`.
+
+</Tab>
+<Tab>
+
+Pick where the file goes:
+
+- **My Dropbox app**: your own Dropbox app. Enter its **App key** and **App secret**, choose **Sign in and upload**, then sign in in your browser. APM signs in with the redirect address `http://localhost:8080`, so your Dropbox app must allow it.
+- **APM public**: APM's shared Dropbox app. The access to it ships inside every copy of `pm`, so treat the encrypted file as public. Your master password is what keeps it closed.
+
+With a retrieval key, the file is named after it: `v_` followed by the SHA-256 of the key, then `.bin`. Without one, it gets a random name such as `/v_3fa91c.bin`.
+
+</Tab>
+</Tabs>
+
+The start of the vault file is not encrypted. If you saved an address in [Settings → Alerts](/docs/desktop/settings#alerts), anyone with a copy of the file can read it, so an **APM public** copy shows it to everyone.
+
+For Google Drive and Dropbox, **Create a retrieval key** is on by default. It stores a one-way hash of the key with the file, so you can restore on another device with just the key. Leave **Custom retrieval key** blank to generate one, or type your own.
+
+While APM works, the dialog says "Waiting for the browser…" (when you sign in) or "Uploading the encrypted vault…". Keep the window open. When the first upload finishes, **Connected to** the provider shows the **Retrieval key** (for Google Drive and Dropbox) or the **Location** and the cipher it is **Encrypted with**. Keep the retrieval key with your recovery key. You can see it again later with **Show retrieval key** in the provider's menu.
+
+<Callout type="warning" title="Type your own retrieval key">
+A generated retrieval key is two words run together, such as `SwiftFalcon`, picked from only 2,304 combinations, so anyone can try them all. On Dropbox the key also names the file, so two vaults with the same key would share one file. Type a long key of your own instead, especially for **APM public**.
+</Callout>
+
+A vault keeps one retrieval key. If you connect both Google Drive and Dropbox with a retrieval key, the second one replaces the first, and only the provider you connected last offers **Show retrieval key**.
+
+The GitHub token and the Google Drive and Dropbox sign-ins are saved inside the encrypted vault, so they travel with it. If a connection fails, APM shows "Could not reach the provider. Check your connection and try again."
+
+## Sync now and auto-sync
+
+- **Sync now** at the top of the page uploads to every connected provider. **Sync now** in a provider's `…` menu uploads to that one. **Sync now** in the command menu does the same as the button. The toast says, for example, "Synced to GitHub" or "Synced to 2 providers". From the command menu with nothing connected, it says "No sync providers connected".
+- **Auto-sync** uploads automatically about two seconds after each change, while the vault is unlocked. Each new change restarts the two seconds. Turning it on or off is recorded in History ("Auto sync turned on").
+
+If one provider fails, the others still upload, and the failed one shows **Last sync failed** with its error. If every provider fails, you see "Could not reach the provider. Check your connection and try again." Auto-sync failures show only in the provider rows and the sidebar.
+
+<Callout type="warning" title="Sync now uploads, it does not download">
+**Sync now** and auto-sync replace the provider's copy with this computer's vault. If you also change the vault on another computer, use **Compare** first to bring those changes in, or they will be overwritten.
+</Callout>
+
+## Compare and merge
+
+**Compare** next to a connected provider (or **Compare with local** in its menu) downloads the provider's copy, decrypts it here, and lists every difference with this computer's vault. The dialog, titled, for example, **This Mac and GitHub**, shows "Downloading and decrypting the remote copy…", then a count such as "2 changed on both, 1 only on GitHub, 0 only here":
+
+- **Different on both**: the item changed in one place or the other. Ticked means **Take remote**, unticked means **Keep local**. These start ticked.
+- **Only on** the provider: ticked means **Add**, unticked means **Skip**. These start ticked.
+- **Only on this Mac**: ticked means **Remove here**, unticked means **Keep**. These start unticked.
+
+Each row shows the item, its space and which fields differ. Tick the remote changes you want, then choose **Take N and sync**, or **Keep local and sync** to keep everything as it is here. APM merges, saves (History notes "Merged 2 cloud change(s) from GitHub"), then uploads the result. The toast says **Merged with GitHub** and how many changes it took. If both copies hold the same items, you see **Already in sync**.
+
+The remote copy must use the same master password. If it does not, compare stops with **Could not compare** and "The cloud vault uses a different master password." If the download fails, you see "Could not reach the provider. Check your connection and try again."
+
+## .apmignore
+
+The **.apmignore** card keeps parts of the vault off one provider or all of them. Rules are applied before encryption, so ignored items never leave this computer. The editor shows line numbers, and the side panel explains each section:
+
+| Section | What it holds | Example |
+|---|---|---|
+| `[spaces]` | Space names or globs to keep local | `scratch-*` |
+| `[entries]` | `space:type:name` | `Homelab:note:Homelab runbook` |
+| `[cloud-specific-ignore]` | `provider:space:type:name` | `gdrive:Work:apikey:*` |
+| `[misc]` | Other options. APM 12.0.0 reads this section but ignores it, so `ignore:history` has no effect. | `ignore:history` |
+
+```text title=".apmignore"
+[spaces]
+scratch-*
+
+[entries]
+Homelab:note:Homelab runbook
+
+[cloud-specific-ignore]
+gdrive:Work:apikey:*
+```
+
+Choose **Save** to apply the rules from the next sync (APM confirms ".apmignore saved"), or **Discard** to drop your edits. If a rule has an error, APM says so and does not save, for example "The .apmignore rules have an error: .apmignore line 5: entry rule must be 'space:type:name'".
+
+The app keeps the file next to your vault, for example `~/.apm/.apmignore`. The footer shows that path and how many rules it has, such as "~/.apm/.apmignore · 3 rules" (blank lines, comments and section headers do not count), or "Unsaved changes" while you edit. Each item's header shows its identifier in the same `Space:type:Name` form. See the [.apmignore reference](/docs/reference/apmignore).
+
+## Disconnect
+
+Choose **Disconnect** in a provider's `…` menu, then confirm **Disconnect GitHub?** Syncing stops, but the encrypted copy stays with the provider until you delete it there. APM forgets the token or sign-in it saved for that provider, and the retrieval key if it belonged to it. History notes "Disconnected GitHub".
+
+## Restore on another device
+
+On a new computer, use **Restore from cloud** on the app's Welcome screen. See [First run](/docs/desktop/first-run#restore-from-cloud). For Google Drive and Dropbox, the app only looks in APM public, so a vault in your own Drive or Dropbox app has to come back with `pm cloud get`. From a terminal, install `pm` and run `pm cloud get` with the provider and your retrieval key or repository. You still need your master password to open it.
+
+## In the terminal
+
+`pm cloud init`, `pm cloud sync`, `pm cloud diff` and `pm cloud get` do the same from the terminal. See the [CLI reference](/docs/cli/commands).

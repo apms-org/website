@@ -1,0 +1,113 @@
+---
+title: Passkeys
+description: Create passkeys that live in your APM vault and sign in with them in any browser you pair.
+order: 5
+group: Using it
+---
+
+APM can keep your passkeys. When a site offers to create a passkey, APM shows its own sheet instead of the browser's, generates the key, and stores it on a login in your vault. When the site later asks for a passkey, APM signs with it. Because the key is in the vault and not in the browser, it works in every browser you pair with APM.
+
+## How it works
+
+The extension answers the page's passkey requests (the WebAuthn `navigator.credentials.create` and `navigator.credentials.get` calls) on secure pages. For each request:
+
+1. The extension builds the client data from the frame's real origin, as the browser reports it, not from anything the page says.
+2. It checks that the site may use the relying party ID it asks for: the page's own host or a parent domain of it, never a public suffix such as `co.uk` or a shared host such as `github.io`, and only on `https://` pages (or `http://localhost` and `http://127.0.0.1`).
+3. It sends APM the origin, the relying party ID and a hash of the client data. APM runs the same origin check again, then creates or signs with the key.
+
+APM generates ECDSA P-256 keys (ES256). The private key is stored encrypted in the login it belongs to and never leaves APM: the extension only ever sees the public key, the signature and the authenticator data.
+
+The page's script and the extension shake hands first. If the extension does not answer within a second and a half, for example because it was just updated and the page still has the old script, the page's request goes to the browser's own passkey flow, so a passkey request never hangs.
+
+## Create a passkey
+
+<Steps>
+
+### Start on the site
+
+On the site's security or account settings, choose the option to add a passkey. Instead of the browser's own sheet, APM opens a sheet over the page: **Save a passkey for** followed by the site, for example "Save a passkey for github.com".
+
+### Choose where to save it
+
+Under **Save to**, APM suggests a login already saved for this site, preferring one with the same username the site sent. If there is none, it suggests **New login for** the site, which holds only this passkey, and, if you have spaces, shows a **Space** list for it.
+
+Choose **Change** to pick a different login. A search box appears when you have more than six logins.
+
+### Save it
+
+Choose **Save passkey**. APM saves the passkey and hands the result to the site. A notice confirms it: "Passkey saved to GitHub. It works in every browser paired with APM."
+
+</Steps>
+
+A new login made this way is named after the site, using the name the site gives for itself (for example "GitHub") or else its domain. It gets the site's domain as its website, the user name the site sent as its username, and no password. If a login with that name already exists in the chosen space, APM adds the passkey to it instead of making a second one.
+
+The vault's history records the change as "Saved a passkey to" followed by the login's name, and the audit log records `PASSKEY_SAVED` with the site and the login. Saving a passkey needs a vault you can write to: in a read-only session it fails with "This APM session is read-only."
+
+If the site sends a list of passkeys it already has for your account and one of them is in your vault, APM refuses, for example: "APM already has a passkey for you@example.com on github.com. Sign in with it instead."
+
+## Sign in with a passkey
+
+There are two ways a site asks for a passkey.
+
+**A sign-in button.** When you choose "Sign in with a passkey" on a site, APM opens **Sign in to** followed by the site, with "Choose a passkey from your vault." Each passkey shows the user name, the login it is saved in, its space and when it was last used. Select one and choose **Sign in**, or double-click it.
+
+**Passkey autofill.** Some sites offer passkeys right in the username field. APM lists those passkeys in the [field menu](/docs/extension/autofill#the-field-menu) under **Passkeys**, below your logins, when **Offer passkeys in the login menu** is on. Choose one to sign in.
+
+APM does not ask for your master password or fingerprint again for each sign-in. An unlocked vault is the check, and APM reports user verification to the site unless the site says it does not want it. Lock the vault when you step away.
+
+## When the vault is locked
+
+- **Creating a passkey** while APM is locked, the sheet says "APM is locked. Unlock APM to save it to your vault. This sheet picks up as soon as it is unlocked." Choose **Unlock with Touch ID** (on a Mac with Touch ID set up for APM) or **Unlock in the toolbar**, and the sheet continues by itself.
+- **Signing in** while APM is locked, APM steps in only on sites where it has created a passkey in this browser before, with the same unlock buttons. Elsewhere the browser's own sheet opens, so a locked vault does not hide passkeys you keep somewhere else.
+- **Passkey autofill** is left to the browser while APM is locked.
+
+## When the browser takes over
+
+APM steps aside and the browser's own passkey flow runs when:
+
+- **Use APM for passkeys** is off.
+- The site is paused, or excluded with **Never fill** or **Never fill or save**.
+- The extension is not paired, or cannot reach APM.
+- The site accepts only key types other than ES256, such as RS256.
+- You are signing in and your vault has no passkey for the site.
+- The relying party ID does not belong to the page, or the page is not secure.
+
+You can also hand any request to the browser yourself: choose **Use this browser instead** in the create sheet, or **Use another device** in the sign-in sheet. Nothing breaks; APM just steps aside.
+
+Closing a sheet with its close button or <Kbd>Esc</Kbd> cancels the request, and the site sees it as cancelled: the page's call fails with `NotAllowedError`, "The operation either timed out or was not allowed." If the site cancels first (for example on a timeout), the sheet closes by itself.
+
+### Messages in the sheets
+
+| Message | Meaning |
+|---------|---------|
+| "APM already has a passkey for you@example.com on github.com. Sign in with it instead." | The site listed the passkeys it already has for your account, and one of them is in your vault. The site sees `InvalidStateError` if you then close the sheet |
+| "No passkey for github.com" | You unlocked from the sign-in sheet, and your vault has no passkey this site accepts. Choose **Use another device**, or sign in with a password |
+| "The site stopped waiting. Try again on the page." | The page cancelled the request, or reloaded, while the sheet was open |
+| "That passkey is not for this site." | The passkey you picked is for another site, or the site asked for specific passkeys and this is not one of them |
+| "The page is no longer asking for a passkey." | You picked a passkey from the field menu after the page stopped offering passkey autofill |
+| "Touch ID was cancelled or did not match." | Try again, or choose **Unlock in the toolbar** |
+| "The site … cannot use passkeys for …" | APM's own origin check failed. The page asked for a relying party ID that does not belong to it |
+
+## Manage your passkeys
+
+Passkeys are listed in three places.
+
+- **Toolbar popup**: choose **More** (the three dots), then **Passkeys**. Search by site, user name or login. Each passkey's menu has **Rename**, **Open** followed by the login's name, and **Remove**. See [Toolbar popup](/docs/extension/popup#passkeys).
+- **Desktop app**: **Settings**, **Browser extension**, **Saved passkeys**.
+- **Terminal**: `pm get` shows a login's passkeys under **Passkeys**. Press <Kbd>e</Kbd> to edit the login, pick a passkey with the arrow keys, then press <Kbd>↵</Kbd> to rename it or <Kbd>x</Kbd> to remove it, and <Kbd>s</Kbd> to save. `pm` can't create a website passkey or sign in with one.
+
+A login's detail view in the popup also lists its passkeys.
+
+<Callout type="warning" title="Removing a passkey">
+Removing a passkey from APM does not remove it from the site. The site still trusts it, so remove it in the site's security settings too.
+</Callout>
+
+## Details
+
+- APM uses "none" attestation, so sites learn nothing about the device.
+- APM creates passkeys with a signature counter of 0 and leaves it there, the way synced passkeys do. That keeps the passkey eligible to move to other password managers through Credential Exchange.
+- Passkeys are part of the vault: they are backed up, synced and exported with it, and `pm import` brings them in from managers that export them. See [Encryption](/docs/security/encryption).
+- **Rename** sets a label to tell passkeys apart, such as the device you made it on. Labels can be up to 120 characters. Renaming and removing are recorded in the audit log as `PASSKEY_RENAMED` and `PASSKEY_DELETED`.
+- Signing in records when the passkey was last used, which the popup and the app show. In a read-only session the sign-in still works, but the time is not saved.
+- APM identifies itself to sites the way a device's built-in passkey provider does: the credential reports the `platform` attachment and the `internal` and `hybrid` transports. Each new passkey gets a random 32-byte credential ID.
+- To offer its sign-in sheet while the vault is locked, the extension remembers the sites where it created a passkey in this browser, up to 500 of them, in the browser's storage. It keeps only the site names.

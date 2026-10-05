@@ -1,0 +1,178 @@
+---
+title: Install pm
+description: Get the pm command from the desktop app, from a release archive, or by building it from source.
+order: 1
+sidebarTitle: Installation
+group: Get started
+---
+
+`pm` is one self-contained binary. Install it whichever way suits you, then check it with `pm --version`. Version 12.0.0 is the first release in which `pm` and the desktop app share one version number.
+
+## Choose a method
+
+| Method | Platforms | Keeps itself up to date |
+|---|---|---|
+| [From the desktop app](#from-the-desktop-app) | macOS | Yes, it follows the app |
+| [Release archive](#from-a-release-archive) | macOS, Linux, Windows | Download again. See [Update](#update) |
+| [Build from source](#build-from-source) | Anything Go supports | Rebuild |
+
+## From the desktop app
+
+On macOS, the packaged APM app carries its own copy of `pm` and can put it on your `PATH` for you, the way VS Code installs `code`.
+
+<Steps>
+
+### Open Settings → Developer
+
+The page checks which `pm` your terminal runs every time you open it.
+
+### Choose Install pm
+
+APM creates `/usr/local/bin/pm` as a link to the `pm` inside `APM.app`. macOS asks for an administrator password when `/usr/local/bin` is not writable.
+
+### Check it
+
+```sh title="Terminal"
+pm --version
+```
+
+```text
+12.0.0
+```
+
+</Steps>
+
+Because the command links to the app's own copy, updating the app also updates `pm`. If an older `pm` is already on your `PATH`, the page offers **Update pm**, which points that path at the app's copy (a plain binary is kept as `pm.old`). See [Install the desktop app](/docs/desktop/install).
+
+<Callout type="note" title="Which vault does it open?">
+A `pm` installed this way opens the app's vault at `~/.apm/vault.dat` by default, because there is no `vault.dat` next to it. `--vault` and `APM_VAULT_PATH` still pick another one. See [where the vault lives](/docs/cli/vault-basics#where-the-vault-lives).
+</Callout>
+
+## From a release archive
+
+Each release on GitHub ([github.com/apms-org/cli/releases](https://github.com/apms-org/cli/releases)) carries two files per platform, both named `apm-<version>-<os>_<arch>`: the plain binary (`.exe` on Windows) and an archive holding it (`.tar.gz` for macOS and Linux, `.zip` for Windows). Builds exist for `darwin`, `linux` and `windows`, each for `amd64` and `arm64`. Whichever you download, rename the binary to `pm`.
+
+<Tabs items={["macOS", "Linux", "Windows"]}>
+<Tab>
+
+```sh title="Terminal"
+tar -xzf apm-v12.0.0-darwin_arm64.tar.gz
+sudo install -m 0755 apm-v12.0.0-darwin_arm64 /usr/local/bin/pm
+pm --version
+```
+
+Use `darwin_amd64` on an Intel Mac. If macOS blocks a downloaded binary, allow it in **System Settings → Privacy & Security**.
+
+</Tab>
+<Tab>
+
+```sh title="Terminal"
+tar -xzf apm-v12.0.0-linux_amd64.tar.gz
+sudo install -m 0755 apm-v12.0.0-linux_amd64 /usr/local/bin/pm
+pm --version
+```
+
+Use `linux_arm64` on ARM machines. To copy secrets to the clipboard, `pm` runs `xclip`, so install it too (for example `sudo apt install xclip`).
+
+</Tab>
+<Tab>
+
+```powershell title="PowerShell"
+Expand-Archive apm-v12.0.0-windows_amd64.zip -DestinationPath $HOME\apm
+Rename-Item $HOME\apm\apm-v12.0.0-windows_amd64.exe pm.exe
+# Add $HOME\apm to your PATH, then open a new terminal
+pm --version
+```
+
+Use `windows_arm64` on ARM devices. Prompts and keys work the same in Windows Terminal and the classic Windows console. In an older Git Bash, run it as `winpty pm ...` so passwords can be typed hidden; see [Keys at prompts](/docs/cli#keys-at-prompts).
+
+</Tab>
+</Tabs>
+
+## Build from source
+
+You need Go 1.25 or newer (the version in `go.mod`) and Git.
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/cli.git
+cd cli
+go build -o pm .
+./pm --version
+```
+
+Move the binary somewhere on your `PATH`. On Windows, build `pm.exe` with `go build -o pm.exe .`.
+
+<Callout type="warning" title="Build before you link the extension">
+`pm extension link` registers the path of the `pm` you run with your browsers. Run it from a built binary, not from `go run`, or the browser loses it when the temporary build is deleted. See [Browser extension](/docs/cli/browser-extension).
+</Callout>
+
+### The team edition
+
+The team edition is a separate binary in the `team/` folder of the same repository. It needs Go 1.25.5 or newer:
+
+```sh title="Terminal"
+cd team
+go build -o pm-team .
+```
+
+See [Team edition](/docs/cli/team-edition).
+
+## After installing
+
+<Steps>
+
+### Create or open a vault
+
+```sh title="Terminal"
+pm setup
+```
+
+The wizard creates a vault if there is none, or checks the one it finds. See [Vault basics](/docs/cli/vault-basics).
+
+### Check where things are
+
+```sh title="Terminal"
+pm info
+```
+
+```text
+APM Stable v12.0.0 Release
+────────────────────────────
+
+User:       alex@apm
+Installed:  /usr/local/bin
+Vault:      /Users/alex/.apm/vault.dat
+
+Version:    v12.0.0 Stable Release
+...
+Status:
+  ✔ Vault accessible
+  ✔ Config valid
+  ✔ All systems ok.
+```
+
+</Steps>
+
+## Canary builds
+
+Releases whose tag starts with `can` are canary builds, made from work in progress for early testing. Back up `vault.dat` before trying one, and prefer releases tagged `v…`.
+
+There is no one-line install script. The `install.sh` and `install.ps1` files in the repository are out of date and don't install a working `pm`; use one of the methods above.
+
+## Update
+
+| You installed | Update with |
+|---|---|
+| From the desktop app | Update the app. The `pm` link follows it. |
+| A release archive | Download the new archive. `pm update` works only in some cases, see below |
+| From source | `git pull` and `go build -o pm .` again |
+
+`pm update` asks GitHub for the latest `apms-org/apm` release and compares versions. It only accepts a binary whose name contains your OS and either has no dot in it or ends in `.exe`. Release binaries carry the version in their name (`apm-v12.0.0-darwin_arm64`), so on macOS and Linux it finds none and prints the release page, and you download the new archive by hand. On Windows it takes the first Windows `.exe` in the release, whatever its architecture. It prints the file name as it downloads, so check that it matches your machine. When it does download, it saves the file next to the current `pm`, keeps the current binary as `pm.old` (`pm.exe.old` on Windows) and puts the new one in its place. `pm update --force` downloads even when you are on the latest version.
+
+## Uninstall
+
+Delete the `pm` binary (or the `/usr/local/bin/pm` link). Your vault and settings stay where they are; delete them too only if you mean to lose them. [File locations](/docs/reference/file-locations) lists every file `pm` writes.
+
+<Callout type="danger" title="Back up before deleting">
+Deleting `vault.dat` without a backup or a cloud copy loses every item for good. APM has no server copy.
+</Callout>

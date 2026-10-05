@@ -1,0 +1,48 @@
+/* The intro before the hero: "apm" in glass over the page's own grid (components/home/intro.jsx).
+   The grid, rails and glows below are also what the glass refracts, so keep intro-scene.js in step with them. */
+:root{--intro-spot:rgba(255, 255, 255, 0)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--intro-spot:rgba(255, 255, 255, 0.045)}}
+:root[data-theme="dark"]{--intro-spot:rgba(255, 255, 255, 0.045)}
+
+/* While the intro is on the page the nav logo waits for the glass to morph into it (intro.jsx sets the values):
+   the tile fades in behind the glass bird first, then the bird and the wordmark take over. */
+html[data-intro] .nav .nav-brand .nav-word,html[data-intro] .nav .nav-brand .apm-mark-tile > svg{opacity:var(--intro-brand, 0)}
+html[data-intro] .nav .nav-brand .apm-mark-tile{background:color-mix(in srgb, var(--mark-tile) calc(var(--intro-tile, 0) * 100%), transparent)}
+html[data-intro]:not(.intro-landed) .nav .nav-brand .apm-mark-tile{box-shadow:none}
+
+/* Full viewport, slid up under the transparent nav. */
+.intro{position:relative;height:100vh;height:100svh;min-height:480px;margin-top:calc(-1 * (var(--web-nav) + env(safe-area-inset-top, 0px)));overflow:hidden;overflow:clip}
+.intro-art{position:absolute;inset:0;pointer-events:none}
+
+/* The hero's top glow, mirrored, so the seam between the two sections disappears. */
+.intro-glow{position:absolute;left:50%;bottom:0;display:none;width:min(1500px, 100%);height:760px;transform:translateX(-50%);background:radial-gradient(ellipse 50% 60% at 50% 100%, var(--web-glow), transparent 70%)}
+.intro.has-glow .intro-glow{display:block}
+
+/* A soft light on the page behind the word (dark theme only). */
+.intro-spot{position:absolute;inset:0;background:radial-gradient(ellipse 48% 42% at 50% 45%, var(--intro-spot), color-mix(in srgb, var(--intro-spot) 56.25%, transparent) 25%, color-mix(in srgb, var(--intro-spot) 25%, transparent) 50%, color-mix(in srgb, var(--intro-spot) 6.25%, transparent) 75%, transparent)}
+
+/* The grid: the hero's columns carried up, rows counted from the bottom edge so they continue into the hero.
+   Strongest behind the word; at the bottom edge it matches the hero grid's own mask exactly. */
+.intro-grid{position:absolute;inset:0;background-image:linear-gradient(to right, var(--web-grid-line) 1px, transparent 1px), linear-gradient(to bottom, var(--web-grid-line) 1px, transparent 1px);background-size:var(--cell, 100px) var(--cell, 100px);background-position:var(--gx, 0px) var(--gy, 0px);
+  -webkit-mask-image:radial-gradient(62% 46% at 50% 50%, #000 30%, transparent 100%), radial-gradient(var(--srx, 864px) var(--sry, 1170px) at 50% 100%, #000 34%, transparent 86%), linear-gradient(to right, transparent var(--gl, 0px), #000 var(--gl, 0px), #000 var(--gr, 100%), transparent var(--gr, 100%));
+  -webkit-mask-composite:source-over, source-in;
+  mask-image:radial-gradient(62% 46% at 50% 50%, #000 30%, transparent 100%), radial-gradient(var(--srx, 864px) var(--sry, 1170px) at 50% 100%, #000 34%, transparent 86%), linear-gradient(to right, transparent var(--gl, 0px), #000 var(--gl, 0px), #000 var(--gr, 100%), transparent var(--gr, 100%));
+  mask-composite:add, intersect}
+
+/* Keeps the nav legible: the page colour fading out over the top. */
+.intro-shade{position:absolute;left:0;right:0;top:0;height:120px;background:linear-gradient(var(--bg), transparent)}
+
+.intro-stage{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity 700ms ease}
+.intro-stage.is-live{opacity:1}
+/* While the word flies up into the logo it passes over the nav (and its scroll veil). */
+.intro.is-lifting .intro-stage{z-index:51}
+.intro-canvas{display:block;width:100%;height:100%}
+
+.intro-cue{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px;padding:6px 10px;border-radius:var(--radius-sm);transform:translateX(-50%);color:var(--text-tertiary);font-family:var(--font-mono);font-size:12px;line-height:16px;letter-spacing:0.02em;text-decoration:none;opacity:0;transition:opacity 900ms ease,color var(--dur-fast) ease}
+.intro-cue.is-on{opacity:1}
+.intro-cue:hover{color:var(--text)}
+.intro-cue > *{opacity:calc(1 - var(--intro-q, 0) * 6)}
+.intro-cue i{position:relative;display:block;width:1px;height:36px;overflow:hidden;background:var(--border-strong)}
+.intro-cue i::after{content:"";position:absolute;left:0;top:0;width:1px;height:16px;background:linear-gradient(transparent, var(--text-secondary), transparent);transform:translateY(-16px);animation:intro-drip 2.6s var(--ease-in-out) 0.4s infinite}
+
+@keyframes intro-drip{0%{transform:translateY(-16px)}64%,100%{transform:translateY(36px)}}

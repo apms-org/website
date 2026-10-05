@@ -1,0 +1,122 @@
+---
+title: Watchtower
+description: Vault health, weak, reused, old, exposed and expiring secrets, trust scores and the clean-up tool.
+order: 11
+group: Keep it safe
+---
+
+Watchtower checks your vault for problems and gives it a health score. The checks run locally against the decrypted vault every time it changes. Nothing is sent anywhere, and APM does not look your passwords up in breach databases.
+
+Open it with **Watchtower** in the sidebar or <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>3</Kbd> (<Kbd>Ctrl</Kbd><Kbd>Alt</Kbd><Kbd>3</Kbd> on Windows and Linux). The sidebar entry shows how many issues are open: in red when any of them is a short password, an exposed secret or an expired item, and in amber otherwise.
+
+## Vault health
+
+The ring at the top scores the vault from 0 to 100, with a verdict: **In good shape** (80 or more), **Needs attention** (50 to 79) or **At risk** (below 50). Next to it, each line shows what added or took away points:
+
+| Line | Points |
+|---|---|
+| **Profile**: hardened or paranoid | 0, noted as memory-hard |
+| **Profile: standard** or **custom** | 0 |
+| **Legacy profile** | −20 |
+| **Security alerts on** / **off** | +10 / −10 |
+| **Short passwords** (under 8 characters) | −5 each |
+| **High-risk secrets** (trust below 55) | −2 each |
+| **Critical secrets** (trust below 35) | −3 each |
+| **App checks** | −3 per easy-to-guess password, −2 per reused one, −2 per old one, −10 per exposed secret, −1 per expiring item |
+
+Each line shows its count and points, for example "Short passwords: 1" with −5, or "App checks: 1 easy to guess, 2 reused" with −7. A secret with a critical trust score is also high-risk, so it costs 5 points in all. The score never goes below 0 or above 100.
+
+The first lines match `pm health`. The app checks are extra. **Security alerts** is the switch in [Settings → Alerts](/docs/desktop/settings#alerts).
+
+## Issues
+
+Below the score, five tiles count each kind of issue: **Weak**, **Reused**, **Old**, **Exposed** and **Expiring**. Click a tile, or a tab, to show only that kind. Click the same tile again to go back to **All issues**, which shows everything.
+
+| Issue | What APM looks for | What the issue says |
+|---|---|---|
+| **Short password** | A login or Wi-Fi password under 8 characters | "Only 7 characters. APM counts anything under 8 as weak." |
+| **Easy to guess** | A password of 8 or more characters with an estimated strength under 40 bits | "About 36 bits. Cracked in 3 seconds offline." |
+| **Reused password** | The same password on more than one login or Wi-Fi network | "Also used by Home-5G." |
+| **Not rotated in N months** | A login or Wi-Fi password unchanged for more than 180 days | "Last changed Mar 30, 2026." |
+| **Marked as exposed** | An item you flagged as exposed | "Rotate this secret and clear the flag." |
+| **Expires in N days** / **Expired N days ago** | An item whose **Expires** date is less than 30 days away or past | "Government ID expires on 2026-10-17." |
+
+Each issue has buttons to act on it:
+
+- **Change password** opens the login or Wi-Fi network in the editor (weak, reused and old passwords).
+- **Clear flag** removes the exposed flag.
+- **Open item** (the arrow) shows the item in the vault.
+
+The same issues appear as notices at the top of the item itself, and as a dot on its row in the list.
+
+When a tab has nothing in it, you see **Nothing to fix** (or, for one kind, **No reused items** and so on) and "Watchtower rechecks every time the vault changes." The **Reused** tab says "Every password in this vault is unique."
+
+### How strength is estimated
+
+The estimate counts which kinds of characters the password uses (lowercase, uppercase, digits, other symbols) and its length, then takes points off for common passwords such as `password` or `qwerty` inside it, a character repeated three times, a year such as `2024`, and the pattern of a capitalised word followed by digits. Passwords made of three or more words joined by hyphens are scored by word instead. The crack time assumes an attacker who makes 10 billion guesses a second.
+
+| Password | Estimate | Watchtower says |
+|---|---|---|
+| `hunter2` | 36 bits | **Short password** |
+| `Summer2024!` | 36 bits, cracked in 3 seconds | **Easy to guess** |
+| `password123` | 20 bits, cracked instantly | **Easy to guess** |
+| `Tr0ub4dor&3` | 71 bits, cracked in 3 thousand years | Nothing |
+
+### Which items can expire
+
+Watchtower reads the **Expires** date of Government IDs, certificates, documents, software licenses, cloud credentials and Kubernetes items. A card's **Expires** is typed as MM/YY, so Watchtower never flags cards.
+
+## Trust scores
+
+The **Trust scores** tab lists every item from the lowest score up, with its score, risk level and the reasons. Click a row to open the item.
+
+Every item starts at 100 and loses points for:
+
+| Factor | Reason shown | Points |
+|---|---|---|
+| Marked as exposed | "Marked as exposed" | −45 |
+| Not rotated in over a year / 6 months / 90 days | "Not rotated in over a year", "Not rotated in 6 months", "Not rotated in 90 days" | −35 / −20 / −10 |
+| Accessed more than 200 / 75 times | "Accessed 212 times" | −20 / −10 |
+| Privilege **Critical**, **Root** or **Admin** | "Privilege: admin" | −15 |
+| Privilege **Elevated** | "Privilege: elevated" | −8 |
+
+An item with none of these shows "No risk factors". In the app, copying an item's main secret with <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd>, from the item's menu or from the command menu, or copying a code on the Authenticator page, counts as an access.
+
+| Score | Risk level |
+|---|---|
+| 80 to 100 | **Low risk** |
+| 55 to 79 | **Medium risk** |
+| 35 to 54 | **High risk** |
+| 0 to 34 | **Critical** |
+
+"Rotated" means the last time the secret changed, or when the item was created. Set an item's privilege and exposed flag in its **Details and activity** view. See [Items](/docs/desktop/items#details-and-activity).
+
+`pm trust` shows the same scores in the terminal.
+
+## Clean up
+
+**Clean up** in the page header scans the vault for broken or empty entries and leftover settings. It runs the same checks as `pm cleanup`. You can also run it from **Settings → Maintenance**, where the row says how many things there are to look at and the button reads **Review** (or **Run** when there is nothing).
+
+The dialog, **Clean up the vault**, shows "Scanning…" while it works, then splits results into **Can be fixed automatically** and **Needs a decision from you**. Each result shows a message and, next to it, the part of the vault it is in, such as `entries` or `totp_entries`.
+
+Can be fixed automatically:
+
+| Message | Fix |
+|---|---|
+| "Password entry #3 has an empty account name", or the same for a TOTP entry, secure note, token or API key | The item is removed |
+| "TOTP entry 'GitHub' has an empty secret" | The item is removed |
+| "Entry 'GitHub' references unknown space 'Old'", or the same for a TOTP entry | Moved to **Default** |
+| "Orphaned cloud token with no active provider configured" | The token is cleared |
+| "Spaces list contains only an empty entry" | The list is reset |
+| "Stale failed attempts counter (2) — can be reset" | The counter is reset |
+
+Reported for you to decide:
+
+| Message | What it means |
+|---|---|
+| "Entry 'GitHub' has no username or password" | A login with neither |
+| "TOTP entry 'GitHub' has an unusually short secret (10 chars)" | A setup key under 16 characters |
+| "Duplicate TOTP entry 'github' in space 'work' (2 copies)" | Authenticator items with the same name in one space. The name and space are shown in lower case. |
+| "Autocomplete window protection is not enabled (recommended)" | Refers to a Windows autocomplete feature APM no longer has. Nothing in the app changes it, so most vaults always show it. You can ignore it. |
+
+Choose **Fix N issues** to apply the automatic fixes. The toast says "Fixed N issues". Like every change, the fix is recorded in [History](/docs/desktop/history), with the note "Cleanup fixed 2 issue(s)", so you can undo it. In a read-only session the **Clean up** button in Settings is disabled.

@@ -1,0 +1,176 @@
+---
+title: Recovery
+description: Set up a recovery key, one-time codes, a recovery passkey or trustee shares with pm auth, and use them to set a new master password.
+order: 16
+group: Guides
+---
+
+APM can't reset a forgotten master password: nobody else holds a key to your vault. Recovery only works if you set it up while you still know the password. This page shows the `pm auth` commands for each recovery factor; [Recovery](/docs/security/recovery) explains how they work cryptographically.
+
+## The factors
+
+| Factor | Set up with | Role |
+|---|---|---|
+| Recovery email and recovery key | `pm auth email` | Required. The key unlocks the vault; the email confirms it's you |
+| One-time recovery codes | `pm auth codes generate` | Optional second factor during recovery |
+| Recovery passkey | `pm auth passkey register` | Optional second factor during recovery |
+| Trustee shares | `pm auth quorum-setup` | A split copy of the recovery key for people you trust |
+
+## Set up the recovery key
+
+```sh title="Terminal"
+pm auth email you@example.com
+```
+
+<Steps>
+
+### Verify the address
+
+APM emails a 6-digit code to the address. Enter it within 15 minutes; you have 5 tries.
+
+```text
+Verification code sent to you@example.com.
+Enter 6-digit verification code (attempt 1/5, expires in 14m52s): 482913
+```
+
+### Save the recovery key
+
+`pm` generates a recovery key, stores what it needs to check the key in the vault, and shows the key once:
+
+```text
+Recovery registered successfully!
+Registration alert sent to you@example.com
+
+YOUR RECOVERY KEY (STAY SECURE):
+  K7M3-P4R8-XQWT-5829
+
+IMPORTANT: Store this key in a physically secure location.
+It will NEVER be shown again and is NOT stored in plain text.
+```
+
+Write it down or store it offline. It is not in the email: APM sends only a notice that recovery was set up.
+
+Despite the last line of that output, the save that follows also writes the key into the vault's unencrypted header, masked with a fixed value from APM's source code, until the vault is next saved after a fresh unlock. See [After you create a recovery key](/docs/security/recovery#after-you-create-a-recovery-key).
+
+</Steps>
+
+Sending email needs an internet connection; `pm` sends from APM's own mail service. If the notice can't be sent, `pm` stops before it shows the key and saves nothing, so run the command again. Running `pm auth email` again replaces the address and the recovery key. Trustee shares made from the old key no longer recover the vault, so run `pm auth quorum-setup` again afterwards.
+
+## Add a second factor
+
+Recovery with the recovery key always needs your email and the key. If you set up recovery codes or a recovery passkey, it also needs one of them. Recovery with trustee shares skips both.
+
+### One-time recovery codes
+
+```sh title="Terminal"
+pm auth codes generate            # 10 codes
+pm auth codes generate --count 20 # up to 50
+pm auth codes status
+```
+
+```text
+Recovery codes generated (store these securely; they are shown once):
+ 1. 3FA91C-7D2E
+ 2. B0C47A-19F3
+...
+```
+
+Each code works once. Generating codes again replaces the whole set. `pm auth codes status` shows how many are left:
+
+```text
+Recovery codes: 10 total, 9 remaining, 1 used
+```
+
+### Recovery passkey
+
+```sh title="Terminal"
+pm auth passkey register   # create one
+pm auth passkey verify     # check it still works
+pm auth passkey disable    # remove it
+```
+
+`pm` opens your browser on a local page (`http://localhost` on a random port) where your browser or security key creates or uses the passkey. This is unrelated to the website passkeys stored on your logins (see [Passkeys](/docs/cli/passkeys)).
+
+## Trustee shares
+
+Quorum recovery splits your recovery key into shares with Shamir's secret sharing. Any `threshold` of them rebuild the key; fewer reveal nothing.
+
+```sh title="Terminal"
+pm auth quorum-setup --threshold 2 --shares 3
+```
+
+```text
+Recovery quorum configured: 2-of-3
+Distribute these shares to distinct trustees. Each share is shown only here:
+Share 1: QSHARE-1-9F2C...
+Share 2: QSHARE-2-41AB...
+Share 3: QSHARE-3-D07E...
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--threshold` | `2` | Shares needed to recover. At least 2 |
+| `--shares` | `3` | Shares to create. At least the threshold |
+| `--key` | | The recovery key, if `pm` can't read it from the vault. `pm` asks for it when needed |
+
+Set up the recovery key with `pm auth email` first. Give each share to a different person and keep none of them with the vault.
+
+## Recover with the recovery key
+
+On the machine with the vault, run:
+
+```sh title="Terminal"
+pm auth recover
+```
+
+<Steps>
+
+### Confirm your email
+
+Type the recovery email. `pm` checks it against the hash in the vault header and emails a 6-digit code.
+
+### Enter the recovery key
+
+Three tries. The recovery key and the emailed code must both be entered within 15 minutes of the email.
+
+### Enter the email code
+
+Five tries.
+
+### Second factor
+
+If you set up recovery codes or a recovery passkey, enter a code or confirm the passkey in your browser. With both set up, `pm` asks which to use. A used code is marked as spent.
+
+### Choose a new master password
+
+Type it twice. `pm` re-encrypts the vault with it, resets the failed-attempt counter and updates the Touch ID copy if you use Touch ID.
+
+</Steps>
+
+<Callout type="warning" title="If pm auth recover says the key is missing">
+`pm auth recover` currently stops with `Recovery record found but key is missing. Manual recovery required.` once the vault has been saved again after a fresh unlock. In `pm`, every unlock with your password saves the vault, so this is the usual case. Use **Forgot master password** in the desktop app instead, or `pm auth quorum-recover` if you set up trustee shares. Neither depends on the missing field.
+</Callout>
+
+## Recover with trustee shares
+
+```sh title="Terminal"
+pm auth quorum-recover
+```
+
+If a recovery email is set, `pm` asks for it first. Then enter as many shares as the threshold, one per prompt, and choose a new master password. No email code is needed, so trustee shares let you recover even without access to your mailbox.
+
+## Remove recovery
+
+```sh title="Terminal"
+pm auth reset
+```
+
+This removes the recovery email and every recovery record: the recovery key, trustee shares, recovery codes and the recovery passkey. It doesn't ask for confirmation. Set recovery up again with `pm auth email`.
+
+<Callout type="danger" title="Without recovery, the master password is the only key">
+After `pm auth reset`, a forgotten master password means the vault is lost. Run it only to replace your recovery setup, and set it up again right away.
+</Callout>
+
+## Locked out after failed attempts
+
+After six wrong master passwords, `pm` no longer opens the real vault with your password and opens a read-only decoy instead; after nine, it refuses outright (see [Failed attempts](/docs/cli/sessions#failed-attempts)). `pm auth recover` and `pm auth quorum-recover` reset the counter as part of recovery.

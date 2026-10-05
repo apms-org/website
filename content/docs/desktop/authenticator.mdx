@@ -1,0 +1,130 @@
+---
+title: Authenticator
+description: Keep two-factor codes in APM, copy them with one key, and link them to your logins.
+order: 6
+group: Using the app
+---
+
+APM can stand in for an authenticator app. It stores the setup key a site gives you when you turn on two-factor authentication, and shows the 6-digit code that changes every 30 seconds.
+
+There are two places a code can live:
+
+- **In a login.** A login's **Two-factor code** field holds the key for that login's site. This is the simplest option.
+- **As an Authenticator item.** A standalone item with a **Name**, a **Setup key** and an optional **Website**. Use it when the code has no matching login.
+
+Both kinds show up on the **Authenticator** page, in `pm totp`, and in the browser extension.
+
+## Add a code
+
+<Tabs items={["To a login", "As an Authenticator item"]}>
+<Tab>
+
+1. Select the login and press <Kbd>⌘</Kbd><Kbd>E</Kbd>.
+2. In **Two-factor code**, paste the setup key or the `otpauth://` link the site shows. Spaces are ignored.
+3. Choose **Save**.
+
+The login now shows a live **Two-factor code** row and the **2FA on** badge.
+
+</Tab>
+<Tab>
+
+1. Open **Authenticator** in the sidebar and choose **Add code**, or start a new item and pick **Authenticator**.
+2. Paste the **Setup key** (for example `JBSW Y3DP EHPK 3PXP`) or an `otpauth://` link. A link also fills in **Name** from the issuer.
+3. Optionally enter the **Website**. It links the code to a site for autofill.
+4. Choose **Save authenticator**.
+
+</Tab>
+</Tabs>
+
+The setup key must be valid base32: letters A to Z and digits 2 to 7. If it is not, APM says so and does not save. APM changes letters to capitals as you type, and drops spaces (and, in a login, dashes) when it saves.
+
+<Callout type="tip" title="Only have a QR code?">
+Most sites show a "can't scan?" or "enter key manually" link under the QR code. That reveals the setup key. You can also scan the QR code with any authenticator and paste the `otpauth://` link it gives you.
+</Callout>
+
+## Codes APM cannot make
+
+The app always makes 6-digit codes that change every 30 seconds, using SHA-1. Nearly every site uses these settings, but an `otpauth://` link can ask for others.
+
+When you paste a link into a **new login**, APM checks it and refuses one it cannot follow:
+
+| Message | The link asks for |
+|---|---|
+| "It uses 8-digit codes. APM generates 6-digit codes" | Codes of another length (`digits=`) |
+| "Its codes change every 60s. APM generates 30s codes" | Another period (`period=`) |
+| "It uses SHA256. APM generates SHA-1 codes" | Another algorithm (`algorithm=`) |
+| "Counter-based (HOTP) codes are not supported. APM generates time-based codes" | An `otpauth://hotp/` code |
+| "Steam Guard codes are not supported. APM generates standard 6-digit codes" | A `steam://` link |
+| "The otpauth:// link is not valid" | Nothing APM can read |
+| "It has no setup key" | A link without `secret=` |
+| "The setup key is not valid base32" | A key with characters outside A to Z and 2 to 7 |
+
+Keep codes like these in the authenticator the site recommends.
+
+<Callout type="warning" title="Authenticator items and edited logins skip this check">
+In an **Authenticator** item, and when you edit a login, the app keeps only the key from the link and ignores `digits`, `period` and `algorithm`. It saves without a warning, and its codes will not match the site's. After adding a code from a link, sign in once with it before you turn off your old authenticator. An `otpauth://hotp/` link is refused there as not valid base32.
+</Callout>
+
+## The Authenticator page
+
+Open it with **Authenticator** in the sidebar or <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>2</Kbd>. It shows every code in the current space as a card. The header counts them, such as "12 codes in Work", and reminds you: "Press 1 to 9 to copy by position, drag to reorder." The sidebar's **Authenticator** count includes logins with a code of their own.
+
+At the top, a bar counts down to the next change: **Codes refresh in Ns**, and **New codes in Ns** in the last 7 seconds, when it is a good idea to wait for the next code.
+
+Each card shows:
+
+- The name and the linked website. A code stored in a login says **In login**, after the login's website if it has one, such as "github.com · In login". An Authenticator item without a website says **Linked to** a login with the same name, or **No website**.
+- The current code, split into two groups of three. Click it to copy. A key APM cannot read shows `--- ---` instead.
+- The **Next** code.
+- A number from 1 to 9 for the first nine cards.
+
+With no codes yet, the page says **No authenticator codes yet**: "Scan the QR code a site shows you with any authenticator, or paste its setup key or otpauth:// link here." The **Add code** button under it opens a new Authenticator item.
+
+### Copy a code
+
+- Click the code, or choose **Copy code** in the card's `…` menu.
+- Press <Kbd>1</Kbd> to <Kbd>9</Kbd> to copy the code in that position. This works whenever you are not typing in a field, no dialog or command menu is open, and you are not holding <Kbd>⌘</Kbd> or <Kbd>Ctrl</Kbd>. The numbers follow the cards on screen, so after you filter, <Kbd>1</Kbd> copies the first match.
+- Anywhere in the vault, select an item and press <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>T</Kbd> to copy its one-time code. This works for logins with their own code, logins linked to an Authenticator item, and Authenticator items themselves.
+
+The toast says "Copied code for" and the name, and counts down to when the clipboard is cleared. Codes are cleared from the clipboard on the same timer as passwords. A code copied on this page also counts as a use of the item, in its **Last used** count.
+
+### Arrange and filter
+
+- Drag a card onto another to reorder them. The order is saved in the vault, so `pm totp` lists codes in the same order. Codes added since you last reordered come after the others, in alphabetical order. The order follows each code's name and space, so a code you rename or move to another space goes back among the alphabetical ones.
+- **Filter codes** narrows the cards by name or website. With no match, it says **No codes match** your text: "Try the service name or website."
+
+### The card menu
+
+| Entry | What it does |
+|---|---|
+| **Copy code** | Copies the current code |
+| **Open item** | Opens the Authenticator item in the vault (not shown for codes stored in logins) |
+| **Open** a login, such as **Open GitHub login** | Opens the linked login |
+| **Edit** or **Edit login** | Opens the item for editing |
+| **Delete** | Moves the Authenticator item to Trash |
+| **Remove code from login** | For a code stored in a login: removes the key and keeps the login's password and passkeys |
+
+**Remove code from login** asks **Remove the two-factor code from GitHub?** ("The login keeps its password and passkeys. Make sure you can still sign in, for example with recovery codes, before you remove it.") and confirms with **Two-factor code removed**. Removing the code saves the whole login, so if a [password policy](/docs/desktop/settings#password-policy) is active and the login's password does not meet it, APM refuses with the policy's message until you change the password.
+
+<Callout type="warning">
+Before you remove a code, make sure you can still sign in to that site, for example with its recovery codes. Save those in a **Recovery codes** item.
+</Callout>
+
+## How codes and logins link
+
+APM connects a login and an Authenticator item when either is true:
+
+- They have the same name (ignoring case).
+- The Authenticator item's **Website** matches the login's website.
+
+A linked login shows a **One-time code** row, with a button to open the Authenticator item. When the two have the same name, the Authenticator item also shows **Used by** with the login. A link made only through the website does not show it. Linking only affects how they are shown and filled. Each still keeps its own data.
+
+A login with a code of its own always uses that code, even when an Authenticator item has the same name.
+
+For the website match, APM saves an Authenticator item's **Website** as a bare host, in lower case and without `www.`, so `https://www.github.com/login` becomes `github.com`. It compares that with the host of the login's **Website** as you wrote it, so a login saved as `www.github.com` does not link. **Other websites** are not used for linking.
+
+Each website can belong to only one Authenticator item. Give a second item the same **Website** and the first one loses its website.
+
+## In the terminal
+
+`pm totp` lists the same codes. The page header shows it as a command chip. See the [CLI reference](/docs/cli/commands).

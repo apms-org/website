@@ -1,0 +1,149 @@
+---
+title: Desktop app
+description: A native window around the same vault engine pm uses. Learn how the app is laid out and how it fits with the CLI.
+order: 0
+---
+
+The APM desktop app is a window around the vault engine that powers **`pm`**. It reads and writes the same `vault.dat`, the same history and the same audit log as the CLI, so you can switch between the app and the terminal at any time. Anything you change in one shows up in the other.
+
+The app is built with Electron. When it starts, it runs its own copy of `pm` in the background (`pm desktop`) and talks to it over a private pipe. That background process does all the encryption, saving, syncing and history work. Your master password is sent to it once to unlock and never leaves it. The window itself runs sandboxed and only asks the engine for what it needs to draw.
+
+<Cards>
+  <Card title="Install" href="/docs/desktop/install" icon="download">Download a release build or build it from source.</Card>
+  <Card title="First run" href="/docs/desktop/first-run" icon="sparkles">Create a vault, open one you have, or restore from the cloud.</Card>
+  <Card title="Lock and unlock" href="/docs/desktop/lock-and-unlock" icon="lock">Touch ID, auto-lock, read-only sessions and recovery.</Card>
+  <Card title="Items" href="/docs/desktop/items" icon="layers">All 25 item types, editing, versions and Trash.</Card>
+  <Card title="Watchtower" href="/docs/desktop/watchtower" icon="radar">Vault health, weak and reused passwords, trust scores.</Card>
+  <Card title="Browser extension" href="/docs/desktop/browser-extension" icon="puzzle">Approve a browser and fill from your vault.</Card>
+  <Card title="Settings" href="/docs/desktop/settings" icon="settings">Every settings page and row.</Card>
+  <Card title="Keyboard shortcuts" href="/docs/desktop/keyboard-shortcuts" icon="keyboard">Every key the app listens for.</Card>
+</Cards>
+
+## A tour of the window
+
+Once the vault is unlocked, the window has three columns: the sidebar, the item list and the detail pane. **Authenticator**, **Watchtower**, **History** and **Settings** replace the list and detail with a full page.
+
+The window's title is your vault's name followed by `· APM`, or `Locked · APM` while the lock screen shows. While the vault is locked, the menu commands that need it, such as **New Item**, **Settings** and **Lock Vault**, are greyed out.
+
+### The sidebar
+
+From top to bottom:
+
+- **Theme button** (sun or moon) switches between light and dark. **Hide sidebar** (<Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>B</Kbd>) collapses the sidebar to a single button.
+- **Vault and space switcher.** Shows the vault's name and the current space with its item count. Click it to pick **All spaces**, **Default** or one of your spaces, create a **New space…** or open **Manage spaces…**. See [Spaces](/docs/desktop/spaces).
+- **Search** opens the command menu (<Kbd>⌘</Kbd><Kbd>K</Kbd>). See [Search and the command menu](/docs/desktop/search).
+- **Library:** **All items**, **Favorites**, **Authenticator**, **Watchtower** and **History**. Watchtower shows a badge with the number of open issues, colored red when one of them is serious.
+- **Types.** One entry for each item type you use (up to nine), with a count. Click **N more types** to see all 25, and **Show fewer** to collapse the list again.
+
+The bottom of the sidebar holds:
+
+- A notice when an AI assistant is waiting for your approval (**N AI requests waiting for approval**). Click it to open **Settings → AI access**.
+- A **Read-only** notice when the session is read-only, or when the vault was written by a newer `pm`.
+- The **sync status**: **Local only**, **Synced to** a provider with how long ago, **Syncing**, or **Sync failed**. Click it to open **Settings → Sync**.
+- **Trash**, **Settings** (<Kbd>⌘</Kbd><Kbd>,</Kbd>) and **Lock vault** (<Kbd>⌘</Kbd><Kbd>L</Kbd>).
+
+### The item list
+
+The list header shows the current view (for example **All items** or **Logins**) and how many items it holds. Next to it are the **Sort** button and **New**. Below is the search field (<Kbd>⌘</Kbd><Kbd>F</Kbd>).
+
+Items are grouped according to the sort order: by when you last used them (**Today**, **This week**, **This month**, **Earlier**), by first letter, by date added or by type. Each row shows the item's icon or the website's logo, its name, a short subtitle (such as the username), a star for favorites and a warning dot when Watchtower has found a problem with it.
+
+Right-click a row for the item menu. Double-click it to edit.
+
+### The detail pane
+
+The detail pane shows the selected item. Its top bar has a breadcrumb (the type, then the item's name) and these buttons:
+
+- **Add to favorites** (the star)
+- **Version history**
+- **Details and activity**
+- **Edit**
+- **More actions** (the `…` menu)
+
+See [Items](/docs/desktop/items) for everything the detail pane can do.
+
+### Toasts
+
+Most actions confirm themselves with a short message at the bottom of the window.
+
+- When you copy a secret, the toast counts down until the clipboard is cleared.
+- When you delete something, the toast offers **Undo**.
+- When a change is saved, the toast shows a short commit ID. Click it to open **History**. Turn this off with **Commit receipts** in **Settings → Appearance**.
+
+## The app and pm
+
+The app and `pm` are one product with one version number. The packaged app ships with its own `pm` inside it and runs that copy, never one from your `PATH`. The only exception is the `APM_PM_PATH` variable, which is meant for development.
+
+- **Same file.** The app opens the same `vault.dat` as `pm`. If `pm` changes the file while the app is unlocked, the app reloads it within a moment. If the file is re-encrypted with a different master password or deleted, the app locks.
+- **Same session.** Unlocking in the app also unlocks `pm` in your terminal, and locking in the app locks it. If `pm` is already unlocked when you open the app, the app opens unlocked too.
+- **Same auto-lock.** When the vault locks itself is stored in the vault and shared by the app, `pm` and the browser extension.
+- **Terminal locks stay in the terminal.** `pm lock` ends the terminal's session only. The app keeps the vault open until you lock it in the app.
+- **A terminal session is picked up at start.** The app checks for an unlocked `pm` session when it starts. Unlocking `pm` later does not unlock an app that is already on its lock screen.
+- **Command chips.** Many pages show the matching `pm` command in a small chip. Click one to copy it. Turn them off with **Show pm commands** in **Settings → Appearance**.
+
+To put `pm` on your terminal's `PATH` from the app, see [The app and pm](/docs/desktop/terminal).
+
+## Where your data lives
+
+### The vault file
+
+The app picks the vault file in this order:
+
+1. The file you chose with **Open an existing vault**, or the file you restored into, saved in the app's `config.json`.
+2. `APM_VAULT_PATH`, if it is set. A relative path is taken from the folder of the `pm` on your `PATH`, or from your home folder if there is no `pm` there.
+3. A `vault.dat` next to the `pm` on your `PATH`, if there is one (this is where older versions of the CLI kept it).
+4. `~/Desktop/apm/vault.dat`, if it exists.
+5. `~/.apm/vault.dat`.
+
+The app starts its engine as `pm desktop --vault` with that path, so the engine never picks a file on its own. **Settings → General → Vault file → Location** shows the path, with **Show in Finder**.
+
+### The app's own folder
+
+The app keeps its own files in a folder named `APM Desktop`:
+
+| Platform | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/APM Desktop` |
+| Windows | `%AppData%\APM Desktop` |
+| Linux | `~/.config/APM Desktop` |
+
+- `config.json` holds a single setting, `vaultPath`: the vault you opened or restored in the app. Only your user account can read it.
+- The window's own storage, in the same folder, keeps your display preferences, your generator options, and the name and item count of each vault you have unlocked, so the lock screen can show them before you unlock. No secret is stored there. Before your first unlock on this computer, the lock screen says **Your vault**.
+
+Set `APM_USER_DATA_DIR` before you start the app to use another folder. `APM_PM_PATH` makes the app run a different `pm` as its engine, for development. See [Environment variables](/docs/reference/environment-variables#app-data-folder).
+
+### Data shared with pm
+
+Everything else is shared with `pm`:
+
+| Where | What |
+|---|---|
+| The APM config folder: `~/Library/Application Support/apm` on macOS, `%AppData%\apm` on Windows, `~/.config/apm` on Linux | History and its snapshots, the audit log, the session key, AI tokens, the browser pairing token and the website icon cache |
+| The system temp folder | The encrypted session file that the app and `pm` share |
+| The vault's folder | The failed-unlock counter (`.apm_lock`), the access log (`apm_audit.log`), alert lines (`email.log`) and the `policies` folder |
+
+The app's engine runs in the vault's folder, which is why its counter, access log and alert lines end up there. A `pm` in your terminal keeps its counter and access log in `~/.apm`, or the folder of `APM_VAULT_PATH`, so with the default vault the app and `pm` share one count. `APM_STATE_DIR` overrides it. See [File locations](/docs/reference/file-locations) for every file.
+
+### Settings in the vault and on this computer
+
+Some settings travel with the vault, and some stay on this computer:
+
+| Stored in the vault (shared with pm and other computers) | Stored by the app on this computer |
+|---|---|
+| Vault name, auto-lock, clipboard clearing, **Open to**, website icons on or off, alerts, spaces and their colors, favorites, Trash, item versions, Authenticator order, sync settings | Theme and custom themes, density, sidebar shown or hidden, sounds, sort order, selected space, **Show pm commands**, **Commit receipts**, generator options |
+
+See [file locations](/docs/reference/file-locations) for every path on every platform.
+
+## Platforms
+
+The app is made for macOS first, and many labels say "Mac" (for example **Lock when the Mac sleeps** and **Show in Finder**). Release builds are also published for Windows and Linux.
+
+- **Touch ID** works only on macOS.
+- **Installing the `pm` command** from **Settings → Developer** works only in the packaged macOS app.
+- On Windows and Linux, read <Kbd>⌘</Kbd> as <Kbd>Ctrl</Kbd> and <Kbd>⌥</Kbd> as <Kbd>Alt</Kbd> in every shortcut.
+- On macOS, closing the window leaves APM running, along with the browser extension bridge. Quit with <Kbd>⌘</Kbd><Kbd>Q</Kbd>. On Windows and Linux, closing the window quits the app.
+- Only one copy of the app runs at a time. Opening it again brings the existing window forward.
+
+<Callout type="note" title="Closing the window on macOS does not lock the vault">
+APM keeps running with the vault unlocked, and the browser extension can still fill from it. The auto-lock timers and **Lock when the Mac sleeps** keep working while the window is closed, and closing the window restarts the idle timer. To lock right away, press <Kbd>⌘</Kbd><Kbd>L</Kbd> before you close the window, or quit with <Kbd>⌘</Kbd><Kbd>Q</Kbd>.
+</Callout>

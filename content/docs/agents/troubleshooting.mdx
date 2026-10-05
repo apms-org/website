@@ -1,0 +1,138 @@
+---
+title: Troubleshooting
+description: Error messages from the APM MCP server, what causes them and how to fix them.
+order: 5
+group: Help
+---
+
+Most problems come down to one of three things: the client can't start `pm`, the token is wrong, or the vault is locked. Start by running the server yourself with the exact command from your client's config:
+
+```sh title="Terminal"
+pm mcp serve --token apm_mcp_your_token
+```
+
+A working server prints nothing and waits for input. Press <Kbd>Ctrl</Kbd><Kbd>C</Kbd> to stop it. Anything else it prints points to one of the sections below. Your client's own MCP log shows what it saw when it started the server.
+
+## The server doesn't start
+
+### The client can't find pm
+
+The client reports that the command was not found, or the server exits at once with no APM message. Desktop apps often don't share your terminal's `PATH`. Put the full path to `pm` in `command`, the one `pm mcp token` prints or that `which pm` (`where pm` on Windows) shows.
+
+### `MCP Server Error: invalid or revoked MCP token`
+
+The token isn't in `mcp_auth.json` on this computer and user account. It may have been revoked, mistyped, or created on another machine. Run `pm mcp list` to see your tokens, create a new one with `pm mcp token`, and update the client's config.
+
+<Callout type="warning">
+When this happens, `pm` also prints a debug line to standard output that lists every token saved on this computer. Clients may record that line in their MCP logs. If you share or upload those logs, revoke and recreate your tokens.
+</Callout>
+
+### `MCP Server Error: token expired`
+
+The token's expiry has passed. Create a new token and replace it in the config. Expired tokens stay in `pm mcp list` until you revoke them.
+
+### `No MCP token found. Triggering automated setup...`
+
+The server was started without `--token` and there are no saved tokens. On Windows, `pm` opens a PowerShell window running `pm mcp token --auto` and exits; finish the setup there and restart the client. On macOS and Linux it prints `Auto-setup currently only supported on Windows.` Create a token with `pm mcp token` and add `--token` to the config.
+
+### The wrong token's permissions are used
+
+If `--token` is missing from the config and you have saved tokens, `pm mcp serve` picks one of them, and which one is not defined. Always pass `--token`.
+
+## Tools return errors
+
+### `Denied`
+
+The token doesn't list that tool. Permissions can't be added to an existing token: create a new token with the tools you need, update the client, and revoke the old one. Which tool belongs to which group is in [Scopes and approval](/docs/agents/scopes-and-approval#permissions).
+
+### `Vault Error: vault is locked. please run 'pm unlock' first to start an MCP session`
+
+Some tools only say `Vault Error`. The server found no unlocked session. Check, in order:
+
+1. **The vault is locked.** Run `pm unlock` or unlock the desktop app. The session also ends after your idle and maximum times and when the computer sleeps; see [Sessions and locking](/docs/security/sessions-and-locking).
+2. **`APM_SESSION_ID` doesn't match.** If your shell sets `APM_SESSION_ID` when you unlock, set the same value in the client's `env` block.
+3. **A different user or temp folder.** The session file lives in the temporary folder of the user who unlocked. A client running as another user, or with a different `TMPDIR`, won't see it. Some clients start servers with only a few environment variables; if yours leaves out `TMPDIR`, add it to the `env` block with the value `echo $TMPDIR` prints in your terminal.
+
+### `vault is locked and ephemeral session is invalid`
+
+There's no regular session, and the `APM_EPHEMERAL_ID` in the client's `env` can't be used. It has expired, been revoked, was bound to another host, or `APM_EPHEMERAL_AGENT` doesn't match the `--agent` it was issued with. Sessions issued with `--bind-pid` can't be used by the server at all. Issue a new one with `pm session issue`.
+
+### `Vault Error: this vault was updated by a newer pm. Update pm to edit it.`
+
+The vault was last saved by a newer version of APM. Reads still work; writes are refused so nothing the newer version stored is lost. Update `pm`.
+
+### The agent sees items you don't have
+
+The current session is read-only, from `pm mode readonly`. In that case the server shows the agent a generated placeholder vault, not yours. Run `pm lock`, then `pm unlock`.
+
+### The client logs an invalid message after a vault error
+
+If the vault file can't be read or decrypted, the tool returns `Vault Error` and `pm` also prints a debug line to standard output, which the client may log as a message it couldn't parse. Check that the vault is where `pm` expects it (`APM_VAULT_PATH` if you set it in the client's `env`, otherwise a `vault.dat` next to `pm` if there is one, otherwise `~/.apm/vault.dat`) and that your session belongs to this vault. If the client disconnected, restart it.
+
+## Finding items
+
+### `Entry not found` from `get_entry`
+
+Names are exact and case-sensitive. Ask the agent to call `list_vault` first and use the name as listed. If it passed a `category`, the category must match APM's type name with spaces: `api key` works, `api_key` doesn't. Leave `category` out if unsure. See `get_entry` in the [tool reference](/docs/agents/tools#secrets).
+
+### `TOTP Account not found`
+
+No authenticator item or login with a 2FA key has exactly that name. Check the name with `list_vault`. A login without a stored 2FA key has no code.
+
+### `search_vault` doesn't find an item you have
+
+`search_vault` doesn't look in certificates, cloud credentials, Kubernetes, Docker registries, SSH hosts, CI/CD secrets, software licenses or legal contracts. Use `list_vault` to find the name, then `get_entry`.
+
+### `Failed to read encrypted file` from `decrypt_entry`
+
+The reference from `get_entry` was already used, or more than five minutes passed and the file was deleted. Call `get_entry` again.
+
+## Changes and approvals
+
+### The agent says `Waiting for approval`
+
+That is the normal reply from `add_entry`, `edit_entry` and `delete_entry`. Nothing has changed yet. Approve or reject the request in the desktop app, under **Settings → AI access**. The agent can call `tx_list` to see whether you did. Calling the tool again doesn't apply the change; it only queues another request.
+
+### The request is gone from `tx_list`, or `tx_abort` says `Error: transaction not found`
+
+Requests expire 15 minutes after the agent made them and are then removed. The agent has to call the tool again to make a new request.
+
+### `Could not apply the request: ...` in the desktop app
+
+The vault refused the change when you approved it, and nothing was saved. For example:
+
+- `entry not found or editing not supported for this type`: `edit_entry` can only change logins (`password`), authenticator items (`totp`) and secure notes (`note`), and only in the space it is given (the default space when `space` is left out). Edit other types in the app or with `pm`.
+- `entry not found`: `delete_entry` found no login, authenticator item or secure note with that name.
+- `account already exists in this space`, or a password policy message such as `password too short (min 16)`: `add_entry` can't add the item as asked.
+
+Reject the request, and have the agent make a new one with corrected arguments.
+
+### A `manage_spaces` or `manage_profiles` change seems to have done nothing
+
+These tools don't check whether saving the vault worked and report success either way. Check that the vault file and its folder are writable by your user and that the disk isn't full.
+
+### The desktop app doesn't show the request
+
+Requests appear only while the app is unlocked, under **Settings → AI access** and as a notice in the sidebar. An agent can make requests while the vault is locked; they show up in the list once you unlock, if they haven't expired, but without the pop-up notice that new requests get. They expire after 15 minutes. Changes that skip the preview (`manage_spaces`, `manage_profiles`, `cloud_config`, `cloud_sync`) never appear; they apply immediately. See [Changes that skip the preview](/docs/agents/scopes-and-approval#changes-that-skip-the-preview).
+
+### `generate_password` fails with "length must be between 1 and 256"
+
+The agent asked for a length outside 1–256. Have it pass a length in that range, or none (or `0`) for the default of 20.
+
+## Access that won't go away
+
+### A revoked or expired token still works
+
+The server checks the token only when it starts. A client that already has it running keeps its permissions until the client restarts it. Run `pm lock` to stop it reaching the vault right away, then quit and reopen the client.
+
+### The client still works after turning off the MCP server switch
+
+The **MCP server** switch in the app doesn't stop `pm mcp serve` from starting with an existing token. Revoke the token instead.
+
+## Setup helpers
+
+### `Could not automatically find an IDE config to update.`
+
+`pm mcp token --auto` only edits the config files it knows, and only if they already exist. The token was still created; add it to your client by hand, as shown in [Setup](/docs/agents/setup#client-config).
+
+Still stuck? See [how to report an issue](/docs/security/reporting), and include the exact error message and your client's name. Leave tokens out of anything you share.

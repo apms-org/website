@@ -1,0 +1,98 @@
+---
+title: .apminject
+description: The format of .apminject files, which tell pm inject which vault items to put into which environment variables.
+order: 5
+group: Configuration
+---
+
+A `.apminject` file lists the vault items a project needs and the environment variable each one goes into. `pm inject` reads it when you don't pass `--inject`. How to use it is covered in [Inject into the shell](/docs/cli/inject).
+
+## Where pm looks
+
+`pm inject` looks for `.apminject` in the current folder, then in each parent folder up to the root, and uses the first one it finds. If there is none:
+
+```text
+Error: No .apminject file found. Use --inject to specify entries explicitly, or create a .apminject file.
+```
+
+## Format
+
+The file is YAML. Each entry has an item name and, optionally, a variable name. Three layouts are accepted:
+
+<Tabs items={["inject key", "entries key", "Plain list"]}>
+<Tab value="inject key">
+
+```yaml title=".apminject"
+inject:
+  - entry: OpenAI
+    as: OPENAI_API_KEY
+  - entry: GitHub
+    as: GITHUB_TOKEN
+  - entry: aws-prod
+```
+
+</Tab>
+<Tab value="entries key">
+
+```yaml title=".apminject"
+entries:
+  - entry: OpenAI
+    as: OPENAI_API_KEY
+  - entry: aws-prod
+```
+
+</Tab>
+<Tab value="Plain list">
+
+```yaml title=".apminject"
+- entry: OpenAI
+  as: OPENAI_API_KEY
+- entry: aws-prod
+```
+
+</Tab>
+</Tabs>
+
+If a file has both `entries:` and `inject:`, only `entries:` is used.
+
+| Key | Required | Meaning |
+|---|---|---|
+| `entry` | Yes | The item's name in the current space, matched exactly, case included. Entries without it are skipped |
+| `as` | No | The environment variable name. Without it, the name is [derived from the item name](#derived-names) |
+
+Other keys are ignored. Each list item must be a mapping with `entry`; a bare string such as `- github` is not accepted. A file with no usable entries fails with `no inject entries found in <path>` or `no entries listed in <path>`.
+
+## Derived names
+
+Without `as`, the variable name is built from the item name: letters and digits are uppercased, every run of other characters becomes a single `_`, underscores at the start and end are dropped, and a leading digit gets a `_` in front.
+
+| Item name | Variable |
+|---|---|
+| `github` | `GITHUB` |
+| `aws-prod` | `AWS_PROD` |
+| `OpenAI token` | `OPENAI_TOKEN` |
+| `2fa backup` | `_2FA_BACKUP` |
+
+## What gets injected
+
+Items are looked up in the current [space](/docs/cli/spaces). In the default space, though, logins, authenticator codes, tokens, notes, API keys, SSH keys, Wi-Fi, recovery codes and certificates are found in any space, and the first match wins; cloud credentials, Docker registries and SSH configs are found only in the default space itself. Each type contributes one value: the password of a login or Wi-Fi item, the setup key of an authenticator, the key or token of an API key, token or Docker registry, the text of a note, the private key of an SSH key, certificate or SSH config, the secret key of cloud credentials, or all recovery codes, one per line. The full table is in [What gets injected](/docs/cli/inject#what-gets-injected).
+
+If any listed item can't be found, nothing is injected:
+
+```text
+Error: entries not found: aws-prod, stripe
+```
+
+`pm inject` also sets `APM_INJECT_SESSION` to the session's ID, so don't use that name in `as`.
+
+## Rules for as
+
+Use a valid variable name for your shell: letters, digits and `_`, not starting with a digit. `pm` doesn't check it.
+
+<Callout type="danger" title="as is written into shell commands unchecked">
+`pm inject` prints shell commands that your shell then runs with `eval`. The value of `as` is written into those commands exactly as it appears in the file. A `.apminject` from someone else, for example in a repository you cloned, can use `as` to run any command, and its `entry` lines choose which of your items get injected. Read a project's `.apminject` before running `pm inject` inside it, or use `--inject` with the names you choose.
+</Callout>
+
+## Keeping it in a repository
+
+The file holds item names and variable names, never secret values, so it can be committed when the item names themselves aren't sensitive. Every developer then needs items with those exact names in their current space. A shared naming convention, or a dedicated space switched to with `pm space switch`, keeps that manageable.

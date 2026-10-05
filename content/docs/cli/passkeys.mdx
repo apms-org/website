@@ -1,0 +1,103 @@
+---
+title: Passkeys
+description: See, label and remove the website passkeys stored in your logins with pm get, and move them in and out with import and export.
+order: 7
+group: Guides
+---
+
+A passkey lets you sign in to a site without a password. APM stores each passkey on a login in your vault, including its private key, and signs sign-in requests itself. The [browser extension](/docs/extension) creates and uses them. In the terminal, `pm get` shows them, and its editor renames or removes them. `pm` never prints a private key, and it can't create a website passkey or sign in with one.
+
+<Callout type="note" title="Not the recovery passkey">
+These are passkeys for websites. The passkey you can register as a recovery factor for the vault itself is a different thing, managed with `pm auth passkey`. See [Recovery](/docs/cli/recovery#recovery-passkey).
+</Callout>
+
+`pm passkeys` (`list`, `rename`, `rm`) was removed. Use `pm get` as below.
+
+## How passkeys get into the vault
+
+- **The browser extension** creates one when a site offers "Create a passkey", and stores it on the matching login (or a new one). See [Passkeys in the extension](/docs/extension).
+- **Import** brings them from Bitwarden JSON, KeePassXC XML, FIDO Credential Exchange (CXF) files and APM exports. 1Password leaves passkeys out of its exports. See [Import and export](/docs/cli/import-export).
+
+An import reports them in its summary, for example:
+
+```text title="Output"
+✓ Imported bw.json: 1 added, 1 passkey (0 skipped)
+```
+
+## See a login's passkeys
+
+Open the login with `pm get`. The search also matches the sites of a login's passkeys. Choose the login and view it (<Kbd>↵</Kbd> or <Kbd>v</Kbd>):
+
+```sh title="Terminal"
+pm get Vercel
+```
+
+```text title="Output"
+Vercel
+Login · space: default · 1 passkey
+
+  Username   you@example.com
+  Password   ********
+  Website    https://vercel.com
+
+  Passkeys
+    vercel.com · you@example.com · added 2026-09-14 · never used
+
+Copy [1] Password  [2] Username  ·  Enter to go back:
+```
+
+Each passkey line shows the site, the user name the site gave it, your label in quotes if it has one, when it was added and when it was last used (or `never used`). Like the rest of `pm get`, this only shows logins in the current space. See [Find items](/docs/cli/items#find-items).
+
+## Rename or remove a passkey
+
+From the result list, press <Kbd>e</Kbd> to edit the login. The editor lists every field, then one **Passkey** row per passkey:
+
+```text title="Terminal"
+Edit Vercel
+Login · space: default
+
+   Name                 Vercel
+   Username             you@example.com
+   Password             ********
+   Two-factor code      empty
+   Website              https://vercel.com
+   Other websites       empty
+   Notes                empty
+   + Add custom field
+   Passkey              vercel.com · you@example.com · added 2026-09-14 · n…
+   Space                default
+
+↑↓ move · Enter edit · s save · Esc done
+```
+
+Move to the passkey with <Kbd>↑</Kbd> <Kbd>↓</Kbd> or <Kbd>j</Kbd> <Kbd>k</Kbd>. The hint line then adds ` · x remove`.
+
+- **Rename:** press <Kbd>↵</Kbd>. `pm` asks "Give it a name, like the device it was made on. Enter keeps it, Esc cancels." <Kbd>Esc</Kbd> cancels only the rename; you stay in the editor. When the passkey already has a label, the prompt also says "- clears it": type `-` to remove the label. Labels are cut to 120 characters.
+- **Remove:** press <Kbd>x</Kbd> and answer <Kbd>y</Kbd> to "Remove the vercel.com passkey? Once you save, you can't sign in to vercel.com with it." <Kbd>n</Kbd>, <Kbd>↵</Kbd> and <Kbd>Esc</Kbd> keep the passkey. After a <Kbd>y</Kbd> the editor shows "Removed the vercel.com passkey."
+
+Nothing is written until you save. The editor counts your edits ("1 change not saved yet."). Press <Kbd>s</Kbd> to save, and `pm` prints `Saved Vercel.` Press <Kbd>Esc</Kbd> or <Kbd>q</Kbd> instead and it asks "Save your 1 change to Vercel?": <Kbd>y</Kbd> saves, <Kbd>n</Kbd> discards ("Discarded your changes."), and <Kbd>Esc</Kbd> goes back to editing. With nothing changed, <Kbd>Esc</Kbd> just leaves ("No changes.").
+
+Each removed passkey is written to the audit log as `PASSKEY_DELETED` with its credential ID. Deleting the whole login with <Kbd>d</Kbd> in `pm get` deletes its passkeys too; the confirmation says so, for example "This also deletes 1 passkey." The site still has the public key on file; remove the passkey in the site's account settings too.
+
+<Callout type="tip" title="Undo">
+A removed passkey is gone from the vault, but [history](/docs/cli/history) keeps the previous vault, so `pm lgit undo` brings it back.
+</Callout>
+
+## Export passkeys
+
+| Format | Passkeys |
+|---|---|
+| `apm` | Yes, all of them |
+| `bitwarden` | Yes |
+| `cxf` | Only passkeys whose signature counter is 0. APM keeps a counter at 0 when it starts there, as synced passkeys do, so passkeys created by APM or imported with counter 0 stay exportable |
+| `csv`, `txt` | No |
+
+Use `--no-passkeys` to leave them out of any export. See [Export](/docs/cli/import-export#export).
+
+<Callout type="warning" title="Exports carry private keys">
+An export that includes passkeys contains their private keys. Encrypt APM and Bitwarden exports with a password, and delete CXF files (which are never encrypted) once imported.
+</Callout>
+
+## Requirements
+
+Editing needs an interactive terminal ("Editing needs an interactive terminal." otherwise) and a vault that is not read-only: in a read-only session, pressing <Kbd>e</Kbd> answers "Vault is READ-ONLY.".

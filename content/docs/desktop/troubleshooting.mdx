@@ -1,0 +1,161 @@
+---
+title: Troubleshooting
+description: Fixes for the desktop app's common problems, from start-up errors and unlock trouble to sync, the browser bridge and the pm command.
+order: 20
+group: Settings and help
+---
+
+Start here when something in the desktop app does not work the way you expect. Each section names the message you see, what causes it and what to do.
+
+## APM could not start
+
+The app shows **APM could not start** with a reason and **Restart APM**.
+
+| Reason | Cause | What to do |
+|---|---|---|
+| **The APM backend is not running.** | At start-up, the engine could not be found or started. The packaged app runs only the `pm` inside it, so its app folder is damaged. In a source build, no usable `pm` was found | Download the release again. In a source build, run `npm run build:backend` or set `APM_PM_PATH` |
+| **The APM backend stopped: The APM backend stopped. Restart the app.** | The background engine stopped again after APM had already restarted it once | Choose **Restart APM**. If it keeps happening, [report an issue](https://github.com/aaravmaloo/apm/issues) with the message shown |
+| **The APM backend bridge is missing. Start the app with npm run dev.** | The window was loaded without the app around it, which only happens in development | Start the app with `npm run dev` |
+
+The words repeat in that message; it is one event.
+
+If the engine stops once, APM restarts it on its own and locks the vault. You see **Vault locked**. Unlock again. APM restarts it only once. If it stops again, you see the screen above.
+
+## macOS or Windows will not open the app
+
+Release builds are not notarized or code-signed.
+
+- **macOS**: open **System Settings → Privacy & Security** and choose **Open Anyway** next to the message about APM.
+- **Windows**: on **Windows protected your PC**, choose **More info**, then **Run anyway**.
+
+See [Install](/docs/desktop/install).
+
+## I cannot unlock
+
+| You see | What it means | What to do |
+|---|---|---|
+| **Incorrect password. 5 attempts left before a wait.** (or 4, 2, 1) | The password is wrong. The number counts down to the lockout at six failed attempts, not to the next wait | Check Caps Lock and your keyboard layout, then try again |
+| **Too many attempts. Try again in 30 seconds.** | Three wrong passwords in a row | Wait for the countdown, **Try again in 30s** |
+| **This vault is locked after repeated failed attempts. Use recovery to regain access.** | Six failed attempts | Use **More options → Forgot master password**. See [Recovery](/docs/desktop/recovery). |
+| **No vault found at** and a path | The vault file was moved or deleted since the app started | Use **More options → Open another vault** to find it |
+| Every password is wrong, even the right one | The app may be pointed at a file that is not your vault, or at another vault | Check the path in **More options → Open another vault**. A wrong file counts every try as a failed attempt |
+
+The count of failed attempts lives in the vault's folder and survives restarts. See [Failed attempts](/docs/desktop/lock-and-unlock#failed-attempts).
+
+## Touch ID problems
+
+- **Touch ID is not available on this Mac.** The Mac has no Touch ID sensor, no enrolled fingerprints, or you are not on macOS. Unlock with your password.
+- **Touch ID did not recognise that fingerprint. Enter your master password.** The finger did not match. Type your password, or press **Unlock with Touch ID** to try again.
+- **Touch ID has an outdated master password. Unlock with your password, then set Touch ID up again.** The Keychain still holds an old password. Unlock with your password, then turn **Unlock with Touch ID** off and on in **Settings → Security**. This does not count as a failed attempt.
+- **Touch ID is locked after too many tries. Unlock with your master password.** macOS locked Touch ID. Unlock with your password. macOS may ask for your login password before Touch ID works again.
+- **The lock screen stopped asking for my fingerprint.** After a rejected fingerprint, the lock screen stops re-arming until you press **Unlock with Touch ID**.
+- **A system dialog appears instead of the glyph in the button.** The inline Touch ID module is not in this build. Touch ID still works through the dialog.
+
+## The vault is read-only
+
+The sidebar shows **Read-only** and edit buttons are disabled.
+
+- **Read-only until** a time: you, or a read-only `pm` session, made this session read-only. Choose **End read-only** in **Settings → Sessions**, or wait.
+- **Read-only.** followed by **This vault was updated by a newer pm. Update APM to edit it.** A newer version of `pm` has written the vault. This app cannot safely change it, so it only reads it. **Settings → Sessions → This session** shows **Mode: Read-only, newer vault format**, with no **End read-only**. Update the app. See [Update the app](/docs/desktop/install#update-the-app).
+
+If a change is tried anyway, it is refused with **This session is read-only.**, or with the newer-vault message above.
+
+## The app and pm open different vaults
+
+The app and `pm` each pick a vault path on their own. Check **Settings → General → Vault file → Location** in the app, and run `pm info` in the terminal. Its **Vault** line shows the file `pm` opens, for example `Vault:      /Users/you/.apm/vault.dat`.
+
+To make `pm` use the app's vault, choose **Copy export** in **Settings → Developer → Command line** and add the line to your shell profile. To make the app use `pm`'s vault, choose **More options → Open another vault** on the lock screen, then **Open an existing vault**, and choose that file. See [Where your data lives](/docs/desktop#where-your-data-lives).
+
+## The vault locked by itself
+
+APM locks on its own when:
+
+- You were idle in the APM window for longer than **Lock after inactivity**. Activity in other apps does not count.
+- The **Maximum session** ran out, even though you were using the app.
+- The computer slept or the screen locked, with **Lock when the Mac sleeps** on.
+- The browser extension locked the vault.
+- The vault file was deleted, or replaced with one that uses a different master password (for example after `pm auth change` in a terminal, or a restore).
+
+The lock screen's status line says which for inactivity, sleep, the session limit and the browser. For the other cases it shows how long ago, such as **Locked just now**. Adjust the rules in **Settings → Sessions**. See [Auto-lock](/docs/desktop/lock-and-unlock#auto-lock).
+
+## The vault stayed unlocked
+
+On macOS, closing the window leaves APM running, and the vault stays unlocked until auto-lock fires: the idle limit, the maximum session or lock on sleep. Each request from the browser extension counts as activity, so a browser that keeps filling keeps the idle timer from running out. Lock with <Kbd>⌘</Kbd><Kbd>L</Kbd> before you close the window, or quit with <Kbd>⌘</Kbd><Kbd>Q</Kbd>.
+
+Quitting APM does not end `pm`'s session in your terminal, so the app can open unlocked the next time you start it. Lock in the app first to end both. See [Lock the vault](/docs/desktop/lock-and-unlock#lock-the-vault).
+
+## The browser extension cannot connect
+
+- **Settings → Browser extension** says **Not running. Another app may be using port 41417. Quit it and restart APM.** Something else, often `pm extension serve` in a terminal, holds the port. Quit it and restart APM. If you set `APM_BRIDGE_PORT`, the message names that port instead.
+- To check from a terminal, run `pm extension status`. With the app open and answering, its **Right now** line says `the extension uses the APM app`, followed by **Listening**, **Version**, **Vault** and **Token** lines. See [Extension troubleshooting](/docs/extension/troubleshooting).
+- **Connection request expired.** You did not approve the code within two minutes. Choose **Connect** in the extension again.
+- **Connection denied.** Someone chose **Deny** for that request. Choose **Connect** in the extension to ask again.
+- **The extension stops working when the app is closed.** Run `pm extension link` once. See [Use it without the app](/docs/desktop/browser-extension#use-it-without-the-app).
+- **Pairing with a code does not work.** Use **Manual pairing** in **Settings → Browser extension** and paste the token into the extension's options.
+- **A browser should no longer have access.** Choose **Rotate** under **Manual pairing**. Every browser is disconnected until you connect it again.
+
+## Sync fails
+
+The sidebar shows **Sync failed**, and **Settings → Sync** shows **Last sync failed**, with the full error in the provider's row.
+
+When connecting, syncing or restoring fails because of the provider, the message that pops up only says **Could not reach the provider. Check your connection and try again.**, whatever the real cause. Check these:
+
+- **GitHub**: check that the repository is `owner/repo`, that it exists, and that the token has **Contents: read and write** on it and has not expired. Disconnect and connect again with a new token.
+- **Google Drive or Dropbox**: finish the sign-in in the browser window APM opened. For your own Dropbox app, check the **App key** and **App secret**.
+- **Your connection**: check that you are online and try **Sync now** again.
+- **The cloud vault uses a different master password.** when you **Compare**: the remote copy was made with another password. Restore it into a separate file with **Restore from cloud** to look at it.
+- **No vault matches that key** when restoring: check the retrieval key, and that you picked the right provider.
+
+Remember that **Sync now** uploads this computer's vault and replaces the remote copy. Use **Compare** first when another computer has made changes. See [Cloud sync](/docs/desktop/sync).
+
+## The recovery email does not arrive
+
+- **Could not reach the provider. Check your connection and try again.** after **Send code**: APM could not reach its mail service. Check your connection and choose **Send code** again.
+- **That code does not match.** The code is wrong, more than 15 minutes old, or you typed five wrong codes. Send a new code and type it carefully.
+
+Check your spam folder too.
+
+## AI requests do not show up
+
+- Requests show while the vault is unlocked in the app.
+- Requests expire after 15 minutes. An expired request disappears and is not listed in **Past requests**. Ask the assistant to try again.
+- If the assistant reports an auth error, its token may be expired or revoked. Create a new one.
+
+## Installing the pm command fails
+
+| Message | What to do |
+|---|---|
+| **Only the packaged app installs the pm command.** | You are on Windows or Linux, or running a source build. Install `pm` separately. |
+| **/usr/local/bin/pm is a file APM did not install** | APM never replaces a real file. Move or delete it, then try again. |
+| The **pm command** row shows a `pm` at another path | That `pm` comes first on your `PATH`, so the terminal runs it. Remove it, or reorder your `PATH`. |
+| **Homebrew manages** it | Run `brew upgrade pm`, or `brew uninstall pm` and install from the app. |
+| Nothing happens after the administrator prompt | APM shows no message when you cancel the prompt. Try again and enter your Mac's administrator password. |
+| **macOS did not allow APM to change /usr/local/bin/pm.** | macOS refused the change even with an administrator. Check the folder's permissions. |
+| **The pm bundled with APM is missing at** a path | The app folder is damaged. Download the app again. |
+
+See [The app and pm](/docs/desktop/terminal#the-pm-command).
+
+## Saving or restoring fails
+
+- **An item called … already exists in this space.** Names must be unique within a type and space. Rename one of them, or move it to another space.
+- **Policy … needs passwords of at least N characters.** A [password policy](/docs/desktop/settings#password-policy) is active. Use a longer password, or clear the policy.
+- **That setup key is not valid base32.** Paste the key or `otpauth://` link exactly as the site shows it.
+- **Files over 50 MB make the vault slow to open and sync.** Keep large files outside the vault.
+- **Snapshot was squashed.** That commit in History has no snapshot left. Only newer versions can be restored.
+
+## Copied secrets stay on the clipboard
+
+APM clears the clipboard after the time set in **Settings → Security → Clear clipboard**, but only if it still holds what APM copied. If you copied something else in the meantime, APM leaves it alone. **Never** turns clearing off. The timer never clears usernames and other plain values. Quitting APM clears the last thing it copied, secret or not, if it is still on the clipboard.
+
+## Website logos are missing
+
+- Turn on **Show website icons** in **Settings → Appearance**.
+- Logos are fetched only while the vault is unlocked.
+- Logos are only fetched for real public domains, not for IP addresses, `localhost` or `.local` and `.internal` names.
+- A site that had no logo is tried again after 3 days.
+- If `APM_ICONS_OFFLINE=1` is set, no logos are fetched.
+- **Clear icon cache** removes saved logos so they are fetched again.
+
+## Report a problem
+
+Choose **Help → Report an Issue** to open the app's issue tracker ([github.com/apms-org/gui/issues](https://github.com/apms-org/gui/issues)). Include your APM version (**Settings → About → Version**), your platform (**Settings → General → Updates** shows both), and the exact message you saw. Never include your master password, recovery key or any secret. See [Get help](/docs/getting-started/getting-help) for what else to include.

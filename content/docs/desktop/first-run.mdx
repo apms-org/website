@@ -1,0 +1,185 @@
+---
+title: Create or open a vault
+description: The Welcome screen, the seven-step vault setup, opening an existing vault.dat and restoring one from the cloud.
+order: 2
+sidebarTitle: First run
+group: Get started
+---
+
+When APM finds no vault, it opens on **Welcome to APM**. You have three choices:
+
+- **Create a new vault.** Set a master password and pick how hard the key is to crack.
+- **Open an existing vault.** Choose a `vault.dat` made by `pm` or another computer.
+- **Restore from cloud.** Download your vault from Google Drive, GitHub or Dropbox.
+
+If you already use `pm`, the app usually finds your vault on its own and opens straight to the lock screen. See [where the app looks](/docs/desktop#the-vault-file).
+
+The footer's **Documentation** link opens these docs in your browser.
+
+## Create a new vault
+
+The setup has seven steps, listed on the left, and the top of each says **Step N of 7**. The last two are optional. **Back** returns to the previous step until the vault is created, and **Cancel** on the first step returns to the Welcome screen. After the vault is created, the first five steps are locked. Under the steps, the app notes **Everything stays on this Mac unless you turn on sync.**
+
+The vault is created at the path shown under **Vault file** in step 5, with the name **Personal vault**. Rename it later in **Settings → General → Vault**.
+
+<Steps>
+
+### Password
+
+Type your master password twice under **Master password** and **Confirm master password**. It must meet every rule in the checklist:
+
+- At least 8 characters
+- An uppercase letter
+- A lowercase letter
+- A number
+- A symbol from `!@#$%^&*()-_=+`
+
+**Continue** stays disabled until every rule is ticked and both fields match. Until they match, the second field says **The passwords do not match.**
+
+A strength meter shows the estimated time to crack it offline, such as **cracked in 4 days offline** or **outlasts the universe offline**. It assumes an attacker who tries 10 billion guesses a second. **Suggest** fills both fields with four capitalized words joined by hyphens, a digit on one of the words and a closing `!`, such as `Harbor-Lantern7-Velvet-Comet!`. Write it down before you continue.
+
+<Callout type="warning" title="APM cannot reset this password">
+The password never leaves this computer, and APM has no way to reset it. Set up recovery in step 6, or later in **Settings → Recovery**, so you have a way back in.
+</Callout>
+
+### Security
+
+Choose how expensive each guess at your password is. A line such as **This Mac has 10 cores and 8 GB of memory, so APM recommends Hardened.** shows what the app detected, and the profile it recommends is marked **Recommended**: **Paranoid** with 16 GB and 8 cores or more, **Hardened** with 8 GB and 4 cores or more, **Standard** otherwise. The app reads these numbers from its window rather than from the system, so its pick can differ from the one `pm setup` makes.
+
+| Profile | Key derivation | Cipher | Unlock time |
+|---|---|---|---|
+| **Standard** | Argon2id, t=3, 64 MiB, p=2 | AES-256-GCM | about 0.3s |
+| **Hardened** | Argon2id, t=5, 256 MiB, p=4 | AES-256-GCM | about 1s |
+| **Paranoid** | Argon2id, t=6, 512 MiB, p=4 | XChaCha20-Poly1305 | about 2s |
+| **Custom** | Your own settings | Your choice | Depends |
+
+Each profile shows its settings and unlock time, for example **Argon2id · t=5 · 256 MiB · p=4 · unlock about 1s**.
+
+With **Custom**, set **Memory** (32 to 1024 MiB, in steps of 32), **Time cost** (1 to 10), **Threads** (1 to 16), **Salt length** (16, 24, 32 or 64 bytes) and **Nonce length** (12 or 24 bytes). It starts at 128 MiB, t=4, 4 threads, a 32-byte salt and a 12-byte nonce. The **Legacy** profile is not offered here; only `pm` can set it.
+
+Under **Cipher**, pick **AES-256-GCM** (hardware accelerated on Apple silicon and modern x86) or **XChaCha20-Poly1305** (constant-time in software, 24-byte nonce). Picking a profile resets the cipher to that profile's default, so choose the cipher last. XChaCha20-Poly1305 always uses a 24-byte nonce, whatever **Nonce length** says. You can change the profile and cipher later. See [encryption profiles](/docs/security/profiles).
+
+### Spaces
+
+Spaces keep groups of secrets apart inside one vault. Every vault has a **Default** space. Setup starts you with **Personal** and **Work**. Remove one with its `×`, type a name and press <Kbd>↵</Kbd> or choose **Add**, or click a suggestion (**Family**, **Homelab**, **Clients**, **Finance**). A name you already added, in any capitalization, is not added twice, and `Default` is skipped because every vault has it. Each new space gets the next of seven colors. See [Spaces](/docs/desktop/spaces).
+
+### Unlock
+
+- **Unlock with Touch ID** (macOS) stores your master password in your macOS login keychain. APM asks for your fingerprint before it reads it. See [Touch ID](/docs/desktop/lock-and-unlock#touch-id). It starts on when this Mac can use Touch ID, and is off and disabled when it cannot.
+- **Session length**: how long an unlock lasts, even while you are active (**15 minutes**, **1 hour**, **4 hours** or **12 hours**). The default is **1 hour**.
+- **Lock when idle**: lock after this long without activity (**1 minute**, **5 minutes**, **15 minutes** or **30 minutes**). The default is **15 minutes**.
+
+APM also locks when your computer sleeps or the screen locks. Change Touch ID later in **Settings → Security**, and the lock rules in **Settings → Sessions**.
+
+### Create
+
+Review the **Vault file** path, **Profile**, **Cipher**, **Spaces**, **Touch ID** and **Lock** (for example **After 15 min idle, 1 h max**). Choose **Create vault**. A progress bar shows **Deriving your key** while the vault is encrypted for the first time, then **Vault created**. The bar is an estimate, so it may pause near the end on a slow computer. **Create vault** then becomes **Continue**.
+
+APM also creates an empty `policies` folder next to the vault, for [password policies](/docs/reference/policies).
+
+If something goes wrong here, the message shows under the review:
+
+| Message | What to do |
+|---|---|
+| **A vault already exists at** the path | The app is pointed at a file that already holds a vault, for example after **Open another vault**. APM never overwrites it. Go back to the first step, choose **Cancel**, then **Back to** and your vault's name. To keep a second vault, create it with `pm setup --vault` and a new path, then open it with **Open an existing vault** |
+| A password rule, such as **password must be at least 8 characters long** | The engine checked the password again. Go back to step 1 |
+
+If APM cannot store the password for Touch ID, the vault is still created, with Touch ID off and no message. Turn it on later in **Settings → Security**.
+
+### Recovery (optional)
+
+Enter a **Recovery email** and choose **Send code**. APM emails a 6-digit code, with a subject such as **123456 - APM Email Verification**, and shows "APM sent a 6-digit code to you@example.com. It expires in 15 minutes." Type the code into the boxes, or paste it. The button becomes **Resend** if you need a new code. As soon as the code is accepted, APM creates your recovery key and shows it.
+
+If the code is wrong, more than 15 minutes old, or the fifth wrong try, you see **That code does not match. Check the email and try again.** Choose **Resend** and use the newest code. If the email could not be sent, you see **Could not reach the provider. Check your connection and try again.**
+
+Your recovery key appears once, under **Email verified**, in the form `K7M3-P2R9-WXHT-4826`. Then:
+
+- **Copy** puts it on the clipboard, and APM clears the clipboard after 60 seconds if it still holds the key.
+- **Save as file** asks where to save `APM-recovery-key.txt`, a text file with the key, the vault's name and today's date.
+- Tick **I stored this key somewhere safe**. **Continue** stays disabled until you do. APM keeps only a wrapped copy that the key unlocks.
+
+APM also emails **SECURITY ALERT: APM Vault Recovery Configured** to the address. That email never contains the key.
+
+A code sent to your email plus this key can reset your master password. Choose **Skip** to set it up later in **Settings → Recovery**. If you sent a code but don't want to finish, **Skip** is the way on: **Continue** waits for a verified code. See [Recovery](/docs/desktop/recovery).
+
+### Sync (optional)
+
+Choose where to keep an encrypted copy:
+
+- **Keep it on this Mac**: no network. Choose **Finish**.
+- **GitHub**: enter a **Repository** (`owner/repo`, private, one you own) and a **Personal access token** with Contents read and write on it. **Connect and finish** stays disabled until the repository looks like `owner/repo` and the token is longer than eight characters.
+- **Google Drive**: your own Drive, through a browser sign-in. The step says APM asks for access to a single app folder. In fact Google asks you to let APM see the files it creates, and the vault is uploaded to the top of your My Drive, under a random name such as `v_3fa91c.bin`.
+- **Dropbox**: your own Dropbox app, through a browser sign-in. That needs a Dropbox app key and secret, which this step does not ask for, so connecting here stops with **Self-hosted Dropbox needs your app key and app secret.** Choose **Skip** and connect Dropbox in **Settings → Sync** instead, where you can enter them.
+
+Choose **Connect and finish**. For Google Drive your browser opens to sign in. Providers only ever receive the encrypted file. To use APM's shared storage with a retrieval key, connect later in **Settings → Sync**. See [Cloud sync](/docs/desktop/sync).
+
+If the provider rejects the connection or cannot be reached, the message is **Could not reach the provider. Check your connection and try again.**, whatever the provider said. Check the repository and the token, or choose **Skip** and connect later in **Settings → Sync**.
+
+</Steps>
+
+### Your vault is ready
+
+The last screen confirms the encryption settings, for example **Encrypted with Argon2id · t=5 · 256 MiB · p=4 and AES-256-GCM.**, and suggests what to do next:
+
+- **Import passwords** opens the [import](/docs/desktop/import-export) flow.
+- **Add your first item** opens the **New item** picker.
+- **Connect the browser extension** opens **Settings → Browser extension**.
+
+Or choose **Open vault** to go straight in.
+
+## Open an existing vault
+
+Choose **Open an existing vault** on the Welcome screen, or **Open another vault** on the lock screen. The **Open a vault** screen shows the **Current file** and its **State**: **Vault found** or **No vault at this path yet**.
+
+- **Choose vault file** opens a file picker for a `.dat` or `.vault` file. Switch the picker to **All files** to choose a file with another name. APM switches to it, and remembers it for next time.
+- **Use the default location** switches to the path the app would use with no choice saved: `APM_VAULT_PATH`, a `vault.dat` next to the `pm` on your `PATH`, `~/Desktop/apm/vault.dat`, then `~/.apm/vault.dat`. If no vault is there, the Welcome screen follows, so you can create one.
+- **Back** returns to where you were.
+
+If you came from another vault's lock screen, the app returns to the Welcome screen after the switch. Choose **Back to** and the vault's name to reach its lock screen.
+
+<Callout type="warning" title="Pick a real vault file">
+APM does not check what is inside the file you pick. If you choose the wrong file, the lock screen still appears, and every unlock attempt counts as a wrong password toward the [failed-attempts limit](/docs/desktop/lock-and-unlock#failed-attempts). Open the right file before you try your password.
+</Callout>
+
+APM works on one `vault.dat` at a time. To point `pm` at the same file, set `APM_VAULT_PATH` or pass `--vault`. **Settings → Developer** can copy the `export` line for your shell. See [The app and pm](/docs/desktop/terminal).
+
+<Callout type="note">
+Switching files locks the vault and restarts the background engine on the new file. The lock screen then asks for that vault's master password.
+</Callout>
+
+## Restore from cloud
+
+Use this on a new computer to download a vault you synced from another one.
+
+<Steps>
+
+### Find your vault
+
+Choose a **Provider**:
+
+- **GitHub**: enter the **Repository** (`owner/repo`) and a **Personal access token** that can read it. The token is saved in the restored vault, so sync to that repository keeps working.
+- **Google Drive** or **Dropbox**: enter the **Retrieval key** shown when you set up sync. `pm cloud init` prints it too. The app looks the key up in APM's public storage, so this only finds a vault you synced with **APM public**. For a vault in your own Drive or Dropbox app, restore it with `pm cloud get` in a terminal instead.
+
+Choose **Continue**. An empty field stops you with **Enter the repository as owner/repo.**, **Enter a token that can read the repository.** or **Enter the retrieval key.**
+
+If a vault already exists on this computer, a **Save the restored vault** dialog asks where to put the restored copy, with `vault-restored.dat` suggested. APM switches to that file. It never overwrites the vault you have. If you pick a file that already exists and confirm, APM first copies that file to the same name plus `.backup.` and the date and time, such as `vault-restored.dat.backup.20261005-141502`.
+
+### Unlock it
+
+The screen says **Ready to download from** the repository, **Google Drive** or **Dropbox**, and **Saved to** the path **once it decrypts.** Enter the master password the vault was created with and choose **Download and unlock**. APM downloads the sealed file, checks the password, saves the file and opens the vault.
+
+</Steps>
+
+| Message | What it means |
+|---|---|
+| **That is not the master password for the downloaded vault.** | The download worked, but the password does not open it. Try again. Nothing is saved until it works |
+| **No vault matches that key:** followed by the provider's error | The retrieval key is wrong, or the vault was not synced with APM public. You go back to the first step |
+| **Could not reach the provider. Check your connection and try again.** | The download failed, for any reason. For GitHub, also check the repository and the token |
+
+<Callout type="note" title="If you cancel after choosing where to save">
+APM switches to the new file as soon as you choose **Download and unlock**. If the restore then fails and you leave, the app is still pointed at that empty path and shows the Welcome screen. Your old vault is untouched: choose **Open an existing vault** and pick it again.
+</Callout>
+
+## Go back to your vault
+
+When a vault exists, the Welcome screen shows **Back to** and your vault's name. Click it to return to the lock screen without changing anything.

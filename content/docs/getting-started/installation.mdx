@@ -1,0 +1,261 @@
+---
+title: Install APM
+description: Install the desktop app, the pm command, APM for Chrome and the MCP server on macOS, Windows or Linux.
+order: 1
+sidebarTitle: Installation
+group: Set up
+---
+
+APM has four parts, and you only need the ones you use. Most people start with the desktop app, add `pm` for the terminal, and add APM for Chrome for the browser. The desktop app and `pm` share one version number (12), and every part opens the same vault.
+
+| Part | What it is | Platforms |
+|------|------------|-----------|
+| Desktop app | The APM app, with `pm` bundled inside as its engine | macOS (Apple silicon and Intel), Windows x64, Linux x64 |
+| `pm` | The command line, and the engine under everything else | macOS, Windows and Linux, on Intel and ARM |
+| APM for Chrome | The browser extension | Chrome, Edge, Brave, Arc, Vivaldi and Chromium, version 116 or later |
+| MCP server | `pm mcp serve`, for AI tools | Wherever `pm` runs |
+
+## Before you start
+
+| To install | You need |
+|------------|----------|
+| The desktop app | Nothing else. The download carries its own copy of `pm` |
+| `pm` from a release | A 64-bit Mac, PC or Linux machine. Builds exist for `amd64` (Intel and AMD) and `arm64` (Apple silicon and other ARM chips) |
+| `pm` from source | Go 1.25 or newer, and `git` |
+| APM for Chrome | A Chromium browser, version 116 or later. Node.js 20.19 or a later 20.x release, or 22.12 or newer, with `npm`, and `git`, to build it. The desktop app or `pm` on the same computer, to use it |
+| Copying secrets with `pm` on Linux | `xclip`. See [Linux clipboard](#linux-clipboard) |
+
+There is no APM account to create and nothing to sign up for. There is no mobile app.
+
+## The desktop app
+
+Download the app for your system from the desktop app's [GitHub Releases](https://github.com/apms-org/gui/releases).
+
+| Platform | File |
+|----------|------|
+| macOS, Apple silicon | `APM-vX.Y.Z-darwin_arm64.zip` |
+| macOS, Intel | `APM-vX.Y.Z-darwin_amd64.zip` |
+| Windows, x64 | `APM-vX.Y.Z-windows_amd64.zip` |
+| Linux, x64 | `APM-vX.Y.Z-linux_amd64.tar.gz` |
+
+Each file is a plain app folder. There is no installer.
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab>
+
+Download `APM-vX.Y.Z-darwin_arm64.zip` for Apple silicon or `APM-vX.Y.Z-darwin_amd64.zip` for an Intel Mac. Unzip it, move **APM** to your Applications folder and open it.
+
+The Mac app can also install the `pm` command for your terminal. See [pm](#pm) below.
+
+</Tab>
+<Tab>
+
+Download `APM-vX.Y.Z-windows_amd64.zip`, a zipped app for x64. Unzip it and open `APM.exe` from the unzipped folder.
+
+</Tab>
+<Tab>
+
+Download `APM-vX.Y.Z-linux_amd64.tar.gz`, for x64. Extract it and run `apm-desktop` from the `linux-unpacked` folder it creates.
+
+</Tab>
+</Tabs>
+
+The release builds are not code-signed, so macOS or Windows may refuse to open the app the first time. [Desktop app: install](/docs/desktop/install) shows how to allow it on each platform.
+
+When it finds no vault, the app shows **Welcome to APM** with **Create a new vault**, **Open an existing vault** and **Restore from cloud**. See [Desktop app: install](/docs/desktop/install) and [First run](/docs/desktop/first-run).
+
+## pm
+
+Every `pm` release on [GitHub Releases](https://github.com/apms-org/cli/releases/latest) attaches two files per platform: an archive, and the same program as a bare file. Either one works. The program inside the archive has the same name as the archive, so rename it to `pm` (or `pm.exe`).
+
+| Platform | Archive | Bare file |
+|----------|---------|-----------|
+| macOS, Apple silicon | `apm-vX.Y.Z-darwin_arm64.tar.gz` | `apm-vX.Y.Z-darwin_arm64` |
+| macOS, Intel | `apm-vX.Y.Z-darwin_amd64.tar.gz` | `apm-vX.Y.Z-darwin_amd64` |
+| Linux, x64 | `apm-vX.Y.Z-linux_amd64.tar.gz` | `apm-vX.Y.Z-linux_amd64` |
+| Linux, ARM | `apm-vX.Y.Z-linux_arm64.tar.gz` | `apm-vX.Y.Z-linux_arm64` |
+| Windows, x64 | `apm-vX.Y.Z-windows_amd64.zip` | `apm-vX.Y.Z-windows_amd64.exe` |
+| Windows, ARM | `apm-vX.Y.Z-windows_arm64.zip` | `apm-vX.Y.Z-windows_arm64.exe` |
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab>
+
+**From the desktop app.** Open **Settings**, **Developer**. Under **Command line**, **pm command** shows whether your terminal has `pm`. Choose **Install pm**. It adds `/usr/local/bin/pm`, linked to the app's own copy, so updating the app updates `pm` too. It asks for an administrator password if `/usr/local/bin` is not writable. If an older `pm` is already there, the same row offers **Update pm**.
+
+**On its own.** Download the archive for your Mac, unpack it and put the program on your `PATH` as `pm`:
+
+```sh title="Terminal"
+tar -xzf apm-v12.0.0-darwin_arm64.tar.gz
+sudo install -m 0755 apm-v12.0.0-darwin_arm64 /usr/local/bin/pm
+pm --version
+```
+
+Use `darwin_amd64` on an Intel Mac. Or build it from source as below.
+
+</Tab>
+<Tab>
+
+Download `apm-vX.Y.Z-windows_amd64.zip` (or `windows_arm64`), unzip it and rename the `.exe` inside to `pm.exe`:
+
+```powershell title="PowerShell"
+Expand-Archive apm-v12.0.0-windows_amd64.zip -DestinationPath $HOME\apm
+Rename-Item $HOME\apm\apm-v12.0.0-windows_amd64.exe pm.exe
+# Add $HOME\apm to your PATH, then open a new terminal
+pm --version
+```
+
+Or build it from source as below. The desktop app bundles its own `pm`, but only installs it for the terminal on macOS.
+
+</Tab>
+<Tab>
+
+Download `apm-vX.Y.Z-linux_amd64.tar.gz` (or `linux_arm64`), unpack it and put the program on your `PATH` as `pm`:
+
+```sh title="Terminal"
+tar -xzf apm-v12.0.0-linux_amd64.tar.gz
+sudo install -m 0755 apm-v12.0.0-linux_amd64 /usr/local/bin/pm
+pm --version
+```
+
+Or build it from source as below. The desktop app bundles its own `pm`, but only installs it for the terminal on macOS.
+
+</Tab>
+</Tabs>
+
+### Build pm from source
+
+You need Go 1.25 or newer and `git`.
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/cli.git
+cd cli
+go build -o pm .
+```
+
+On Windows, build `pm.exe` with `go build -o pm.exe .`. Move the result to a folder on your `PATH`. Build a real binary before you run `pm extension link`: a `pm` started with `go run` lives in a temporary folder, and `pm extension link` warns that the browser would lose it.
+
+### Check it
+
+```sh title="Terminal"
+pm --version
+```
+
+```text title="Output"
+12.0.0
+```
+
+It prints the bare version, with no `v`, so scripts can read it. `pm info` shows more, and checks that `pm` can find your vault:
+
+```sh title="Terminal"
+pm info
+```
+
+```text title="Output"
+APM Stable v12.0.0 Release
+────────────────────────────
+
+User:       you@apm
+Installed:  /usr/local/bin
+Vault:      /Users/you/.apm/vault.dat
+
+Version:    v12.0.0 Stable Release
+Build:       (07/30/2026 (MM/DD/YYYY))
+
+Repo:       github.com/apms-org/apm
+Support:    aaravmaloo06@gmail.com
+
+Status:
+  ✔ Vault accessible
+  ✔ Config valid
+  ✔ All systems ok.
+```
+
+**Installed** is the folder that holds the `pm` you ran, and **Vault** is the vault it opens. If **Vault accessible** shows ✘, there is no vault at that path yet: run `pm setup` to create one, create it in the desktop app, or point `pm` at your vault with `APM_VAULT_PATH`. See [Installing pm](/docs/cli/installation) for more options.
+
+<Callout type="warning" title="Use pm 12 or newer with a vault APM 12 has opened">
+APM 12 moves some data inside logins when it first opens a vault. `pm` 11 and older do not understand it and would drop it when saving. Once APM 12 has opened your vault, do not edit it with an older `pm`.
+</Callout>
+
+### Linux clipboard
+
+On Linux, `pm` copies secrets by running `xclip -selection clipboard`. Install `xclip` (for example `sudo apt install xclip`). Without it, `pm` still prints "Secret copied to clipboard." but nothing is copied. On macOS `pm` uses `pbcopy`, and on Windows PowerShell's `Set-Clipboard`, which are always there.
+
+### Package managers and install scripts
+
+Install `pm` from GitHub Releases or from source, as above. The other routes you may find are out of date:
+
+- **`scripts/install.sh`** in the `pm` repository looks for release files named `stable-…`, which releases no longer carry, and installs the command as `apm` rather than `pm`.
+- **`scripts/install.ps1`** only stops with "Windows release assets are no longer published."
+- **The Homebrew formula** `apm` in `aaravmaloo/homebrew-tap` builds the command as `apm`, not `pm`. The desktop app's **Install pm** row, the extension and these docs all expect `pm`.
+
+### Canary builds
+
+Releases tagged `can…` are canary builds: early test versions, published to the same releases page as regular `v…` releases. Their files follow the same pattern with the canary tag in place of the version, such as `apm-can-v10.2.0-darwin_arm64.tar.gz` for the tag `can-v10.2.0`. Use them only to try a fix before it ships. Back up `vault.dat` first, and remember that a vault saved by a newer `pm` opens read-only in an older one when the newer version changed the vault format.
+
+## APM for Chrome
+
+The extension is built from source and loaded unpacked. You need Node.js 20.19 or a later 20.x release, or 22.12 or newer, and `git`.
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/extension.git
+cd extension
+npm install
+npm run build
+```
+
+The build ends with a line like this:
+
+```text title="Output"
+built dist in 54ms, 553 KB of scripts
+```
+
+Then open `chrome://extensions` (or your browser's own extensions page), turn on **Developer mode**, choose **Load unpacked** and select the `dist` folder. Pin **APM** to the toolbar.
+
+The extension works through the desktop app, or through `pm` when the app is closed. Pair it once: see [Install the extension](/docs/extension/install) and [Pairing](/docs/extension/pairing).
+
+## The MCP server for AI tools
+
+The MCP server is part of `pm`, so there is nothing else to install. Create a token for each AI tool:
+
+```sh title="Terminal"
+pm mcp token
+```
+
+It asks for a name, an expiry in minutes (0 for never) and the MCP tools to allow, then prints the configuration to add to your MCP client, which runs `pm mcp serve --token` (with the full path to `pm`) followed by the token. The server needs an unlocked vault: run `pm unlock` first. Without a session, the AI tool's calls fail with "Vault Error: vault is locked. please run 'pm unlock' first to start an MCP session" (some tools say only "Vault Error"). In the desktop app, the same tokens are under **Settings**, **AI access**. See [Set up an AI client](/docs/agents/setup).
+
+## Where APM keeps things
+
+| What | Where |
+|------|-------|
+| Your vault | `~/.apm/vault.dat` by default. A `vault.dat` next to `pm` is used instead when there is one, and `APM_VAULT_PATH` points anywhere else |
+| APM data (audit log, history snapshots, the key that protects `pm` sessions, AI tokens, the extension's pairing token) | macOS: `~/Library/Application Support/apm`. Linux: `~/.config/apm`. Windows: `%AppData%\apm`. The `pm` session itself is a file in your temporary folder |
+
+The desktop app can open a vault anywhere; it remembers the path you choose. To use that vault from the terminal, copy the `APM_VAULT_PATH` line from the app's **Settings**, **Developer**, **Use this vault from the terminal** into your shell profile. Every file APM writes is listed in [File locations](/docs/reference/file-locations).
+
+## Update
+
+Keep the desktop app and `pm` on the same version.
+
+| Part | How to update |
+|------|---------------|
+| Desktop app | Download the new release and replace the app folder. On a Mac, a `pm` you installed from the app points at the app's own copy, so it updates too |
+| `pm` | Download the new release and replace the program, or build again from source. `pm update` checks for a newer release, see below |
+| APM for Chrome | In the `extension` folder run `git pull`, `npm install` and `npm run build`, then choose the reload button on the extension's card in `chrome://extensions`. See [Update it](/docs/extension/install#update-it) |
+
+`pm update` asks GitHub for the latest release and compares versions:
+
+```text title="Output"
+Checking for updates... (Current version: 12.0.0)
+New version available: v12.1.0
+Identifying update asset...
+```
+
+On Windows it then downloads the first `.exe` in the release, without checking your processor type, and swaps it in, keeping the old one next to it as `pm.exe.old`, and ends with "Update successful! Please restart the application." On macOS and Linux it currently cannot pick the right file from the release and stops with "No suitable binary found for your OS (darwin) in the latest release." (or `linux`), followed by a link to the release page. Download the archive yourself as above.
+
+## Next
+
+<Cards>
+  <Card title="Quickstart" href="/docs/getting-started/quickstart" icon="rocket">Create a vault, add a login, use it from the terminal and fill it in Chrome.</Card>
+  <Card title="Concepts" href="/docs/getting-started/concepts" icon="book-open">How the vault, sessions, spaces and sync fit together.</Card>
+  <Card title="Get help" href="/docs/getting-started/getting-help" icon="life-buoy">Built-in help, what to put in a bug report, and where to send it.</Card>
+</Cards>

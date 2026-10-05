@@ -1,0 +1,125 @@
+---
+title: Threat model
+description: What APM is built to protect you from, what it cannot protect you from, and the known weak spots in the current version.
+order: 6
+group: Model
+---
+
+A password manager is only as useful as your understanding of where it stops. This page says plainly what APM defends against, what it does not, and which weaknesses exist in the current code. Everything here was checked against the engine's source.
+
+## Who APM assumes you are defending against
+
+| Attacker | Example |
+|---|---|
+| Someone with a copy of `vault.dat` | A stolen laptop backup, a leaked cloud folder, a copied USB stick |
+| Someone who can change files you store elsewhere | A compromised cloud account or repository |
+| Another user on the same computer | A shared family or lab machine |
+| Someone at your unlocked computer | You stepped away and forgot to lock |
+| A web page | A malicious site trying to talk to the browser bridge |
+| An AI agent you connected | A client that calls more tools than you meant it to |
+
+## What APM protects against
+
+| Threat | How APM handles it |
+|---|---|
+| Reading a copied vault | The body is encrypted with a random 256-bit data key, sealed under a key from Argon2id. Every guess costs a full Argon2id run with your [profile's](/docs/security/profiles) memory and time. |
+| Tampering with the vault | HMAC-SHA256 over the whole file is checked before decryption, and AEAD tags protect the key slot and body. A changed file is refused. See [Encryption](/docs/security/encryption#integrity). |
+| A breach at APM | There is no APM account, and no server holds your keys or your vault. |
+| A cloud provider reading your vault | Only the encrypted file is uploaded. See [Sync security](/docs/security/sync-security). |
+| Other users on the computer | The vault, session files and APM's config folder are created readable by your user only. |
+| An unattended, unlocked computer | Auto-lock after 15 minutes idle, 1 hour at most, and on sleep, by default. See [Sessions and locking](/docs/security/sessions-and-locking). |
+| Guessing at your keyboard | In the app and the browser extension, a 30-second wait after every third wrong password and a lockout after six. In `pm`, three tries per command, a decoy vault from the sixth failure and a refusal from the ninth. See [Failed attempts](/docs/security/sessions-and-locking#failed-attempts). |
+| Web pages | The browser bridge answers only on `127.0.0.1`, only to browser-extension origins, and only with a token from a pairing you approved. See [Browser extension](/docs/extension). |
+| Agents overreaching | Each MCP client gets its own token limited to the tools you grant, and adds, edits and deletes wait as requests that only you can approve, in the desktop app's **Settings → AI access**. See [Scopes and approval](/docs/agents/scopes-and-approval). |
+
+## What APM does not protect against
+
+### Malware running as you
+
+Software running under your user account can do almost anything APM can:
+
+- While the vault is unlocked, it can read the session file and `session.key` and recover your master password. See [The pm session](/docs/security/sessions-and-locking#the-pm-session).
+- It can read `ephemeral_sessions.json`, which holds your master password in plain text while an ephemeral session exists.
+- On macOS with Touch ID set up, it can read your master password from the login keychain with the `security` command.
+- It can log your keystrokes, read the clipboard and read the memory of the APM processes.
+
+Keep your computer free of software you don't trust. APM is not a defence against a compromised operating system or account.
+
+### A weak master password
+
+Anyone with a copy of the file can guess offline as fast as their hardware allows. The profile multiplies the cost of each guess. It does not make a short or reused password safe. `pm setup` and the desktop app require at least 8 characters with upper and lower case, a digit and one of the symbols `!@#$%^&*()-_=+`. `pm auth change`, `pm auth recover` and `pm auth quorum-recover` do not check these rules. That is a floor, not a recommendation. Use a long passphrase.
+
+### Someone with your recovery key and your file
+
+The recovery key opens the vault's data key directly. The emailed code, one-time codes and recovery passkey are checks APM's software runs, not part of the encryption. See [Recovery](/docs/security/recovery#how-recovery-works).
+
+### Someone who once had the data key
+
+The data key is created with the vault and never changes. Changing your master password or profile, or replacing your recovery key, re-seals that same data key. Anyone who obtained it once, for example from an old copy of the file plus an old recovery key, can open every later version of the file. The only way to get a new data key is a new vault: create one and import your old vault into it.
+
+### Rolling back to an old copy
+
+Every old copy of `vault.dat` carries a valid signature from the keys it was saved with. Someone who can replace your file can swap in an older version, and APM cannot tell it apart from a real one. If the older copy used the same master password, it opens normally.
+
+### What the header and logs reveal
+
+Some information is readable without your password:
+
+- The profile and cipher.
+- A hint of your recovery email (first letter and domain) and its unsalted SHA-256 hash, so a guessed address can be confirmed.
+- The alert email address, in full, if you set one.
+- The hashes of your one-time recovery codes. Each code has 40 bits of randomness and is hashed without a salt, so someone with the file can recover the codes offline. That does not open the vault, because the recovery key is still needed.
+- The audit log (`audit.json`) and lgit index in your config folder: what happened and when, including the names of items an MCP client opened.
+- `apm_audit.log`, in `~/.apm` or the folder of `APM_VAULT_PATH`: the time of every unlock attempt and whether it failed, with a hash of the computer and user name.
+- The size of the vault and when it changes.
+
+### Tamper-evident history is local
+
+The audit log and lgit history are hash-chained and signed with HMAC-SHA256. The signing keys sit in the same config folder. They catch accidental damage and edits by someone without access to that folder. Anyone who can write to your config folder can rewrite and re-sign the history.
+
+## Known limitations
+
+These are weaknesses in the current version. Each one is described where it matters, and most have a workaround.
+
+| Limitation | Effect | What to do |
+|---|---|---|
+| Masked recovery key in the header | Right after a recovery key is created, the next save writes it into the header, masked with a public constant. Any copy from that window opens without your password. | Follow [After you create a recovery key](/docs/security/recovery#after-you-create-a-recovery-key). |
+| `pm auth recover` | Stops with `Recovery record found but key is missing.` once the vault has been saved again after a fresh unlock | Recover from the desktop app. |
+| APM_PUBLIC sync | The encrypted file sits in APM's storage, reachable with credentials shipped in `pm`. On Google Drive it is shared with anyone who has the link. | Use Self-hosted or GitHub sync. See [Sync security](/docs/security/sync-security). |
+| Session and ephemeral session files | Readable by any program running as you while active. Ephemeral sessions store the master password in plain text. | Keep idle limits short. Revoke ephemeral sessions when done. |
+| Read-only scope | Enforced by each `pm` command, and not every command checks it. `pm auth change`, `pm auth email`, `pm session issue`, `pm cloud init` and `pm space create` all work from a read-only session, and the MCP server ignores an ephemeral session's scope. | Treat a read session as able to write. |
+| Touch ID | The keychain item is not tied to biometrics. Setting it up, or updating it after a password change, passes your master password to the `security` command on its command line, where other processes of yours can briefly see it. | Leave Touch ID off on machines where you run untrusted software. |
+| Failed-attempt counter | A plain number in `.apm_lock` in `~/.apm`, or in the folder of `APM_VAULT_PATH`. The app and `pm` share it. Anyone who can write to that folder can reset it, so it slows guessing at the keyboard only. | Rely on a strong master password and profile. |
+| Closed app window on macOS | Closing the window leaves APM running with the vault unlocked, and the browser extension keeps working. The idle limit, the maximum session and lock on sleep still apply, but each extension request counts as activity. | Keep an idle limit and maximum session set, lock before you close the window, or quit APM. See [Sessions and locking](/docs/security/sessions-and-locking#what-unlocked-means). |
+| Security alerts | Alerts you turn on with `pm auth alerts` and `pm auth level` are only written to an `email.log` file in the current folder. No email is sent. | Don't rely on alerts for notification. |
+| Clipboard in `pm` | `pm` never clears the clipboard. On Windows, a copied secret is passed to PowerShell on its command line. | Copy from the desktop app, which clears the clipboard. |
+| Legacy profile | Runs Argon2id with almost no memory | Use Standard or higher. See [Security profiles](/docs/security/profiles). |
+| Old copies | lgit snapshots, backups and cloud versions keep older encrypted copies under older passwords. `pm compromise` overwrites and deletes `vault.dat` only. | Run `pm lgit squash --keep 1` and delete cloud copies when you retire a password. |
+
+### MCP server
+
+| Limitation | Effect |
+|---|---|
+| Secrets reach the model | Anything an agent reads goes into its context, and to the model provider if the model is hosted. `search_vault` returns full item contents, so a read-only token is not names-only. |
+| Some admin tools apply at once | `manage_profiles`, `manage_spaces`, `cloud_config` and `cloud_sync` don't wait for your approval. `manage_profiles` can switch the vault to the legacy profile. `cloud_sync` to Google Drive uses APM_PUBLIC mode. |
+| Tokens are plain text | Tokens are stored unhashed in `mcp_auth.json` in your config folder and in your client's config file, and appear on the server's command line. |
+| Revocation waits for a restart | A token is checked when the server starts. Revoking or expiring it takes effect the next time the client starts the server. |
+| A bad token dumps all tokens | When the server is started with a token it doesn't recognize, it prints every saved token to its output, which your MCP client may log. |
+| No token means any token | `pm mcp serve` started without `--token` picks one of the saved tokens on its own and runs with that token's tools. |
+| Reads are not audited | `list_vault`, `search_vault`, `get_totp` and `decrypt_entry` leave no audit entry. |
+| Agents keep the session alive | Each MCP call counts as activity, so a busy agent holds the vault unlocked until the maximum session or sleep. |
+| The app's switch doesn't stop the server | Turning **MCP server** off in the app's **AI access** settings only disables **New token** and **Set up**. Its description says "the app stops showing approval requests", but `pm mcp serve` keeps answering with existing tokens, and requests still show. |
+| A read-only session swaps in the decoy vault | While your `pm` session is read-only, for example after `pm mode readonly`, the MCP server reads the decoy vault filled with made-up entries instead of yours. The tools that save at once then write that decoy over your real vault, encrypted with your real password. Restore the earlier version from a backup or an lgit snapshot if that happens. |
+
+Grant only the tools a client needs, set an expiry, and run `pm lock` to cut every agent off at once. See [Scopes and approval](/docs/agents/scopes-and-approval) and [Troubleshooting](/docs/agents/troubleshooting).
+
+## Good practice
+
+- Use a long, unique passphrase as your master password, and the Hardened or Paranoid profile on machines that can afford it.
+- Keep the idle limit short, and lock with `pm lock` or the app when you step away.
+- Set up recovery, keep the recovery key offline and away from the vault file, and clean up after creating it.
+- Sync with Self-hosted Google Drive, Self-hosted Dropbox or a private GitHub repository.
+- Give each MCP client its own token with the fewest tools and an expiry. Prefer approving writes in the desktop app.
+- Keep `pm`, the desktop app and the extension up to date.
+
+Found something that isn't listed here? See [Report a vulnerability](/docs/security/reporting).

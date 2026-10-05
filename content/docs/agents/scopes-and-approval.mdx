@@ -1,0 +1,229 @@
+---
+title: Scopes and approval
+description: How MCP tokens, tool permissions, unlock sessions and your approval in the desktop app decide what an agent can do.
+order: 2
+group: Set up
+---
+
+Three things decide what an AI client can do with your vault: the **token** it starts the server with, the **tools** that token lists, and whether your vault is **unlocked** right now. Adds, edits and deletes also wait for **your approval** in the desktop app before anything is written.
+
+## Tokens
+
+### What a token looks like
+
+A token is `apm_mcp_` followed by 48 hexadecimal characters, made from 24 random bytes:
+
+```text
+apm_mcp_5d0c9a7be1f04c2a8e93d6b1f7a2c4e0b9d8f6a3c1e5b7d2
+```
+
+It is a bearer secret: whoever has it can start the server with its permissions. It is passed to the server on the command line (`pm mcp serve --token ...`), so it is stored in your client's config file and shows up in the system's process list while the server runs.
+
+### Where tokens are kept
+
+`pm` saves tokens in `mcp_auth.json` in your APM config folder, readable only by your user (file mode `0600`):
+
+| OS | Folder |
+|----|--------|
+| macOS | `~/Library/Application Support/apm/` |
+| Linux | `~/.config/apm/` (or `$XDG_CONFIG_HOME/apm/`) |
+| Windows | `%AppData%\apm\` |
+
+Each record holds the token, its name, its permissions, when it was created, when it expires, when it was last used and how many times a server started with it. The token itself is stored as plain text, not hashed, and the file is outside the encrypted vault. Treat the file like the tokens it holds.
+
+Tokens belong to the user account and computer they were created on. A vault you sync to another computer does not bring its tokens along.
+
+### When a token is checked
+
+When the client starts `pm mcp serve`, the server looks the token up and refuses to start if it is unknown (`invalid or revoked MCP token`) or past its expiry (`token expired`). Both cases are written to the audit log as `MCP_AUTH_FAILED`.
+
+After that, the server keeps the token's permissions in memory for as long as it runs. This has two consequences:
+
+- **Revoking or expiring a token takes effect on the next start.** A client that already has the server running keeps its access until you restart the client.
+- **Locking is the immediate off switch.** Every tool that reads or writes the vault needs your session, so `pm lock` (or locking the desktop app) stops them on the next call.
+
+To cut a client off completely: run `pm mcp revoke <name>`, run `pm lock`, then quit the client.
+
+Permissions on an existing token can't be changed. Create a new token with the tools you want and revoke the old one.
+
+## Permissions
+
+A token's permissions are a list of tool names. A call to a tool that isn't on the list returns `Denied` and does nothing. `pm mcp token` offers all 17 tool names; the desktop app shows the same tools in groups and has presets.
+
+### Tool groups
+
+| Group | Tools | What the agent gets |
+|-------|-------|---------------------|
+| Read | `list_vault` | Names of every item, grouped by type, across all spaces. No field values. |
+| Read | `search_vault` | Every item whose contents contain the search text, **returned with all its fields, secrets included**. |
+| Secrets | `get_entry`, `decrypt_entry` | The full contents of one item by name: passwords, keys, 2FA seeds, notes, passkey private keys. `get_entry` alone returns only an encrypted reference; `decrypt_entry` turns it into the contents. |
+| Secrets | `get_totp` | The current 6-digit code for an authenticator item or a login with a 2FA key. |
+| Write | `add_entry`, `edit_entry`, `delete_entry` | Ask to change items. Nothing changes until you approve the request in the app. |
+| Write | `manage_spaces` | List, create and switch spaces. Applies at once. |
+| Write | `cloud_sync` | Upload the encrypted vault to Google Drive. Applies at once. Its GitHub option always fails. |
+| Admin | `manage_profiles` | List encryption profiles and switch the vault to another one. Applies at once. |
+| Admin | `cloud_config` | Replace the Google Drive token or the GitHub token and repository used for sync. Applies at once. |
+| Admin | `get_history` | The vault's item history: action, type and item name. |
+| Admin | `get_audit_logs` | Recent audit log entries. |
+| Utility | `generate_password` | A random password. Nothing is saved. |
+| Utility | `tx_list`, `tx_abort` | See and cancel pending changes, from any client. |
+
+<Callout type="danger" title="search_vault reveals secrets">
+`search_vault` matches the search text against every field of an item, including passwords, and returns the matching items in full. A token with only `search_vault` can read any password it can guess part of, or that contains a common character. It searches each item as JSON, field names included, so a query such as `password` matches every login. Grant it only where you would grant `get_entry` and `decrypt_entry`. For a names-only assistant, use `list_vault` on its own.
+</Callout>
+
+<Callout type="warning" title="cloud_config redirects your own syncs">
+An agent with `cloud_config` can replace the stored GitHub token and repository. Your next GitHub sync, from `pm cloud sync github` or from the desktop app (auto-sync included), then uploads the vault to the repository the agent chose. The file stays encrypted with your master password, but you lose control over where copies live. `cloud_sync` can't do this on its own: its GitHub option always fails (see the [tool reference](/docs/agents/tools#write)). See [Sync security](/docs/security/sync-security).
+</Callout>
+
+### Group names in older tokens
+
+Tokens can also hold a group name instead of tool names. `pm mcp token` and the desktop app's token dialog only offer tool names today, but tokens made by older versions of `pm` may hold group names, and these still work. Groups are not nested:
+
+| Name | Tools it allows |
+|------|-----------------|
+| `read` | `list_vault`, `search_vault` |
+| `secrets` | `get_entry`, `decrypt_entry`, `get_totp` |
+| `write` | `add_entry`, `delete_entry`, `edit_entry`, `manage_spaces`, `cloud_sync` |
+| `admin` | `manage_profiles`, `cloud_config`, `get_history`, `get_audit_logs` |
+| `all` | Every tool |
+
+`secrets` does not include `list_vault`, and `admin` does not include `write`. The utility tools are only allowed by their own names or by `all`.
+
+## Vault access needs an unlocked session
+
+The MCP server never needs or returns your master password. When a tool needs the vault, the server reads the `pm` session you opened:
+
+- `pm unlock` in a terminal, or
+- unlocking the desktop app, which starts the same session.
+
+The session lives in your system's temporary folder as `pm_session_global.json`, or `pm_session_<id>.json` when `APM_SESSION_ID` is set. It is encrypted with a key kept in your APM config folder. If you set `APM_SESSION_ID` in your shell, set the same value in the client's `env` block, or the server looks in the wrong place. See [Sessions and locking](/docs/security/sessions-and-locking).
+
+What this means in practice:
+
+- **No session, no vault.** Tools return `Vault Error: vault is locked. please run 'pm unlock' first to start an MCP session` (some tools just say `Vault Error`).
+- **Agent calls count as activity.** Each call that reads the vault resets the idle timer. An agent that keeps working keeps the vault unlocked until the session's maximum length or until the computer sleeps, whichever your auto-lock policy sets.
+- **Some tools work while locked.** `generate_password`, `get_audit_logs`, `tx_list`, `tx_abort`, `add_entry`, `edit_entry` and `delete_entry` don't open the vault. Add, edit and delete requests made while the vault is locked wait in the queue; the desktop app shows them once you unlock it. Neither does `decrypt_entry`, which can still open a reference that `get_entry` handed out in the last five minutes.
+
+### Read-only sessions
+
+If the current session is read-only (started with `pm mode readonly <minutes>`), the server does not open your vault. It gives the agent a generated placeholder vault with random items instead. Lock and unlock normally if the agent sees items you don't recognize.
+
+<Callout type="danger" title="Don't let an agent write during a read-only session">
+The server doesn't block the tools that write directly in this state. A `manage_spaces`, `manage_profiles` or `cloud_config` change is made to the placeholder vault, and the placeholder is then saved over your vault file with your master password. Add, edit and delete requests are only queued, and the desktop app refuses to approve them while the session is read-only.
+</Callout>
+
+### Ephemeral sessions
+
+Instead of sharing your own session, you can give a client a short-lived one with `pm session issue`, and pass its ID to the server in the client's `env`:
+
+```json title="env block"
+"env": {
+  "APM_EPHEMERAL_ID": "eps_8c41d0f2a9b7e3c5d1f60a4b",
+  "APM_EPHEMERAL_AGENT": "mcp"
+}
+```
+
+The server uses it only when there is no regular session, so `pm lock` first. The session ends at its `--ttl` or when you run `pm session revoke <id>`. Its `--scope` (`read` or `write`) is not applied to MCP calls: the token's permissions decide. Don't use `--bind-pid`; it binds the session to the `pm session issue` process itself, which has already exited when the server starts. Step-by-step in [Recipes](/docs/agents/recipes#give-an-agent-a-short-lived-session).
+
+## Writes: you approve in the app
+
+`add_entry`, `edit_entry` and `delete_entry` never write to the vault. They queue a request, and only you can apply it, from the desktop app.
+
+<Steps>
+
+### The agent asks
+
+The agent calls the tool once. APM writes nothing to the vault. It records a pending request, writes `MCP_TX_REQUESTED` to the audit log, and replies with a one-line preview of the change:
+
+```text title="Tool result"
+Waiting for approval: Add api_key entry 'Postmark server token' in space 'work'
+Request tx_3f9c0a7d21be5e8c94a1d6f0 expires at 2026-10-05T14:30:00+05:30. The user approves or rejects it in the APM app (Settings > AI access). Nothing changes until they approve. Call tx_list to see whether it was approved.
+```
+
+Pending requests are kept in `mcp_transactions.json` in your APM config folder, including the arguments the agent sent (secret values too), and expire after **15 minutes**. Calling the tool again doesn't commit anything: `tx_id` or `approve` arguments are ignored, and the call queues another request.
+
+### You approve or reject it
+
+While the desktop app is unlocked it checks for new requests every few seconds. The sidebar shows **N AI requests waiting for approval**, and **Settings → AI access** lists each one with the client's name, the operation, the item's fields (secret values masked) and the time left. Choose **Approve** or **Reject**.
+
+### APM saves and records it
+
+Approving applies the arguments stored with the request, saves the vault and records an lgit commit with the note `Approved <token name>: <preview>`, so you can undo it with `pm lgit undo`. It also writes `MCP_ENTRY_ADDED`, `MCP_ENTRY_EDITED` or `MCP_ENTRY_DELETED` to the audit log with the token's name. Rejecting writes `MCP_TX_ABORTED`. A rejected or expired request changes nothing.
+
+</Steps>
+
+If the request can't be applied when you approve it, for example the item no longer exists or the space already has an account with that name, the app shows `Could not apply the request: <error>` and saves nothing.
+
+`tx_list` shows pending and recent requests from every client, each `pending`, `committed` or `aborted`, so the agent can check whether you approved. To cancel a pending change, reject it in the app, or call `tx_abort` with its ID.
+
+Here is one round trip. The agent asked for three changes, then withdrew the delete with `tx_abort`, and you approved the add in the app:
+
+```text title="tx_list, before you answer"
+tx_f39eb5eec2e737dce27e9bea | delete_entry | Claude Desktop | aborted | expires=2026-10-05T21:32:26+05:30
+tx_129489c4ccd9fa208b2c966d | edit_entry | Claude Desktop | pending | expires=2026-10-05T21:32:26+05:30
+tx_eade19acfbe25e4655c47486 | add_entry | Claude Desktop | pending | expires=2026-10-05T21:32:26+05:30
+```
+
+```text title="tx_list, after you approve the add"
+tx_f39eb5eec2e737dce27e9bea | delete_entry | Claude Desktop | aborted | expires=2026-10-05T21:32:26+05:30
+tx_129489c4ccd9fa208b2c966d | edit_entry | Claude Desktop | pending | expires=2026-10-05T21:32:26+05:30
+tx_eade19acfbe25e4655c47486 | add_entry | Claude Desktop | committed | expires=2026-10-05T21:32:26+05:30
+```
+
+```text title="get_audit_logs"
+[2026-10-05T21:17:26+05:30] MCP_TX_REQUESTED: Token 'Claude Desktop' requested: Add password entry 'Figma' in space 'default'
+[2026-10-05T21:19:00+05:30] MCP_ENTRY_ADDED: Approved in the desktop app for token 'Claude Desktop': Add password entry 'Figma' in space 'default'
+```
+
+Approving a request that was already answered fails with "That request is already committed." or "That request is already aborted.", and one past its 15 minutes with "That request expired or no longer exists." An edit request that names no `space` reads `in space ''` in its summary; when you approve it, the default space is used.
+
+### Changes that skip the preview
+
+These tools apply immediately, with no request for you to approve:
+
+| Tool | Action |
+|------|--------|
+| `manage_spaces` | `add` creates a space; `switch` changes the vault's current space for `pm` and the app too |
+| `manage_profiles` | `set` re-encrypts the vault with another encryption profile |
+| `cloud_config` | Replaces stored sync credentials |
+| `cloud_sync` | Uploads the encrypted vault |
+
+Grant them only to clients you trust with that change. Encryption profiles are explained in [Profiles](/docs/security/profiles).
+
+## Audit log
+
+MCP activity goes into APM's audit log, `audit.json` in your APM config folder. Each entry has a timestamp, an action, details, your user name and host name, and is chained to the previous entry by hash and signed with a key kept beside the log. View it, with each entry's verification status, with:
+
+```sh title="Terminal"
+pm logs
+```
+
+| Action | Written when |
+|--------|--------------|
+| `MCP_TOKEN_CREATED`, `MCP_TOKEN_REVOKED` | A token is created or revoked |
+| `MCP_AUTH_FAILED` | A server start used an unknown or expired token |
+| `MCP_ENTRY_ACCESSED` | `get_entry` opened an item (token, item and type) |
+| `MCP_TX_REQUESTED` | An agent asked to add, edit or delete an item (token and preview) |
+| `MCP_ENTRY_ADDED`, `MCP_ENTRY_EDITED`, `MCP_ENTRY_DELETED` | You approved a request in the app |
+| `MCP_TX_ABORTED` | You rejected a request in the app |
+| `MCP_SPACE_ADDED`, `MCP_SPACE_SWITCHED` | `manage_spaces` changed spaces |
+| `MCP_PROFILE_CHANGED` | `manage_profiles` changed the profile |
+| `MCP_CLOUD_CONFIG`, `MCP_CLOUD_SYNC` | `cloud_config` ran, or `cloud_sync` updated an existing synced copy |
+| `MCP_ENABLED`, `MCP_DISABLED` | The **MCP server** switch changed in the app |
+
+Not every call is logged. `list_vault`, `search_vault`, `get_totp`, `decrypt_entry`, `get_history`, `get_audit_logs`, `generate_password`, `tx_list` and `tx_abort` leave no audit entry. Added and deleted items also appear in the vault's own history, which `pm logs` shows and `get_history` returns. Edits approved in the app don't add a history entry.
+
+<Callout type="note" title="About the MCP server switch">
+The **MCP server** switch in **Settings → AI access** controls the app's side: with it off, you can't create tokens or set up clients from the app. It doesn't stop `pm mcp serve` from starting with a token you already have. Revoke tokens to do that.
+</Callout>
+
+## Good practice
+
+- **One token per client**, named after it, so revoking one doesn't break the others and the audit log says who did what.
+- **Fewest tools that do the job.** `list_vault` plus `get_totp` covers a lot. Add `search_vault` and the Secrets group only when the client needs secret values.
+- **Set an expiry.** Short ones for experiments, a week or a month for daily tools.
+- **Lock when you're done.** `pm lock` stops every client at once.
+- **Review now and then.** `pm mcp list` shows tokens you forgot; `pm logs` shows what they did.
+
+For how agent access fits into APM's overall security, see the [threat model](/docs/security/threat-model).

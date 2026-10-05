@@ -1,0 +1,313 @@
+---
+title: Items
+description: The 25 item types, creating and editing items, fields, files, favorites, versions, Trash and Quick Look.
+order: 4
+group: Using the app
+---
+
+Everything you save in APM is an item. Each item has a type, and each type has its own fields. Items live in a [space](/docs/desktop/spaces), and their names must be unique within their type and space.
+
+Shortcuts on this page use Mac keys. On Windows and Linux, press <Kbd>Ctrl</Kbd> where it says <Kbd>⌘</Kbd>. See [Keyboard shortcuts](/docs/desktop/keyboard-shortcuts).
+
+## Item types
+
+APM has 25 types in four groups. A field marked with `*` is required. The **main secret** is what <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd> and **Copy Password** copy for that type. The **ID** is the type's name in an item's identifier, such as `Default:password:GitHub`.
+
+### Identity and personal
+
+| Type | ID | Fields | Main secret |
+|---|---|---|---|
+| **Login** | `password` | Name\*, Username, Password\*, Two-factor code, Website, Other websites, Notes, Custom fields | Password |
+| **Authenticator** | `totp` | Name\*, Setup key\*, Website | Setup key |
+| **Secure note** | `note` | Title\*, Note | Note |
+| **Wi-Fi network** | `wifi` | Network name\*, Password\*, Security, Router address | Password |
+| **Government ID** | `govid` | Name\*, Document, ID number\*, Expires | ID number |
+| **Medical record** | `medical` | Name\*, Insurance ID, Prescriptions, Allergies | Insurance ID |
+| **Travel** | `travel` | Name\*, Ticket number, Booking code, Loyalty program | Booking code |
+| **Contact** | `contact` | Name\*, Phone, Email, Address, Emergency contact | Phone |
+| **Recovery codes** | `recovery` | Service\*, Codes\* | Codes |
+
+### Developer and infrastructure
+
+| Type | ID | Fields | Main secret |
+|---|---|---|---|
+| **API key** | `apikey` | Name\*, Service, Key\* | Key |
+| **Token** | `token` | Name\*, Token\*, Kind | Token |
+| **SSH key** | `ssh_key` | Name\*, Private key\* | Private key |
+| **SSH host** | `ssh_config` | Alias\*, Host\*, User, Port, Key path, Private key, Fingerprint | Private key |
+| **Cloud credentials** | `cloud` | Name\*, Access key, Secret key, Region, Account ID, Role, Expires | Secret key |
+| **Kubernetes** | `k8s` | Name\*, Cluster URL, Namespace, Expires | Cluster URL |
+| **Docker registry** | `docker` | Name\*, Registry, Username, Token | Token |
+| **CI/CD secret** | `cicd` | Name\*, Webhook, Environment variables | Webhook |
+| **Certificate** | `certificate` | Name\*, Issuer, Expires, Certificate, Private key | Private key |
+
+### Finance and legal
+
+| Type | ID | Fields | Main secret |
+|---|---|---|---|
+| **Card or account** | `banking` | Name\*, Kind (Card, IBAN or SWIFT), Number\*, CVV, Expires (MM/YY) | Number |
+| **Software license** | `license` | Product\*, Serial key\*, Activation, Expires | Serial key |
+| **Legal contract** | `legal` | Name\*, Summary, Parties, Signed | Summary |
+
+### Media and files
+
+| Type | ID | Fields | Main secret |
+|---|---|---|---|
+| **Document** | `document` | Name\*, File\*, Document password, Tags, Expires | Document password |
+| **Photo** | `photo` | Name\*, Image\* | None |
+| **Audio** | `audio` | Name\*, Audio file\* | None |
+| **Video** | `video` | Name\*, Video file\* | None |
+
+Choices for select fields. A new item starts on the first choice:
+
+- **Wi-Fi network → Security**: WPA3 Personal, WPA2 Personal, WPA2 Enterprise, WEP or Open.
+- **Government ID → Document**: Passport, Driver's License, Voter ID or National ID.
+- **Card or account → Kind**: Card, IBAN or SWIFT.
+
+A new **SSH host** starts with **Port** set to 22.
+
+Under each name, the list shows a short subtitle. For a login it is the username, or the website when there is no username. An Authenticator item shows "6 digits · 30s", a recovery code list shows how many codes it has and how many are unused, such as "10 codes · 8 unused", a card shows its kind and last four digits, such as "Card ···· 4242", and a file item shows the file's name and size.
+
+<Callout type="note" title="Emergency contact">
+The **Emergency contact** checkbox says the contact is "Shown first in Contacts and on the lock screen card." APM does neither. The flag only shows on the item, as **Emergency contact: Yes**.
+</Callout>
+
+## Create an item
+
+Start a new item in any of these ways:
+
+- Press <Kbd>⌘</Kbd><Kbd>N</Kbd>, or choose **File → New Item**.
+- Click **New** above the list. When the list is filtered to one type, **New** starts that type directly.
+- In the command menu, choose **New item**, or type "New" and the type, such as **New login** or **New ssh key**.
+- On the **Authenticator** page, choose **Add code**.
+
+<Steps>
+
+### Pick a type
+
+The **New item** picker ("Choose what you are saving. Each type has its own fields.") groups the 25 types by category, each with a one-line description. Type in **Search 25 types** to narrow it down. It matches the type's name and description, so "card" finds **Card or account**. If nothing matches, it says **No type matches** your text and suggests "Try Login, Card, SSH key or Note."
+
+### Fill in the fields
+
+The dialog is titled after the type, such as **New login**. The first field has focus. Required fields have a `*`. Password fields have a **Generate** button that opens the [password generator](/docs/desktop/generator) next to the field, and a strength meter. Choose a **Space** at the bottom. It starts on the space selected in the sidebar, or **Default** when the sidebar shows **All spaces**.
+
+For a **Document**, a callout reminds you: "Delete the original yourself. APM encrypts a copy. The file you chose stays on disk until you remove it."
+
+### Save
+
+Choose **Save** and the type, for example **Save login**, or press <Kbd>⌘</Kbd><Kbd>↵</Kbd>. **All types** goes back to the picker. It is not there when you started from a type, for example with **New** on a filtered list or **Add code**.
+
+</Steps>
+
+APM selects the new item and confirms with a toast, such as **Added GitHub**, plus **In Work** when it went into a space other than Default.
+
+APM checks a few things before it saves:
+
+- Every required field is filled in.
+- For an **Authenticator** item, the setup key is valid base32 (A to Z and 2 to 7). Paste an `otpauth://` link instead and APM takes the key from it, and fills in **Name** from the issuer if it is empty.
+- If a [password policy](/docs/desktop/settings#password-policy) is active, a login or Wi-Fi password must meet it. The field shows what the policy needs as you type.
+- No other item of the same type in that space has the same name. Names are compared without regard to case or spaces at either end, so "GitHub" and "github " clash.
+
+### When APM will not save
+
+The message appears above the dialog's buttons, or above the help line when you are editing.
+
+| Message | What to do |
+|---|---|
+| "“Name” is required." | Fill in the field it names. The label changes with the field, for example "“Network name” is required." |
+| "That setup key is not valid base32. It should only contain A to Z and 2 to 7." | A new Authenticator item's key has other characters. Copy the key again, or paste the `otpauth://` link. When you edit an Authenticator item, the message is "That setup key is not valid base32." |
+| "That two-factor setup key is not valid. Paste the key or the otpauth:// link the site shows." | You are editing a login, and its **Two-factor code** has characters other than A to Z and 2 to 7 once spaces and dashes are removed |
+| "The setup key is not valid base32" | The same problem, in a new login's **Two-factor code** |
+| "It uses 8-digit codes. APM generates 6-digit codes" | A new login's `otpauth://` link asks for codes APM cannot make. See [Codes APM cannot make](/docs/desktop/authenticator#codes-apm-cannot-make) |
+| "Policy “team-standard” needs passwords of at least 14 characters." | The active policy's minimum length. Make the password longer, or use **Generate** |
+| "Policy team-standard: password must contain an uppercase letter" | The active policy's other rules: an uppercase letter, a number or a symbol. The field's hint lists every rule, for example "Policy “team-standard” needs 14+ characters, an uppercase letter, a number, a symbol." |
+| "An item called GitHub already exists in this space." | Rename the new item, or pick another space |
+| "Another item with that name already exists in that space." | The same clash, when you rename an item or change its **Space** in the editor. **Move to space…** says "Items with the same name already exist there:" and the names |
+| "Files over 50 MB make the vault slow to open and sync. Keep large files outside the vault." | Choose a smaller file |
+
+The policy is checked whenever you save a login or Wi-Fi network, not only when you change its password. A login saved before the policy was turned on cannot be edited until its password meets the policy too.
+
+<Callout type="warning" title="Files are copied, not moved">
+For a **Document**, **Photo**, **Audio** or **Video** item, APM encrypts a copy of the file into the vault. The original stays on disk until you delete it yourself. Files over 50 MB are refused, because they make the vault slow to open and sync. Drop a file on the field or click it to choose one. Once a file is chosen, the field shows its size and "click to replace".
+</Callout>
+
+## The detail pane
+
+Select an item to see it in the detail pane. With nothing selected, it says **Nothing selected** and suggests <Kbd>⌘</Kbd><Kbd>K</Kbd> to jump to an item.
+
+### The header
+
+- A path such as **Logins › GitHub**. Click the type to see the list of that type.
+- The item's icon. For logins this is the website's own logo when [website icons](/docs/desktop/settings#appearance) are on, otherwise the first letter.
+- The name and badges: the type, the space, **2FA on** when it has a one-time code, **Passkey** or **N passkeys**, and **Added by AI** when an AI assistant created it.
+- The **identifier** (`Space:type:Name`, for example `Default:password:GitHub`). This is how `pm` and `.apmignore` refer to the item. Click it to copy it; the toast says **Identifier copied**.
+- A chip with the matching `pm get` command. Click it to copy the command. **Show pm commands** in **Settings → Appearance** hides these chips.
+- Buttons for the star, **Version history**, **Details and activity**, **Edit** and **More actions** (`…`).
+
+When [Watchtower](/docs/desktop/watchtower) has found a problem, up to two notices appear under the header, for example **Reused password** with a **Change password** button, or **Marked as exposed** with **Clear flag**.
+
+### Fields
+
+Each filled-in field is a row. Empty fields are hidden. An item with nothing filled in but its name says **No details yet** with an **Add some** link that opens the editor.
+
+- **Secret fields** (passwords, keys, tokens, private keys) are masked. **Reveal** shows the value, with digits and symbols colored. **Hide** masks it again.
+- **Copy** copies a value. Clicking a value copies it too. Links open in your browser instead; a website saved without `http://` or `https://` opens as `https://`.
+- Passwords show a strength meter. Dates show a countdown when they are less than 60 days away: **In 12 days**, **Expires today** or **Expired 3 days ago**.
+- **Two-factor code** shows the live 6-digit code instead of the key.
+- **Other websites** shows one row per site. **Tags** show as chips.
+- **Environment variables** (CI/CD secret) show as a table with each value masked. Click a value to copy it, use the eye to reveal it, or **Copy as .env** for all of them as `KEY=value` lines.
+- **Custom fields** show with their own labels. Hidden ones are masked like passwords. A custom field with no label shows as **Field 1**, **Field 2** and so on.
+- **Recovery codes** show how many are unused, such as **8 of 10 unused**, with **Running low** at three or fewer. Use **Reveal codes**, **Copy unused codes**, or the check on a code to **Mark as used**. Click a code to copy it. A used code is shown in full and marked **Used**, and clicking it does nothing.
+
+When you copy something, a toast confirms it, such as **Copied password** or **Copied username**. For a secret, the toast counts down to when the clipboard is cleared, "Clears in 30s" by default; set the time in **Settings → Security → Clear clipboard** (10, 30 or 90 seconds, or **Never**). APM only clears the clipboard if it still holds what APM put there. For a plain value, the toast shows the value instead, and the clipboard is not cleared.
+
+Below the fields, a footer shows when the item was created and modified, how many earlier versions it has (or **No earlier versions**), and its trust score.
+
+### Linked codes and logins
+
+- A login shows a **One-time code** row when an Authenticator item has the same name, or the same website as the login. The link button next to it (**From Authenticator**) opens that item.
+- An Authenticator item shows **Used by** with the login that has the same name.
+
+See [How codes and logins link](/docs/desktop/authenticator#how-codes-and-logins-link).
+
+## Notes and files
+
+A **Secure note** shows its text with paragraphs and lists, and a word and character count. A block of lines that all start with `-`, `*` or a number such as `1.` shows as a list. **Open editor** opens a full editor:
+
+- The note's name, its space and "Secure note" at the top.
+- Line numbers, and the cursor's line and column, line count, words and characters in the footer, such as "Ln 4, Col 12 · 18 lines · 240 words · 1312 chars".
+- **● modified** or **● saved** in the footer.
+- <Kbd>⌘</Kbd><Kbd>S</Kbd> saves, and the toast says **Note saved**. <Kbd>Tab</Kbd> inserts two spaces.
+- **Close** with unsaved changes shows "You have unsaved changes. Close without saving?" with **Keep editing** and **Discard**.
+
+Items with a file show a card with the file name, its size and type, and "encrypted in vault". **Save a copy** writes the decrypted file wherever you choose. The toast names the file and has a **Show** button that opens its folder.
+
+- Images, audio and video up to 60 MB preview right in the pane. While APM decrypts a file, the pane says "Decrypting…".
+- A **Document** with a **Document password** stays closed until you type that password and choose **Open**. A wrong one shows "That is not this document's password."
+- Other files show **No preview for this file. Save a copy to open it.**
+
+<Callout type="warning" title="A document password is a lock in the app, not extra encryption">
+The type is described as "A file sealed with its own password", and the field as "Needed to open the file, in addition to your vault." In fact, the file is encrypted with the rest of the vault, and the document password is stored in the item as an ordinary field. Anyone who can unlock the vault can reveal it in the item's **Document password** row, and Quick Look previews an image in a locked document without asking for it. Use it to keep a file from opening by accident, not to protect it from someone with your master password.
+</Callout>
+
+## Edit an item
+
+Start editing with **Edit** in the header, <Kbd>⌘</Kbd><Kbd>E</Kbd>, a double-click on the row, or **Edit** in the item menu.
+
+The pane switches to **Editing**. Change the name at the top, any field, or the **Space**. Then choose **Save** (<Kbd>⌘</Kbd><Kbd>S</Kbd>), or **Cancel** (<Kbd>Esc</Kbd>). **Save** stays greyed out until you change something. If you made changes, Cancel asks **Discard your changes?** first. After a save, the toast says **Saved** and the name, such as **Saved GitHub**.
+
+In the editor, password fields show the password in plain text, in a monospaced font, so you can check what you typed. Hidden custom fields stay masked.
+
+Saving keeps the old values as a version you can restore. Changing an item's main secret also resets its **Last rotated** date, which the trust score uses. Contacts, Kubernetes items and legal contracts are the exception: their **Last rotated** date stays as it was.
+
+<Callout type="warning" title="Save before you click away">
+Only **Cancel** and <Kbd>Esc</Kbd> ask before throwing changes away. If you click another item in the list, or a place in the sidebar, while you are editing, the editor closes and your unsaved changes are lost.
+</Callout>
+
+### Login fields
+
+- **Two-factor code**: paste the setup key or the `otpauth://` link the site shows when you turn on 2FA. Spaces are ignored, and the key is converted to capitals as you type. The login then shows live codes and appears on the [Authenticator](/docs/desktop/authenticator) page.
+- **Website** and **Other websites**: the browser extension offers the login on any of them. In **Other websites**, type a URL and choose **Add** or press <Kbd>↵</Kbd>, or paste several separated by spaces or commas. A site you typed is also added when you leave the field. Duplicates are skipped. Each site has an `×` to remove it.
+- **Custom fields**: **Add field**, then a **Label** and a **Value**. The eye button marks a field as hidden, so it is masked and copied like a password. Use it for PINs, security answers and account numbers. The `×` removes a field. A field with neither a label nor a value is dropped when you save.
+- **Passkeys**: shown below the fields. You cannot create a passkey here. The browser extension saves one when a site offers to create it. See [Passkeys](/docs/desktop/passkeys).
+
+### Other fields
+
+- **Codes** (Recovery codes): one code per line. The hint under the box counts them, such as "10 codes".
+- **Environment variables** (CI/CD secret): one `KEY=value` per line, or separated by commas.
+- **Tags** (Document): type a tag and choose **Add** or press <Kbd>↵</Kbd>.
+- **Expires**, **Signed** and the other date fields have a date picker. **Expires** on a card is plain text, in the form `MM/YY`.
+
+## The item menu
+
+Open it with **More actions** (`…`) in the header, or right-click a row in the list. It offers what applies to the item:
+
+| Entry | Shortcut |
+|---|---|
+| **Copy** and the main secret's name, for example **Copy password** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd> |
+| **Copy username** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>U</Kbd> |
+| **Copy one-time code** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>T</Kbd> |
+| **Open website** | <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>O</Kbd> |
+| **Add to favorites** or **Remove from favorites** | |
+| **Edit** | <Kbd>⌘</Kbd><Kbd>E</Kbd> |
+| **Duplicate** | |
+| **Move to space…** | |
+| **Quick look** | <Kbd>Space</Kbd> |
+| **Change password…** (logins and Wi-Fi) | |
+| **Delete** | <Kbd>⌘</Kbd><Kbd>⌫</Kbd> |
+
+- The copy entries only appear when the item has something to copy: a main secret, a username, or a one-time code of its own or from a linked Authenticator item. **Open website** only appears when the item has a website.
+- **Duplicate** makes a copy named with " copy" at the end (then " copy 2" and so on) in the same space, and selects it. The copy has the same fields and file, but not the original's passkeys, star or earlier versions.
+- **Move to space…** opens a list of spaces with their item counts.
+- **Change password…** opens the editor so you can set a new password.
+
+<Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>O</Kbd> also opens a Docker registry's **Registry** address, which the menu does not offer. When a shortcut has nothing to act on, APM says so: **Nothing to copy**, **No username on this item**, **No one-time code for this item** or **No website on this item**.
+
+## Favorites
+
+Star an item with the star in the header, the item menu, or **Favorite** on a multi-selection. Favorites appear under **Favorites** in the sidebar, and at the top of the command menu's item results. With none yet, **Favorites** says "Star an item to pin it here and to the top of the command menu."
+
+A favorite keeps its star when you move it to Trash and restore it.
+
+## Delete and Trash
+
+**Delete** asks to confirm, then moves the item to **Trash**. The dialog asks **Delete “GitHub”?** and says "It moves to Trash. You can restore it until you empty Trash." For several items it lists the first five, then "and N more". If a login has passkeys, the dialog warns that deleting it stops those passkeys from working in the browser extension.
+
+The confirmation always appears. The **Confirm before deleting** switch in **Settings → General** does not change that.
+
+After a delete, the toast says **Moved GitHub to Trash** (or **Moved 3 items to Trash**) and offers **Undo** for 5 seconds.
+
+Open **Trash** at the bottom of the sidebar.
+
+- Items in Trash stay inside the encrypted vault, and sync with it, until you empty Trash. `pm` does not show them.
+- The list shows when each item was deleted, newest first, such as "Deleted 2 days ago".
+- Select one to see it with **Restore** and **Delete**. Right-click for **Restore** and **Delete permanently**. You cannot edit or Quick Look an item in Trash.
+- **Delete** in Trash asks **Delete “GitHub”?** ("This removes it from the vault for good. Older snapshots in History still contain it until you prune.") and confirms with **Delete permanently**.
+- **Restore** puts it back in its space, with its star, versions and passkeys, and says **Restored GitHub**. If another item there now has the same name, APM says "An item with the same name already exists:" and the name, and leaves it in Trash. Rename the other item first.
+- **Empty** above the list asks **Empty Trash?** ("N items will be deleted permanently. History still holds older vault snapshots until you prune them.") and deletes everything in Trash for good.
+
+<Callout type="note">
+A permanent delete removes the item from the vault, but older snapshots in [History](/docs/desktop/history) still contain it until you prune or squash them.
+</Callout>
+
+## Version history
+
+Each time you save an item with a changed value, APM keeps the previous values as a version. It keeps up to 20 versions per item, inside the vault. File contents are not versioned, and moving an item to another space, starring it or changing its privilege does not make a version. An import that merges into an item, or replaces it, also keeps the item's values from before as a version.
+
+Click **Version history** in the header, or the **N earlier versions** link in the footer. The list starts with **Current version**. Each version shows when it was saved, which fields changed (for example "Changed password, notes") and, for up to three of them, the old and new values (secrets stay masked). **Restore** asks **Restore this version?** ("The current values become a new version, so you can undo this too.") and puts that version back. The toast says **Version restored**. Restoring never changes the item's file.
+
+With no versions yet, it says "No earlier versions. APM keeps up to 20 per item."
+
+For whole-vault history, see [History and undo](/docs/desktop/history).
+
+## Details and activity
+
+Click **Details and activity** in the header to see:
+
+- **Trust score**: 0 to 100 with a risk level and the reasons behind it, such as "Not rotated in 90 days" with `-10`. See [Watchtower](/docs/desktop/watchtower#trust-scores).
+- **Privilege**: **Normal**, **Elevated**, **Admin**, **Root** or **Critical**. How much damage the secret could do. Elevated lowers the trust score by 8 points, and admin, root and critical by 15.
+- **Exposed**: mark a secret you know has leaked. The switch's description says it "drops 45 trust points until you rotate it". In fact the 45 points come back only when you turn the switch off, or choose **Clear flag**; changing the secret alone does not clear it.
+- **Space**; **Created**, with who created it, such as "Oct 5, 2026, 9:41 AM by you" (or "by an AI client"); **Last used** and how many times, such as "2 hours ago · 14 times"; **Last rotated**, with the age in days; **Category key** (`type|Name|space`, such as `password|GitHub|default`); and **Item ID**.
+- **Activity**: up to 12 recent entries from the vault's signed history for this item, such as **Added**, **Edited**, **Viewed or copied**, **Deleted** and **Merged from sync**.
+
+**Last used** counts copies of the main secret made with the item menu, <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>C</Kbd>, **Edit → Copy Password** or the command menu, and codes copied on the Authenticator page. Each of these also adds a **Viewed or copied** entry to **Activity**. Copying from the fields in the detail pane does not count, and nothing counts while the vault is read-only.
+
+## Quick Look
+
+Press <Kbd>Space</Kbd> to preview the item under the pointer, or the selected one. Quick Look shows an image preview, the first 18 lines of a note, a live one-time code and up to six other fields. Secret fields stay masked.
+
+While it is open, <Kbd>↑</Kbd> and <Kbd>↓</Kbd> move to the next item. <Kbd>Space</Kbd> or <Kbd>Esc</Kbd> closes it, and so does a click outside it. **Open item** selects the item in the list.
+
+## Select several items
+
+- <Kbd>⌘</Kbd>-click adds or removes an item.
+- <Kbd>⇧</Kbd>-click selects a range.
+- <Kbd>⇧</Kbd><Kbd>↑</Kbd> or <Kbd>⇧</Kbd><Kbd>↓</Kbd> extends the selection.
+- <Kbd>⌘</Kbd><Kbd>A</Kbd> selects everything in the list.
+- <Kbd>Esc</Kbd> or **Clear** in the bar above the list clears the selection.
+
+With more than one item selected, the detail pane shows how many, which types (such as "2 logins, 1 api key"), and four buttons: **Favorite**, **Move**, **Export** and **Delete**. Right-click for the same actions: **Add to favorites**, **Move to space…**, **Export selected…** and **Delete N items**. Starring them says **Starred 3 items**.
+
+## A read-only vault
+
+When the vault is read-only, the bottom of the sidebar says **Read-only**, with the time it ends when it has one. A vault written by a newer `pm` says "Read-only. This vault was updated by a newer pm. Update APM to edit it." Either way, **New** and **Edit** are greyed out, and any other change is refused with "This session is read-only." or the newer-vault message. You can still view and copy items.

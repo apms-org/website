@@ -1,0 +1,175 @@
+---
+title: Encryption
+description: How APM turns your master password into keys, encrypts the vault and detects tampering.
+order: 1
+group: Model
+---
+
+APM uses a two-level key scheme. Your master password derives the keys that protect a random **data key**, and the data key encrypts the vault. Everything happens on your computer, and every save writes the whole file again with fresh randomness.
+
+## Key hierarchy
+
+```text title="Key hierarchy"
+master password + salt (new on every save)
+                │
+                ▼
+Argon2id (time, memory and threads from your profile)
+                │
+                ▼  96 bytes
+┌────────────────┬────────────────┬────────────────┐
+│ bytes 0–31     │ bytes 32–63    │ bytes 64–95    │
+│ encryption key │ auth key       │ validator      │
+└───────┬────────┴───────┬────────┴───────┬────────┘
+        │                │                │
+        │ seals          │ signs          │ stored in the header,
+        ▼                ▼                │ checked first
+    key slot        HMAC-SHA256 over
+        │           the whole file
+        │ holds
+        ▼
+    data key (32 random bytes, one per vault)
+        │
+        │ encrypts, fresh nonce on every save
+        ▼
+    vault body (your items, as JSON)
+
+recovery key + recovery salt
+        │ Argon2id (time 2, 64 MiB, 2 threads)
+        ▼
+    recovery slot (AES-256-GCM) ── holds ──► the same data key
+```
+
+## Key derivation
+
+APM runs Argon2id once per unlock or save. The inputs are your master password, a random salt and the time, memory and thread counts from your [security profile](/docs/security/profiles). The output is 96 bytes, split into three independent 32-byte keys:
+
+| Bytes | Key | What it does |
+|---|---|---|
+| 0 to 31 | Encryption key | Seals and opens the key slot that holds the data key |
+| 32 to 63 | Auth key | Computes the HMAC-SHA256 signature over the file |
+| 64 to 95 | Validator | Stored in the header. A wrong password produces a different validator, so it is rejected before anything else runs |
+
+The salt is 16 or 32 bytes on the built-in profiles (a custom profile made with `pm` takes any length you enter), and comes from the operating system's secure random generator. A new salt is drawn on every save, so all three keys change every time the file is written. `pm` also rewrites the file after every unlock with your password, so the salt changes then too. Unlocking from an open session, or in the desktop app, does not rewrite it.
+
+APM compares the validator and the signature in constant time, and wipes the derived keys from memory once it is done with them.
+
+<Callout type="note" title="The validator is a password check, not a shortcut">
+Anyone with a copy of `vault.dat` can use the validator to test a password guess. Each guess still costs a full Argon2id run with your profile's memory and time. That is the same cost any password-encrypted file imposes, and it is why the profile and the strength of your master password matter.
+</Callout>
+
+## The data key
+
+The first time a vault is saved, APM generates a 32-byte data key with the secure random generator. It stays the same for the life of the vault. Each save:
+
+1. Serializes the vault to JSON.
+2. Encrypts the JSON with the data key and a fresh random nonce, using the profile's cipher.
+3. Seals the data key into the **key slot** with the encryption key. The key slot's nonce is the first bytes of SHA-256 of the salt. Because the salt is new on every save, that nonce is new on every save too.
+
+Because the data key never changes, changing your master password only re-seals the key slot. Your recovery key keeps working, since the recovery slot wraps the same data key. See [Recovery](/docs/security/recovery).
+
+## Ciphers
+
+Both ciphers are authenticated (AEAD): they encrypt and also detect any change to the ciphertext.
+
+| Cipher | Key | Nonce | Where it is used |
+|---|---|---|---|
+| AES-256-GCM | 256-bit | 12 bytes, or 24 bytes on the Paranoid profile (Go's GCM with a non-standard nonce size) | Default for the built-in profiles |
+| XChaCha20-Poly1305 | 256-bit | 24 bytes | Optional. Pick it in `pm setup`, `pm profile create`, `pm profile edit`, or **Settings → Security → Cipher** in the desktop app. The desktop app also uses it when you choose Paranoid. |
+
+The same cipher seals both the key slot and the body. The recovery slot always uses AES-256-GCM.
+
+`pm profile set <name>` switches to a built-in profile with AES-256-GCM. If you picked XChaCha20-Poly1305 and then switch profile from the command line, check the cipher afterwards with `pm cinfo`.
+
+## Integrity
+
+APM checks integrity in two places:
+
+- **HMAC-SHA256 over the file.** The last 32 bytes of `vault.dat` are an HMAC, keyed with the auth key, over every byte before them: header, profile, recovery block, salt, validator, nonce, key slot and body. `pm` verifies it right after the validator and before it opens the key slot. If it does not match, unlocking stops with `vault file has been tampered with or corrupted`.
+- **AEAD tags.** The key slot and the body each carry a 16-byte authentication tag. Opening either one fails if a single bit changed.
+
+You can see the check work by changing one byte of a copy of the vault and unlocking it with the right password:
+
+```text title="Output"
+Master Password (attempt 1/3):
+Error: vault file has been tampered with or corrupted
+Master Password (attempt 2/3):
+Error: vault file has been tampered with or corrupted
+Master Password (attempt 3/3):
+Error: vault file has been tampered with or corrupted
+too many failed attempts
+```
+
+`pm` counts each of those tries as a [failed attempt](/docs/security/sessions-and-locking#failed-attempts), and the desktop app reports a damaged file as an incorrect password. Restore the file from a backup, an [lgit snapshot](/docs/cli/history) or a cloud copy.
+
+## What happens when you unlock
+
+<Steps>
+
+### Read the header
+`pm` checks for `APMVAULT`, reads the version and the profile, and skips over the recovery block.
+
+### Derive the keys
+Argon2id runs with the profile's settings and the stored salt. This is the slow step, on purpose.
+
+### Check the validator
+If the derived validator does not match the stored one, you see `incorrect password`. Nothing else is touched.
+
+### Check the signature
+The HMAC is recomputed over the file. A mismatch means the file changed after it was written.
+
+### Open the key slot
+The encryption key opens the key slot and yields the data key.
+
+### Decrypt the body
+The data key decrypts the body, and the JSON becomes your vault in memory.
+
+</Steps>
+
+### When unlocking fails
+
+Each of these stops the unlock. `pm` prints it after `Error: ` and asks again, up to three times per command:
+
+| Message | What it means |
+|---|---|
+| `incorrect password` | The validator did not match. Check the password and the keyboard layout. |
+| `vault file has been tampered with or corrupted` | The password is right, but the HMAC over the file does not match. The file changed after it was written. |
+| `failed to decrypt vault payload (incorrect password or corrupted data)` | The signature matched, but the key slot or the body would not open |
+| `unsupported vault version: 9` | The version byte is one this `pm` does not know. It may come from a much newer `pm`, or the file is damaged. |
+| `corrupted header (salt)`, `corrupted header (validator)`, `corrupted header (nonce)` and similar | The file is shorter than its header says, usually because it was cut off |
+| `Vault not found. Run 'pm setup'.` | There is no file at the vault path. Run `pm info` to see which path `pm` uses. |
+
+`pm cinfo` reads only the header, so it still works on a file whose body is damaged. With an unknown version byte it prints `Error reading header: unsupported version: 9`.
+
+## Other places APM encrypts
+
+| What | How |
+|---|---|
+| Recovery slot | The data key, sealed with AES-256-GCM under a key derived from your recovery key with Argon2id (time 2, 64 MiB, 2 threads). See [Recovery](/docs/security/recovery). |
+| Session file | Encrypted with AES-256-GCM plus HMAC-SHA256, using keys derived with the Standard profile from a random 32-byte key in `session.key`. See [Sessions and locking](/docs/security/sessions-and-locking). |
+| Cloud uploads with `.apmignore` | A filtered copy is encrypted the normal way with your master password before upload, with one exception for the first GitHub upload. See [Sync security](/docs/security/sync-security#what-gets-uploaded). |
+| Audit log and lgit history | Not encrypted. Each entry is hash-chained and signed with HMAC-SHA256 using a local key. The lgit snapshots are copies of the encrypted vault file. |
+
+## Older formats
+
+APM still opens vaults written by older versions: format versions 1, 2 and 3, and the original file with no `APMVAULT` header. When it opens one, it rewrites it in the current format on the next save. See [Vault format](/docs/security/vault-format#older-formats).
+
+## Check your settings
+
+`pm cinfo` reads the header and prints the format, profile and cipher without unlocking the vault:
+
+```text title="Output"
+APM Crypto Configuration
+========================
+Format:    APMVAULT v4
+Profile:   hardened
+KDF:       Argon2id
+  Time:    5
+  Memory:  256 KB
+  Threads: 4
+Cipher:    AES-256-GCM
+  Nonce:   12 bytes
+  Salt:    32 bytes
+Integrity: HMAC-SHA256 (Encrypt-then-MAC)
+```
+
+The **Memory** line is in MiB despite its `KB` label. `pm profile current` shows the same parameters for an unlocked vault. Both are described in [Security profiles](/docs/security/profiles#see-your-profile).

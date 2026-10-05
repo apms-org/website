@@ -1,0 +1,224 @@
+---
+title: Import and export
+description: Bring items in from 1Password, Bitwarden, KeePass, browsers and other APM vaults, export to five formats, and compare the vault with an old backup.
+order: 10
+group: Guides
+---
+
+`pm import` reads an export from another password manager, compares every item with your vault and imports only what you choose. `pm export` writes the vault, or part of it, in APM's own format or a format other managers read. `pm export compare` tells you what changed since an earlier export. The desktop app runs the same engine with a guided screen; see [Import and export in the desktop app](/docs/desktop/import-export).
+
+## Import
+
+```sh title="Terminal"
+pm import bitwarden_export.json            # review, then import
+pm import export.1pux --dry-run            # only show the comparison
+pm import vault.json --on-conflict merge -y
+pm import --formats                        # what pm reads and writes
+```
+
+### Supported sources
+
+`pm` detects the format from the file. Pass `--from` to force a source if detection picks the wrong one.
+
+| Source | Files | Passkeys | How to export it |
+|---|---|---|---|
+| APM | `.json` or `.apm` export (plain or encrypted), `vault.dat` and backups | Yes | `pm export`, or **Settings → Import and export** in the app. A vault file opens with that vault's master password |
+| Bitwarden | `.json`, password-protected `.json`, `.zip` (with attachments), `.csv` | From `.json` and `.zip` | **Tools → Export vault**. Folders, custom fields and password history come along. CSV holds logins and notes only |
+| 1Password | `.1pux`, `.csv` | No, 1Password leaves passkeys out of every export | 1Password 8: **File → Export**, pick the account, then 1PUX. CSV holds logins only |
+| KeePass and KeePassXC | XML export, `.csv` | From KeePassXC XML | KeePassXC: **Database → Export → XML File**. KeePass 2: **File → Export → KeePass XML (2.x)** |
+| Credential Exchange (CXF) | `.json`, `.cxf` | Yes, with private keys | Any provider that supports FIDO credential exchange |
+| Browsers | Passwords `.csv` from Chrome, Edge, Brave, Firefox or Safari, or any CSV with name, url, username and password columns | No | The browser's password settings |
+| Authenticator apps | `.txt` with one `otpauth://` link per line | No | The app's export |
+
+`pm` can't read a KeePass database (`.kdbx`), 1Password 7's `.1pif`, or `.opvault`/`.agilekeychain` directly. It tells you which export to make instead.
+
+### What import shows you
+
+Before anything is written, every item in the file gets a status:
+
+| Mark | Status | Meaning |
+|---|---|---|
+| `+` | New | Not in your vault |
+| `=` | Already in your vault | Identical; skipped |
+| `~` | Conflict | Same name, different contents |
+| `?` | Possible duplicate | The same login, key or passkey under another name |
+| `x` | Can't be imported | With the reason, for example an unsupported one-time code |
+
+```text
+$ pm import chrome.csv --dry-run
+chrome.csv · Chrome, Edge or Brave passwords CSV · 2 items
+
+  Login                 2
+
+  + 1 new
+  ~ 1 conflict                     same name, different contents
+
+Conflicts and possible duplicates
+  ~ GitHub                       Login           Same name in your vault, different password, adds website
+      → skip
+      ~ Password         •••••••• → ••••••••
+      + Website          https://github.com
+
+New
+  + Netflix                      Login           me@example.com · netflix.com
+
+Dry run. Nothing was imported. Run without --dry-run to import.
+```
+
+Secret values are masked unless you pass `--show-secrets`.
+
+### Conflicts and duplicates
+
+Each conflict or possible duplicate takes one of four actions:
+
+| Action | What happens |
+|---|---|
+| `skip` | Keep what you have |
+| `merge` | Fill empty fields, add websites, notes and passkeys; your values win |
+| `replace` | Take the file's values. Your old values stay in the item's history |
+| `keep-both` | Import it as a separate item |
+
+Each row has a suggested action that never loses a passkey or an account. On a terminal, `pm` asks how to handle them with a list: use the suggestions, decide one by one, or apply one action to all. Move with <Kbd>↑</Kbd> <Kbd>↓</Kbd> and choose with <Kbd>↵</Kbd>. When you decide one by one, each conflict shows its actions in a list with the suggested one highlighted first. <Kbd>Esc</Kbd> in any of these lists cancels the import: `pm` prints `Import cancelled.` and changes nothing, so it never falls back to the suggestion. To decide in advance, pass `--on-conflict` and `--on-duplicate` with `skip`, `merge`, `replace`, `keep-both` or `ask` (`ask` always decides one by one). `-y` imports without asking, using the suggestions plus any policies you passed. When stdin is not a terminal, `pm import` doesn't ask either: it imports as if you passed `-y`.
+
+Last, before it writes anything, `pm` asks `Import 3 items into default? (Y/n)`. <Kbd>y</Kbd> or <Kbd>↵</Kbd> imports. <Kbd>n</Kbd> or <Kbd>Esc</Kbd> prints `Import cancelled. Nothing changed.` Like every yes/no question, it takes one key. See [Keys at prompts](/docs/cli#keys-at-prompts).
+
+### Where items go
+
+Items go into the current space. `--space Work` imports into another one. `--keep-spaces` turns the file's grouping into spaces: Bitwarden folders, 1Password vaults, KeePass groups and APM spaces. APM files keep their spaces unless you pass `--keep-spaces=false`.
+
+### Passwords for encrypted exports
+
+`-p` (`--password`) gives the export's password. On a terminal, `pm` asks for it when the file needs one, up to three times. <Kbd>Esc</Kbd> at that prompt cancels the command.
+
+### After importing
+
+```text
+✓ Imported chrome.csv: 1 added (1 skipped)
+Undo the whole import with: pm lgit undo
+! Delete chrome.csv. It holds your passwords in plain text, and APM does not touch the original.
+```
+
+An import is one save, so `pm lgit undo` reverts all of it. See [History and undo](/docs/cli/history). `pm` never deletes the source file. Delete unencrypted exports yourself.
+
+### Import flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--from` | `auto` | `auto`, `1password`, `bitwarden`, `keepass`, `cxf`, `apm` or `csv` |
+| `-p`, `--password` | | Password of an encrypted export |
+| `--space` | current space | Import into this space |
+| `--keep-spaces` | on for APM files | Use the file's folders, vaults or groups as spaces |
+| `--dry-run` | | Show the comparison and stop |
+| `--on-conflict` | suggested | `skip`, `merge`, `replace`, `keep-both` or `ask` |
+| `--on-duplicate` | suggested | Same values as `--on-conflict` |
+| `-y`, `--yes` | | Don't ask |
+| `--show-secrets` | | Show secret values in the comparison |
+| `--json` | | Print the plan (with `--dry-run`) or the result as JSON |
+| `--formats` | | List supported formats and exit |
+
+A read-only session can run `--dry-run` but not import.
+
+## Export
+
+```sh title="Terminal"
+pm export                                  # APM format, asks to encrypt it
+pm export --format cxf -o vault.cxf.json   # FIDO Credential Exchange
+pm export --format bitwarden --encrypt     # Bitwarden, password-protected
+pm export --type password,totp --space Work --format csv
+pm export --dry-run                        # what would be exported
+```
+
+### Formats
+
+| `--format` | Holds | Passkeys | Encryption | Files |
+|---|---|---|---|---|
+| `apm` (default) | Everything, including spaces and favorites | Yes | Argon2id and AES-256-GCM with a password | With `--files` |
+| `cxf` | Every type except documents, photos, audio and video. Types CXF has no credential for are written as custom fields | Only passkeys with a sign counter of 0 | No | No |
+| `bitwarden` | A Bitwarden `.json` with folders and one-time codes | Yes | Bitwarden's password-protected format | No |
+| `csv` | One row per item: name, url, username, password, note, totp, type, space | No | No | No |
+| `txt` | A readable list of every item | No | No | No |
+
+Without `--format`, `pm` picks one from the output name: `.csv` → `csv`, `.txt` → `txt`, a name containing `cxf` → `cxf`, containing `bitwarden` → `bitwarden`, otherwise `apm`. `--without-password` with no output name writes `txt`.
+
+For formats other than `apm`, a login's 2FA key is written as a separate one-time code item, and its custom fields are added to its notes.
+
+### Output file
+
+The default name is `apm-export-<date>.json` (`.csv`, `.txt`), `apm-export-<date>.cxf.json` for CXF, or `apm-bitwarden-export-<date>.json`. `pm` never overwrites an existing file: it asks `Overwrite it? (y/N)` on a terminal and fails otherwise, unless you pass `--force`. <Kbd>n</Kbd>, <Kbd>↵</Kbd> or <Kbd>Esc</Kbd> prints `Export cancelled.` Files are written with permissions `0600`.
+
+### Encryption
+
+For `apm` and `bitwarden`, `pm` asks on a terminal whether to encrypt, then asks twice for an export password of at least 8 characters. Use a new password here, not your master password. <Kbd>Esc</Kbd> at the yes/no question or at either password prompt cancels the export with `Export cancelled.`; at the yes/no question it doesn't mean No. `--encrypt` asks without the yes/no question, `-p` gives the password, and `--no-encrypt` writes a plain file without asking. Formats that can't be encrypted ignore a password and say so. When stdin is not a terminal, `pm` doesn't ask: without `-p`, it writes a plain file.
+
+<Callout type="warning" title="Plain exports hold every secret">
+An unencrypted export is readable by anyone who can open the file. `pm` says so after writing it. Encrypt it, keep it somewhere safe, and delete it when you are done.
+</Callout>
+
+### Choosing what to export
+
+| Flag | Meaning |
+|---|---|
+| `--type` | Only these types, comma-separated: `password`, `totp`, `note`, `apikey`, `token`, `ssh_key`, `ssh_config`, `wifi`, `recovery`, `certificate`, `banking`, `document`, `govid`, `medical`, `travel`, `contact`, `cloud`, `k8s`, `docker`, `cicd`, `license`, `legal`, `photo`, `audio`, `video`. `login`, `logins` and `passwords` mean `password`; `otp`, `2fa` and `authenticator` mean `totp`; `notes` means `note` |
+| `--space` | Only these spaces, comma-separated. Use `default` for the default space |
+| `--no-passkeys` | Leave passkeys out |
+| `--files` | Include documents, photos, audio and video (`apm` only) |
+| `--without-password` | Leave secrets out of `csv` and `txt`, for a printable inventory |
+
+`--dry-run` shows what would be exported and what the format leaves out:
+
+```text
+$ pm export --format csv --dry-run
+apm-export-2026-10-05.csv · CSV · 3 items
+  Authenticator         1
+  API key               1
+  Login                 1
+  - CSV cannot hold passkeys (1)
+
+Dry run. Nothing was written.
+```
+
+### Export flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-o`, `--output` | `apm-export-<date>.<ext>` | Output file |
+| `-f`, `--format` | from the file name, else `apm` | `apm`, `cxf`, `bitwarden`, `csv` or `txt` |
+| `-p`, `--password` | | Encrypt with this password |
+| `--encrypt` | | Encrypt, asking for the password |
+| `--no-encrypt` | | Write a plain file without asking |
+| `--type` | all | Item types to include |
+| `--space` | all | Spaces to include |
+| `--no-passkeys` | | Leave passkeys out |
+| `--files` | | Include files (`apm`) |
+| `--without-password` | | Leave secrets out (`csv`, `txt`) |
+| `--dry-run` | | Show and stop |
+| `--force` | | Overwrite the output file |
+| `--json` | | Print the summary as JSON |
+| `--formats` | | List formats and exit |
+
+## Compare with an earlier export
+
+```sh title="Terminal"
+pm export compare backup.json
+```
+
+```text
+backup.json · APM export compared with your vault
+
+  + 0 only in the file          deleted since, or never imported
+  ~ 1 changed
+  = 41 the same
+  * 3 only in your vault        added since
+```
+
+It reads any format `pm import` reads, lists each item that is only in the file, changed or only in your vault, and never writes anything. To bring back what is only in the file, run `pm import` on it. Flags: `-p` for an encrypted file, `--from`, `--show-secrets` and `--json`.
+
+## Back up the vault itself
+
+The simplest full backup is a copy of the vault file. It stays encrypted with your master password, and `pm import` can read it later:
+
+```sh title="Terminal"
+cp ~/.apm/vault.dat ~/Backups/vault-$(date +%F).dat
+```
+
+The history in [lgit](/docs/cli/history) is local only; cloud sync and copies of `vault.dat` are your off-machine backups.

@@ -1,0 +1,406 @@
+---
+title: Settings reference
+description: Every page, card and row in the desktop app's Settings, what it does and where it is stored.
+order: 18
+group: Settings and help
+sidebarTitle: Settings
+---
+
+Open Settings with <Kbd>⌘</Kbd><Kbd>,</Kbd> (<Kbd>Ctrl</Kbd><Kbd>,</Kbd> on Windows and Linux), **Settings** at the bottom of the sidebar, **Settings...** in the app menu (macOS) or **Settings** in the **File** menu (Windows and Linux), or <Kbd>⌥</Kbd><Kbd>⌘</Kbd><Kbd>5</Kbd> (<Kbd>Ctrl</Kbd><Kbd>Alt</Kbd><Kbd>5</Kbd>). These open the **General** page. The command menu also jumps straight to any page: type "Settings" and pick an entry such as **Settings: Sync**.
+
+The left column groups the pages. **Find a setting** filters them by name and by keywords, so typing "autolock", "clipboard" or "Touch ID" finds the right page. If nothing matches, the column says "No settings match “…”" with what you typed.
+
+| Group | Pages |
+|---|---|
+| **Vault** | [General](#general), [Security](#security), [Recovery](#recovery), [Sessions](#sessions) |
+| **App** | [Appearance](#appearance), [Spaces](#spaces), [Alerts](#alerts) |
+| **Connections** | [Sync](#sync), [Browser extension](#browser-extension), [AI access](#ai-access) |
+| **Data** | [Import and export](#import-and-export), [Developer](#developer), [Maintenance](#maintenance) |
+| | [About](#about) |
+
+## Where settings are kept
+
+Most settings are stored inside the encrypted vault, so they follow it to `pm` and to other computers. Appearance settings, sounds and command chips are stored by the app on this computer.
+
+| Stored in the vault | Stored by the app on this computer |
+|---|---|
+| Vault name, **Open to**, **Copy on click**, **Confirm before deleting** | Mode and theme, your own themes |
+| Auto-lock rules and **Clear clipboard** | **Density**, **Show sidebar**, **Show pm commands**, **Commit receipts** |
+| Encryption profile, cipher and the active password policy | **Sounds** |
+| **Show website icons** | The page you were on, the selected space and the sort order |
+| Alerts, the alert address and level, **Anomaly detection** | |
+| Sync connections and recovery methods | |
+
+The app keeps its own settings in its data folder: `~/Library/Application Support/APM Desktop` on macOS, `%AppData%\APM Desktop` on Windows and `~/.config/APM Desktop` on Linux. The Touch ID copy of your password is in the macOS Keychain. The `.apmignore` file, the `policies` folder and `email.log` sit next to `vault.dat`.
+
+Every change to a vault setting is saved as a commit in [History](/docs/desktop/history), with a note such as "Settings changed" or "Settings changed: name".
+
+<Callout type="note" title="In a read-only session">
+Most controls that change the vault are disabled. A few stay clickable, such as **Open to**, **Clear clipboard**, the Touch ID switch, the alert switches and a policy's **Use**. Changing one of those shows "This session is read-only." and nothing is saved.
+</Callout>
+
+## General
+
+**Vault**
+
+| Row | What it does |
+|---|---|
+| **Name** | The vault's name, up to 48 characters, shown in the window title and on the lock screen. Choose **Save**. APM confirms **Vault renamed**. **Save** is disabled while the name is blank or unchanged. It is stored in the vault, and `pm` ignores it. |
+
+**Vault file**
+
+| Row | What it shows |
+|---|---|
+| **Location** | The vault file's path, with **Show in Finder** (the button has that name on every system) |
+| **Size** | The file size, such as "2.3 KB", and the count, such as "12 items, 2 spaces, 3 in Trash". The count of spaces leaves out **Default**. |
+| **Last changed** | How long ago the file changed, such as "5 minutes ago", and "Created Aug 26, 2026". A vault made before APM recorded creation dates says "Created before APM tracked it". |
+| **Format** | **APMVAULT v4**, the same file `pm` reads and writes |
+
+**Behavior**
+
+| Row | Options | What it does |
+|---|---|---|
+| **Open to** | **All items** (default), **Favorites**, **Last viewed**, **Authenticator** | What you see after unlocking. **Last viewed** returns to the page you were on, such as Watchtower. |
+| **Copy on click** | On or off (on) | Described as: clicking a secret field copies it instead of selecting the text |
+| **Confirm before deleting** | On or off (on) | Described as: items go to Trash either way, and stay there until you empty it |
+| **Sounds** | On or off (on) | A soft chime when the vault unlocks and locks. Stored on this computer. |
+
+<Callout type="note">
+In APM 12.0.0, **Copy on click** and **Confirm before deleting** are saved with the vault, but the item view always copies on click and always asks before deleting, whatever they are set to.
+</Callout>
+
+**Updates** shows the app version and platform, for example **macOS · Apple silicon** or **macOS · x64**. On Windows and Linux it shows the raw platform name, such as **win32 · x64** or **linux · x64**. **See releases** opens the releases page in your browser. Nothing about your vault is sent.
+
+## Security
+
+| Card or row | What it does |
+|---|---|
+| **Master password** → **Change master password** | See [Change the master password](#change-the-master-password). The footer says "Last changed 3 days ago", or "Not changed since the vault was created" and the date. |
+| **Unlock with Touch ID** (macOS) | Turning it on asks for your master password, then stores it in your login keychain. APM asks for your fingerprint before reading it (see [Touch ID](/docs/desktop/lock-and-unlock#touch-id)). Turning it off deletes the Keychain entry, after you confirm. `pm` uses the same entry. Disabled when Touch ID is not available. |
+| **Auto-lock** → **Change** | A summary such as "Locks after 15 minutes idle, 1 hour after unlocking or when the Mac sleeps". Shows **Only on sleep** or **Never locks** as a warning. **Change** opens [Sessions](#sessions). |
+| **Clipboard** → **Clear clipboard** | **After 10 seconds**, **After 30 seconds** (default), **After 90 seconds** or **Never**. Only clears the clipboard if it still holds what APM copied. |
+| **Encryption profile** | **Standard**, **Hardened** (marked **Recommended**) or **Paranoid**, with each one's parameters and unlock time. A custom profile shows as its own entry. A **Legacy** vault (set from the CLI) shows **Costs 20 health**. **Custom profile…** opens the custom dialog. |
+| **Cipher** | **AES-256-GCM** or **XChaCha20-Poly1305**. The one in use is marked **In use**. The footer shows the full parameters, nonce and salt size, such as "Argon2id · t=3 · 64 MiB · p=2 · AES-256-GCM · 12-byte nonce · 16-byte salt". |
+| **Password policy** | Lists the policy files found in the `policies` folder next to your vault file. (The card's description says "next to pm", but the app reads the folder beside the vault.) Expand one to see its rules. **Use** enforces it, **Clear policy** stops. |
+
+Quitting APM also clears the clipboard if it still holds the last thing APM copied, even when **Clear clipboard** is **Never**.
+
+### Change the master password
+
+1. Choose **Change master password**. It is disabled in a read-only session.
+2. Enter the **Current master password**.
+3. Enter the new **Master password** and **Confirm master password**. The new one must have at least 8 characters, an uppercase letter, a lowercase letter, a number and a symbol from `!@#$%^&*()-_=+`, the same rules as setup. **Suggest** fills in a four-word passphrase.
+4. Choose **Change password**.
+
+The vault is re-encrypted with a key from the new password. Recovery methods keep working. APM confirms **Master password changed**, and if Touch ID is on, "Touch ID keeps working. The Keychain entry was updated." History notes "Master password changed".
+
+| Message | What to do |
+|---|---|
+| "That is not your current master password." | Type the current password again |
+| "The new password must be different." | Pick a password you are not using now |
+| "The passwords do not match." | Retype the confirmation |
+
+Older History snapshots still use the old password. See [Restore an older version](/docs/desktop/history#restore-an-older-version).
+
+### Touch ID
+
+Turning the switch on opens **Set up Touch ID**. Enter your **Master password** and choose **Turn on Touch ID**. APM saves it without a fingerprint check and confirms **Touch ID is on**, "Next time, unlock with your fingerprint." A wrong password shows "That is not your master password."
+
+Turning it off asks **Turn off Touch ID?** Choose **Turn off**. APM deletes the Keychain entry and confirms **Touch ID removed**.
+
+On Windows and Linux, and on a Mac without Touch ID, the switch is disabled and the row says "Touch ID is not available on this Mac."
+
+### Change the encryption profile or cipher
+
+Picking a different profile or cipher opens **Re-encrypt with** the new profile, for example **Re-encrypt with Paranoid?** It compares the old and new **Key derivation**, **Time cost**, **Memory**, **Threads**, **Cipher** and **Unlock time**. Choose **Re-encrypt vault** and keep the app open until it finishes. Profiles with 512 MiB or more warn **Needs 512 MiB free to unlock**: older or busy machines, and `pm` on a small server, may struggle to unlock. When it is done, the dialog says **Vault re-encrypted** with the new unlock estimate.
+
+| Profile | Parameters shown | The card says | The dialog estimates |
+|---|---|---|---|
+| **Standard** | Argon2id · t=3 · 64 MiB · p=2 | unlock about 0.3s | about 0.3s |
+| **Hardened** | Argon2id · t=5 · 256 MiB · p=4 | unlock about 1s | about 2s |
+| **Paranoid** | Argon2id · t=6 · 512 MiB · p=4 | unlock about 2s | about 4.8s |
+
+Both unlock times are fixed estimates, not measured on your computer.
+
+Each built-in profile also sets the cipher. **Standard** and **Hardened** switch to AES-256-GCM, and **Paranoid** switches to XChaCha20-Poly1305. To pair another cipher with a profile, pick the profile first, then the cipher. Profiles and ciphers cannot be changed in a read-only session. History notes the change, for example "Re-encrypted with paranoid profile".
+
+The **Legacy** profile cannot be picked in the app. If a vault uses it, picking any other profile moves it off Legacy.
+
+### Custom profile
+
+**Custom profile…** sets:
+
+| Knob | Range |
+|---|---|
+| **Name** | Up to 32 characters |
+| **Time cost** | 1 to 10 passes |
+| **Memory** | 64 to 1024 MiB per guess, in steps of 64 |
+| **Parallelism** | 1 to 8 threads |
+| **Salt** | 16 or 32 bytes |
+| **Cipher** | AES-256-GCM or XChaCha20-Poly1305 (24-byte nonce) |
+
+The first time, the knobs start at the **Hardened** values and the name "My profile". After that they start at your current custom profile. The footer estimates the unlock time on this computer, such as "Unlock about 2s on this Mac", and turns amber above 2.5 seconds. **Continue** goes to the re-encrypt step.
+
+The parameters are stored in the vault header, so any copy of `pm` can unlock it. The name is not saved: afterwards, the profile shows as **Custom**. History notes "Re-encrypted with a custom profile". See [encryption profiles](/docs/security/profiles).
+
+### Password policy
+
+A policy is a YAML file with a minimum length, whether it needs an uppercase letter, a number and a symbol, and how often to rotate. Put `.yaml` or `.yml` files in a `policies` folder next to `vault.dat`, for example `~/.apm/policies/strict.yaml`, then reopen Settings:
+
+```yaml title="policies/strict.yaml"
+name: strict
+password_policy:
+  min_length: 14
+  require_uppercase: true
+  require_numbers: true
+  require_symbols: true
+rotation_policy:
+  rotate_every_days: 90
+```
+
+The card lists it as **strict**, "14+ characters · rotate every 90 days". Expand it to see **Minimum length**, **Uppercase letter**, **Number** and **Symbol** (**Required** or **Optional**) and **Rotation**. With no files, the card says "No policy files found. Add YAML files to the policies folder, then reopen Settings." A file APM cannot read as YAML is left out without a message.
+
+Choose **Use**. APM confirms "Enforcing “strict”", the policy shows **Active**, and History notes "Loaded policy strict". The vault keeps its own copy of the rules, so deleting the file later does not stop them. **Clear policy** stops enforcing it ("Policy cleared").
+
+While a policy is active, logins and Wi-Fi passwords must meet it when you add or change them. The password field turns red and lists the rules, for example "Policy “strict” needs 14+ characters, an uppercase letter, a number, a symbol." If a password still gets past the field, saving fails with a message such as "Policy strict: password too short (min 14)" or "Policy strict: password must contain a symbol".
+
+Existing items are checked only when you edit them. Saving any change to a login, even to its notes, fails until its password meets the policy.
+
+The app shows the rotation rule but does not enforce it. Watchtower still flags passwords older than 180 days. Without a policy, any password is accepted, and Watchtower still flags weak ones. See [policies](/docs/reference/policies).
+
+## Recovery
+
+Five methods, each with a status badge and a button: **Recovery email and key**, **Recovery key**, **One-time codes**, **Recovery passkey** and **Trustee shares**. A coverage bar counts how many are ready. **Remove all recovery data** deletes them all after you type `REMOVE`. See [Recovery](/docs/desktop/recovery).
+
+## Sessions
+
+### Auto-lock
+
+Stored in the vault, shared with `pm` and the browser extension.
+
+| Row | Options | Default |
+|---|---|---|
+| **Lock after inactivity** | 1, 5, 15 or 30 minutes, 1 or 4 hours, **Never** | 15 minutes |
+| **Maximum session** | 15 minutes, 1, 4, 8 or 24 hours, **Never** | 1 hour |
+| **Lock when the Mac sleeps** | On or off. Also when the screen locks or the lid closes. | On |
+
+If a rule was set to another value elsewhere, such as 10 minutes, it shows as an extra option. These rows are disabled in a read-only session.
+
+**Never** asks you to confirm first: **Never lock when idle?** or **Remove the session limit?** When a rule is off, a warning explains what that means:
+
+| Rules off | Warning |
+|---|---|
+| Inactivity | **APM doesn't lock when you step away** |
+| Maximum session | **Sessions have no time limit** |
+| Both, sleep on | **APM only locks when the Mac sleeps** |
+| Both, sleep off | **APM never locks on its own** |
+
+### This session
+
+**This session** shows when you unlocked (**Unlocked**), how long until it locks (**Locks in**, such as "14m" or "1h 0m", or **On sleep** or **Never**) and the **Mode**: **Full access**, **Read-only until** a time such as 3:45 PM, or **Read-only, newer vault format**.
+
+- **Read-only** makes the session read-only for **15 minutes**, **30 minutes**, **1 hour** or **4 hours**. The toast says, for example, "Read-only for 15 minutes" or "Read-only for 1h", "Nothing can be added, edited or deleted." The sidebar shows **Read-only** until that time.
+- **End read-only** turns editing back on ("Editing is back on").
+- **Lock now** (<Kbd>⌘</Kbd><Kbd>L</Kbd>, or <Kbd>Ctrl</Kbd><Kbd>L</Kbd> on Windows and Linux) locks.
+
+A vault written by a newer version of APM opens read-only and has no **Read-only** button. See [Read-only sessions](/docs/desktop/lock-and-unlock#read-only-sessions).
+
+### Terminal session
+
+**Terminal session** shows **pm is unlocked** with **Active**, or **pm is locked** with **Locked**. When it is unlocked, the row says until when, such as "Until 3:45 PM, or after 15 minutes idle", or "No time limit", and adds "· read-only" for a read-only session. See [Sharing a session with pm](/docs/desktop/lock-and-unlock#sharing-a-session-with-pm).
+
+### Ephemeral sessions
+
+**Ephemeral sessions** lists scoped, expiring sessions for scripts and agents. Choose **Issue session** to make one:
+
+| Field | Default | Notes |
+|---|---|---|
+| **Label** | Empty, required | Such as "CI deploy" |
+| **Agent name** | Empty | Optional, such as `github-actions`. "If set, the process must also send it." Spaces become hyphens. |
+| **Expires after** | **1 hour** | **15 minutes**, **1 hour**, **4 hours** or **24 hours** |
+| **Access** | **Read only** | Or **Read and write** |
+| **Bind to this Mac** | On | "The session fails on any other machine." |
+
+**Session issued** shows the variables to hand to the process, such as `APM_EPHEMERAL_ID=eps_a2b69a37fadcaf1f092a51f0 APM_EPHEMERAL_AGENT=github-actions`, and when the session ends. In a read-only session, issuing fails with "This session is read-only."
+
+Each active session shows its label, scope (**read** or **write**), **host-bound** when bound to this computer, its ID, agent and age, and the time left, such as "59m left". **Revoke** stops it at once ("Revoked “CI deploy”"). Revoked sessions move to **Expired and revoked**, which shows the last five. Sessions are kept on this computer, not in the vault, and the list shows every ephemeral session on this computer. See [The app and pm](/docs/desktop/terminal#ephemeral-sessions) and [Lock and unlock](/docs/desktop/lock-and-unlock#auto-lock).
+
+## Appearance
+
+All of these are stored on this computer.
+
+| Card or row | What it does |
+|---|---|
+| **Mode** | **System** (follows your system's light or dark setting), **Light** or **Dark** |
+| **Themes** | **Midnight**, **Graphite**, **Nord**, **Catppuccin**, **Tokyo Night**, **Rosé Pine**, **Dracula**, **Gruvbox**, **Paper**, **Cream** and your own themes. Each built-in theme is marked **Light** or **Dark**. Click one to apply it. Themes change the whole app, including the lock screen. |
+| **New theme** / **Make your own** | Opens the theme editor |
+| **Density** | **Comfortable** (default) or **Compact**. Compact fits about 30% more rows in the item list. |
+| **Show sidebar** | Same as <Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>B</Kbd>. On by default. |
+| **Show pm commands** | The small chips with the matching `pm` command. Click one to copy it. On by default. |
+| **Commit receipts** | Shows the History commit for each change in its confirmation toast. On by default. |
+| **Show website icons** | Fetches each login's logo from the site itself, refreshes it monthly and keeps it on this computer. Nothing goes to a third party. Stored in the vault, so it is disabled in a read-only session. |
+| **Clear icon cache** | Removes every saved logo and confirms **Icon cache cleared**. Items show their first letter until a logo is fetched again. |
+
+A mode and a theme are one choice: picking a theme replaces **System**, **Light** or **Dark**, and picking a mode replaces the theme. The theme button at the top of the sidebar and on the lock screen switches between plain light and dark, so it also replaces a theme.
+
+Saved logos are kept in an `icons` folder in APM's config folder, for example `~/Library/Application Support/apm/icons` on macOS. A site whose logo could not be fetched is tried again after three days.
+
+### The theme editor
+
+A theme has nine colors: **Background**, **Sidebar**, **Surface**, **Fill**, **Border**, **Text**, **Secondary text**, **Accent** and **Accent 2**. APM derives hover, pressed, soft and status shades from them.
+
+- **Name** the theme (up to 28 characters, "My theme" to start) and pick **Start from**: a built-in theme or **Current colors**. A new theme starts from **Graphite**.
+- Change each color with the swatch or type a six-digit hex value, such as `#8b93ff`.
+- A live preview shows the sidebar, item rows, buttons and badges.
+- Four contrast checks show each pair's contrast ratio and **Pass**, **Auto-fixed** (APM adjusted the color to stay readable) or **Low**. **Low** does not stop you saving.
+- **Copy JSON** copies the theme. **Save and apply** saves it and confirms, for example, **Applied My theme**. When you edit a theme, the button reads **Save theme**.
+
+| Check | Passes at |
+|---|---|
+| **Text on background** | 7 or more |
+| **Secondary text on fill** | 4.5 or more, or **Auto-fixed** |
+| **Accent on surface** | 4.5 or more, or **Auto-fixed** |
+| **Border on background** | 1.15 or more |
+
+**Copy JSON** gives the theme's name, base and colors. The app has no import for it, so use it to share or keep a record of your colors:
+
+```json title="My theme"
+{
+  "name": "My theme",
+  "base": "dark",
+  "colors": {
+    "bg": "#0f1115",
+    "s2": "#13151a",
+    "s3": "#181b21",
+    "s4": "#20232b",
+    "b1": "#252932",
+    "t1": "#e6e8ee",
+    "t2": "#9ba2af",
+    "accent": "#8b93ff",
+    "accent2": "#5eead4"
+  }
+}
+```
+
+Your own themes have a `…` menu with **Edit**, **Duplicate** (adds a copy named, for example, "My theme copy"), **Copy as JSON** and **Delete**. **Delete** does not ask first. Deleting the theme in use switches the app back to **System**.
+
+## Spaces
+
+Lists **Default** ("cannot be removed") and each space with its item count and creation date, such as "4 items · created Aug 26, 2026". Click the colored dot to pick one of seven colors for a space. **Open** switches to the space and shows its items. The `…` menu has **Rename** and **Delete space**. **New space** (<Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>N</Kbd>) creates one. Colors cannot be changed in a read-only session. See [Spaces](/docs/desktop/spaces).
+
+Spaces sync as part of the vault. To keep a space off a provider, use [.apmignore](/docs/desktop/sync#apmignore).
+
+## Alerts
+
+Alerts are meant to be emails about important events. In APM 12.0.0 no email is actually sent: each alert is written as a line to a file named `email.log`, and only while the app or `pm` is running. The app writes it in the vault's folder, next to `vault.dat`, for example `~/.apm/email.log`. `pm` writes it in the folder it was started from.
+
+| Card or row | What it does |
+|---|---|
+| **Security alerts** | Turns alerts on. Needs an email address first: without one, APM says **Add an email below first**. If no address is saved yet but you typed one in **Email**, turning alerts on saves it too. Adds 10 points to vault health when on, and takes 10 away when off. |
+| **Anomaly detection** | Flags an unlock between 2:00 and 5:59 in the morning. It only raises an alert when **Security alerts** is on too. |
+| **Where alerts go** → **Email** | The address to send to. Choose **Save**. It is enabled once the address looks like `name@example.com`, and APM confirms "Alerts will go to" the address. Logs show it masked, as the first letter and the domain (`y****@example.com`). The full address is also stored unencrypted at the start of `vault.dat`, so anyone with a copy of the file, including a synced copy, can read it. |
+| **What to send** | **Critical only** (Level 1, the default), **Security changes** (Level 2) or **Everything** (Level 3). Needs alerts on. |
+| **Recent alertable events** | The last eight events at your level, marked **Emailed** when alerts are on and **Logged** when they are off. **Emailed** only means alerts were on, not that an email went out. With none, it says "Nothing at this level yet." |
+
+Whatever the **Anomaly detection** switch says, the app records an **ANOMALY** event in the [audit log](/docs/desktop/history#audit-log) for an unlock between 2:00 and 5:59.
+
+The **What to send** card lists these events for each level:
+
+| Event | Level |
+|---|---|
+| Failed unlock attempts, unusual activity, vault destroyed, password reset with recovery | 1 and up |
+| Master password changed, encryption profile changed, security settings changed, AI token created | 2 and up |
+| Every unlock, exports, syncs | 3 |
+
+Not all of them raise an alert in APM 12.0.0. Destroying the vault, changing the encryption profile, creating an AI token, unlocking and syncing write nothing to `email.log`. From `pm`, adding, editing or deleting an entry raises a level 3 alert.
+
+### What the app writes to email.log
+
+| When | Line | Level |
+|---|---|---|
+| A wrong master password on the lock screen | **BREACH ATTEMPT** | 1 |
+| An unlock between 2:00 and 5:59, with **Anomaly detection** on | **ANOMALY** | 1 |
+| A master password reset with recovery | **RECOVERY SUCCESS** | 1 |
+| Turning **Security alerts** on | **ALERT SETTINGS** | 2 |
+| Changing the level | **SECURITY LEVEL** | 2 |
+| Changing the master password | **PASSWORD CHANGE** | 2 |
+| **Remove all recovery data** | **RECOVERY RESET** | 2 |
+| An export | **DATA EXPORT** | 3 |
+
+A line is written only when **Security alerts** is on, an address is saved, and your level is at least the event's level. Turning alerts off writes nothing, and at the default Level 1, neither does turning them on. Each line has the time, the level, the event, the details and the masked address:
+
+```text title="email.log"
+[2026-10-05T21:25:18+05:30] ALERT (Level 2 - SECURITY LEVEL): Security paranoia level updated to 2. - Sent to y****@example.com
+[2026-10-05T21:25:19+05:30] ALERT (Level 2 - ALERT SETTINGS): Global security alerts turned ON. - Sent to y****@example.com
+[2026-10-05T21:25:19+05:30] ALERT (Level 2 - PASSWORD CHANGE): Master password has been successfully rotated. - Sent to y****@example.com
+```
+
+## Sync
+
+Sync status with **Auto-sync** and **Sync now**, the **Providers** card (**GitHub**, **Google Drive**, **Dropbox**) with **Connect**, **Compare** and a menu for **Sync now**, **Compare with local**, **Show retrieval key** and **Disconnect**, the **.apmignore** editor, and **Restore on another device**. See [Cloud sync](/docs/desktop/sync).
+
+## Browser extension
+
+The **Browser bridge** status, **Connect a browser** (with any pending request), **Use it without the app**, **Manual pairing** with the token and **Rotate**, **Install the extension**, and **Saved passkeys**. See [Browser extension](/docs/desktop/browser-extension).
+
+## AI access
+
+The **MCP server** switch, pending approvals, **Access tokens** with **New token** and **Revoke**, **Assistants** with **Set up** for Claude Desktop, Cursor, VS Code and Cline, a manual config block, and **Past requests**. The page's entry in the left column shows a badge with the number of waiting requests. See [AI access](/docs/desktop/ai-access).
+
+## Import and export
+
+Three cards, **Import**, **Export** and **Compare** (the first two show when you last used them, such as "Last import 3h", or "Nothing imported yet" and "Never exported"), and **Encrypted backup** with **Save a backup**. **Import** is disabled in a read-only session.
+
+**Save a backup** saves a byte-for-byte copy of `vault.dat`, named like `vault-2026-10-05.dat`, and confirms **Backup saved** with **Show**. It opens with your current master password. The footer counts what it includes, such as "Includes 12 items and 2 spaces. History snapshots are not included." See [Import and export](/docs/desktop/import-export).
+
+## Developer
+
+**Inject into a shell** and **Shell function** build `pm inject` commands and `.apminject` files. **Command line** has these rows:
+
+| Row | What it shows |
+|---|---|
+| **pm command** | Whether the `pm` command is installed and up to date, with **Install pm** or **Update pm**. Only the packaged macOS app can install it. On Windows, Linux and development builds the row says "Only the packaged app installs the pm command." |
+| **Engine** | The engine the app runs and where it came from: **Inside APM.app**, **From APM_PM_PATH**, **Development build**, **From your PATH** or **Missing** |
+| **Use this vault from the terminal** | **Copy export** copies a line such as `export APM_VAULT_PATH="/Users/you/.apm/vault.dat"` and says "Copied the export line", "Add it to your shell profile." |
+
+See [The app and pm](/docs/desktop/terminal).
+
+## Maintenance
+
+| Card or row | What it does |
+|---|---|
+| **Storage** | A bar comparing the **Vault** file and its **History snapshots**, with their sizes. The footer gives the total, such as "49.4 KB for the vault and its history". |
+| **Clean up** → **Run** or **Review** | Finds empty names, broken authenticators, missing spaces and duplicates. The row says, for example, "2 things to look at", or "Checking…" while it scans. Most vaults show at least one, the autocomplete notice described in [Watchtower](/docs/desktop/watchtower#clean-up). Disabled in a read-only session. |
+| **Prune snapshots** → **Prune** | Deletes snapshot files no commit points to, without asking first. The row counts the snapshots in use. The toast says, for example, "Pruned 3 files" and "12 snapshots kept". |
+| **Squash history** → **Squash** | Keeps the newest commits and drops the rest. The row counts your commits. Disabled with fewer than 2 commits. |
+| **Verify integrity** → **Verify** | Checks every commit signature in the history chain. The toast says "All 24 commits verified", or, for example, "2 of 24 commits failed". |
+| **Danger zone** → **Destroy vault** | See below |
+
+### Destroy the vault
+
+The **Destroy this vault** row in **Danger zone** removes this vault from this computer. There is no undo.
+
+1. Choose **Destroy vault**. It is disabled in a read-only session.
+2. The dialog, **Destroy “Personal”?**, says how many items and history commits are deleted, such as "12 items and 24 history commits are deleted from this Mac." If sync is on, it also says **Synced copies stay**: the encrypted copies with your providers are not deleted.
+3. Type the vault's name exactly as shown to enable **Destroy vault**, then choose it. The dialog shows "Deleting vault.dat and its history…".
+
+APM overwrites `vault.dat` once with random bytes, then deletes it. It also:
+
+- removes this vault's commits and snapshots from History, leaving other vaults' history alone;
+- revokes every active ephemeral session on this computer;
+- ends the shared terminal session.
+
+The app then goes back to the Welcome screen. The audit log keeps a **VAULT_DESTROYED** entry. Other files next to the vault, such as `.apmignore`, `email.log` and the `policies` folder, stay. So does the Touch ID copy of your password in the Keychain: turn Touch ID off first if you want it gone. Copies in backups, such as Time Machine, are not touched either.
+
+## About
+
+The tagline "A local-first password and secrets manager for people who live in the terminal.", then:
+
+| Row | Shows |
+|---|---|
+| **Version** | The APM version |
+| **Vault format** | **v4**, "APMVAULT header, v4 payload" |
+| **License** | **MIT** |
+| **Source** | github.com/apms-org/gui |
+| **Documentation** | apms-org.github.io/cli |
+| **Keyboard shortcuts** | **Show** (<Kbd>⌘</Kbd><Kbd>/</Kbd>) |

@@ -1,0 +1,572 @@
+---
+title: Tool reference
+description: Every tool the APM MCP server exposes, with its permission, arguments, an example call and what it returns.
+order: 3
+sidebarTitle: Tools
+group: Reference
+---
+
+The APM MCP server (`APM-Server`) registers 17 tools. Each block below lists the permission a token needs, whether the tool opens the vault (and so needs an unlocked session), the arguments from the tool's input schema, an example call and an example result.
+
+All results are plain text. When a token lacks the permission, every tool returns `Denied` and does nothing. Names are matched exactly and are case-sensitive: `GitHub` does not match `github`. Use `list_vault` to see exact names.
+
+Examples show the `params` of an MCP `tools/call` request. Your client builds these for you.
+
+## What the client sees
+
+When a client connects, the server introduces itself as `APM-Server`, version `1.3.0`, with the `tools` and `logging` capabilities:
+
+```json title="initialize result"
+{
+  "capabilities": {
+    "logging": {},
+    "tools": {
+      "listChanged": true
+    }
+  },
+  "protocolVersion": "2025-06-18",
+  "serverInfo": {
+    "name": "APM-Server",
+    "version": "1.3.0"
+  }
+}
+```
+
+The protocol version is the one the client asked for. `tools/list` then returns all 17 tools, whatever the token allows; a tool the token doesn't list still appears, and calling it returns `Denied`. These are the descriptions the client shows:
+
+| Tool | Description |
+|------|-------------|
+| `add_entry` | Request a new vault entry. The entry is added only after the user approves the request in the APM app. |
+| `cloud_config` | Configure cloud sync credentials |
+| `cloud_sync` | Trigger cloud sync |
+| `decrypt_entry` | Decrypt an entry using a provided reference key (from get_entry) |
+| `delete_entry` | Request removal of a vault entry. The entry is removed only after the user approves the request in the APM app. |
+| `edit_entry` | Request a change to an existing vault entry. The change is made only after the user approves the request in the APM app. |
+| `generate_password` | Generate a secure random password |
+| `get_audit_logs` | Retrieve recent audit logs |
+| `get_entry` | Get the full details (including secrets) for any vault entry by name. You can optionally specify a category to narrow down the search. |
+| `get_history` | View vault item history (audit logs for specific items) |
+| `get_totp` | Get the current TOTP code for a vault entry |
+| `list_vault` | List all entries in the vault by category |
+| `manage_profiles` | List or configure encryption profiles |
+| `manage_spaces` | List, create or switch spaces |
+| `search_vault` | Search for a keyword across all vault entries and categories |
+| `tx_abort` | Abort a pending MCP transaction by id |
+| `tx_list` | List pending/recent MCP mutation transactions |
+
+## When a call fails
+
+Every failure comes back as a tool result marked as an error, with one line of text:
+
+| Result | Tools | Meaning |
+|--------|-------|---------|
+| `Denied` | Any | The token doesn't list this tool |
+| `Vault Error: vault is locked. please run 'pm unlock' first to start an MCP session` | `list_vault`, `get_entry` | No unlocked `pm` session |
+| `Vault Error: vault is locked and ephemeral session is invalid` | `list_vault`, `get_entry` | No session, and `APM_EPHEMERAL_ID` can't be used |
+| `Vault Error` | `search_vault`, `get_totp`, `manage_spaces`, `manage_profiles`, `cloud_config`, `get_history`, `cloud_sync` | The same causes, without the detail |
+| `Vault Error: this vault was updated by a newer pm. Update pm to edit it.` | `manage_spaces`, `manage_profiles`, `cloud_config` writes | The vault was saved by a newer APM; update `pm` |
+
+`generate_password`, `get_audit_logs`, `decrypt_entry`, `tx_list`, `tx_abort` and the three request tools work while the vault is locked.
+
+When the `pm` session is read-only, for example after `pm mode readonly`, the vault tools answer from a generated placeholder vault, not yours:
+
+```text title="list_vault during a read-only session"
+Vault Content Overview:
+
+[Passwords]
+- UltraOwl
+- CalmCobra
+- MagicRaven
+
+[TOTP]
+- ToughGlobe
+- KindCobra
+
+[Secure Notes]
+- KindLuna
+```
+
+The names are made up and change. See [Read-only sessions](/docs/agents/scopes-and-approval#read-only-sessions).
+
+## Read
+
+<Command name="list_vault" summary="List every item's name, grouped by type">
+
+**Permission:** `list_vault` (also allowed by `read`) · **Opens the vault:** yes · **Audit:** none
+
+Takes no arguments. Lists items from every space. Item types with no items are left out. Only names are returned, never field values.
+
+A login's own 2FA key isn't listed under `[TOTP]`. When APM opens a vault, it also folds an authenticator item into a login of the same name, or one whose website the authenticator item is linked to, if exactly one login in that space matches and it has no 2FA key yet. That item then appears only under `[Passwords]`, and `get_totp` still finds its code by the login's name.
+
+```json title="Call"
+{ "name": "list_vault", "arguments": {} }
+```
+
+```text title="Result"
+Vault Content Overview:
+
+[Passwords]
+- GitHub
+- Linear
+
+[TOTP]
+- Proton
+
+[API Keys]
+- Postmark server token
+
+[WiFi Credentials]
+- Halden-5G
+```
+
+Section names: Passwords (logins), TOTP, Secure Notes, API Keys, SSH Keys, WiFi Credentials, Recovery Codes, Certificates, Banking Items, Documents, Medical Records, Travel Documents, Gov IDs, Contacts, Cloud Credentials, K8s Secrets, Docker Registries, SSH Configs, CI/CD Secrets, Licenses, Contracts, Tokens, Audio Files, Video Files, Photo Files.
+
+</Command>
+
+<Command name="search_vault" summary="Find items whose contents contain a word, and return them in full">
+
+**Permission:** `search_vault` (also allowed by `read`) · **Opens the vault:** yes · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `query` | string | yes | Text to look for. Case-insensitive, matched against each item as JSON: every field value, secret fields included, and the field names too, so `password` matches every login. |
+
+Searches logins, authenticator items, secure notes, API keys, SSH keys, Wi-Fi networks, recovery codes, cards and accounts, government IDs, medical records, travel, documents, contacts, tokens, audio, video and photos. It does not search certificates, cloud credentials, Kubernetes, Docker registries, SSH hosts, CI/CD secrets, software licenses or legal contracts.
+
+```json title="Call"
+{ "name": "search_vault", "arguments": { "query": "github" } }
+```
+
+```text title="Result"
+[Password] {GitHub maya@example.com t7#Rq9!vLm2^Wx4zK8 [https://github.com] github.com  []  JBSWY3DPEHPK3PXP []}
+```
+
+Each match is one line: the type in brackets, then the item's field values in order (here account, username, password, URLs, website, space, passkeys, notes, 2FA key and custom fields), **including passwords, 2FA seeds and keys**. Returns `No matches found` when nothing matches.
+
+<Callout type="danger">
+`search_vault` exposes secret values. Grant it only to clients you would trust with `get_entry` and `decrypt_entry`.
+</Callout>
+
+</Command>
+
+## Secrets
+
+<Command name="get_entry" summary="Prepare one item's full contents for decrypt_entry">
+
+**Permission:** `get_entry` (also allowed by `secrets`) · **Opens the vault:** yes · **Audit:** `MCP_ENTRY_ACCESSED`
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | yes | The item's exact name. |
+| `category` | string | no | Limit the search to matching types. See below. |
+
+`get_entry` finds the first item with that name, in the order of the types listed under `category`, across all spaces. It doesn't return the contents. It encrypts the item as JSON with AES-256-GCM under a new random 256-bit key, writes it to a temporary file named `apm_mcp_*.enc` in your system's temp folder, and returns the file's path and the key as a hex `Reference`. Pass both to `decrypt_entry`. The file is deleted when `decrypt_entry` opens it, or five minutes later if the server is still running. The file is readable only by your user. If the server stops before then, for example because the client quit, the file stays in the temp folder until the system clears it; it is useless without the reference, which only the agent saw.
+
+```json title="Call"
+{ "name": "get_entry", "arguments": { "name": "GitHub", "category": "password" } }
+```
+
+```text title="Result"
+Data for Password 'GitHub' encrypted at /var/folders/7k/x1b2/T/apm_mcp_2841977315.enc. Reference: 4be1c2...9f07. Use decrypt_entry to view.
+```
+
+`category` is compared, ignoring case, as a substring in either direction with these type names: `Password`, `TOTP`, `Secure Note`, `API Key`, `SSH Key`, `WiFi`, `Recovery Code`, `Certificate`, `Banking`, `Document`, `Medical Record`, `Travel`, `Gov ID`, `Contact`, `Cloud`, `K8s Secret`, `Docker`, `SSH Config`, `CI/CD`, `License`, `Contract`, `Token`, `Audio`, `Video`, `Photo`. Use spaces, not underscores: `api key` and `recovery` match, `api_key` and `recovery_code` don't.
+
+The name each type is found by: the account for logins and authenticator items, the SSID for Wi-Fi, the service for recovery codes, the label for certificates, cards and accounts, medical records, travel and cloud credentials, the product name for licenses, the alias for SSH hosts, the holder's name for government IDs, and the name for everything else.
+
+Returns `Entry not found` if nothing matches.
+
+<Callout type="note">
+The path and key go to the agent together, so this step doesn't hide anything from it. It keeps the contents out of the first reply, and a token needs `decrypt_entry` as well to read them through APM.
+</Callout>
+
+</Command>
+
+<Command name="decrypt_entry" summary="Open a reference from get_entry and return the item">
+
+**Permission:** `decrypt_entry` (also allowed by `secrets`) · **Opens the vault:** no · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `path` | string | yes | The file path from `get_entry`. |
+| `reference` | string | yes | The hex key from `get_entry`. |
+
+Decrypts the file, deletes it and returns the item as indented JSON, with every field: passwords, notes, 2FA seeds, custom fields and, for logins, any passkeys including their private keys.
+
+```json title="Call"
+{
+  "name": "decrypt_entry",
+  "arguments": {
+    "path": "/var/folders/7k/x1b2/T/apm_mcp_2841977315.enc",
+    "reference": "4be1c2...9f07"
+  }
+}
+```
+
+```json title="Result"
+{
+  "account": "GitHub",
+  "username": "maya@example.com",
+  "password": "t7#Rq9!vLm2^Wx4zK8",
+  "urls": [
+    "https://github.com"
+  ],
+  "website": "github.com",
+  "totp": "JBSWY3DPEHPK3PXP"
+}
+```
+
+Errors: `Failed to read encrypted file` (wrong path, already used, or deleted after five minutes), `Invalid reference key`, `Decryption failed`.
+
+</Command>
+
+<Command name="get_totp" summary="Get the current 2FA code for an item">
+
+**Permission:** `get_totp` (also allowed by `secrets`) · **Opens the vault:** yes · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | yes | Exact name of an authenticator item, or of a login that stores a 2FA key. |
+
+Authenticator items are checked first, then logins. The code is the standard 6-digit, 30-second TOTP.
+
+```json title="Call"
+{ "name": "get_totp", "arguments": { "name": "GitHub" } }
+```
+
+```text title="Result"
+TOTP Code for GitHub: 492039
+```
+
+Returns `TOTP Account not found` if no item has that name.
+
+</Command>
+
+## Write
+
+The three item tools below never write to the vault. Each call queues a pending request, writes `MCP_TX_REQUESTED` to the audit log and replies `Waiting for approval`. The change happens only when you approve the request in the desktop app; until then the agent can check it with `tx_list`. Calling again, with or without `tx_id` and `approve`, queues another request. See [Writes: you approve in the app](/docs/agents/scopes-and-approval#writes-you-approve-in-the-app).
+
+<Command name="add_entry" summary="Ask to add an item">
+
+**Permission:** `add_entry` (also allowed by `write`) · **Opens the vault:** no · **Audit:** `MCP_TX_REQUESTED`; `MCP_ENTRY_ADDED` when you approve
+
+`type` and `name` are required. Which other arguments are used depends on `type`:
+
+| `type` | Arguments used | Notes |
+|--------|----------------|-------|
+| `password` | `name`, `username`, `password` | A login. The vault's password policy applies. |
+| `totp` | `name`, `secret` | An authenticator item; `secret` is the base32 key. |
+| `note` | `name`, `content` | A secure note. |
+| `token` | `name`, `token_val`, `token_type` | |
+| `api_key` | `name`, `service`, `key` | |
+| `ssh_key` | `name`, `content` | `content` is the private key. |
+| `wifi` | `ssid`, `password`, `security`, `router_ip` | Titled by `ssid`. |
+| `recovery_code` | `service`, `codes` | Titled by `service`; `codes` is an array of strings. |
+| `certificate` | `label`, `content`, `key`, `issuer`, `expiry` | `content` is the certificate, `key` the private key, `expiry` is `YYYY-MM-DD`. |
+| `banking` | `label`, `bank_type`, `details`, `cvv`, `expiry` | A card or account. |
+| `gov_id` | `id_type`, `id_number`, `full_name`, `expiry` | Titled by `full_name`. |
+| `medical` | `label`, `insurance_id`, `prescriptions`, `allergies` | |
+| `travel` | `label`, `ticket_number`, `booking_code`, `loyalty` | |
+| `contact` | `name`, `phone`, `email`, `address`, `emergency` | `emergency` is a boolean. |
+| `cloud` | `label`, `access_key`, `secret_key`, `region`, `account_id`, `role`, `expiry` | |
+| `k8s_secret` | `name`, `cluster_url`, `namespace`, `expiry` | |
+| `docker` | `name`, `registry_url`, `username`, `token_val` | |
+| `ssh_config` | `alias`, `host`, `username`, `port`, `key_path`, `content`, `fingerprint` | An SSH host; `content` is the private key. |
+| `cicd` | `name`, `webhook`, `env_vars` | |
+| `license` | `product_name`, `serial_key`, `activation`, `expiry` | |
+| `contract` | `name`, `summary`, `parties`, `signed_date` | |
+| `document` | `name`, `file_name`, `content`, `password`, `tags`, `expiry` | `content` is stored as text; `tags` is an array of strings. |
+| `audio`, `video`, `photo` | `name`, `file_name`, `content` | `content` is stored as text, so binary files don't come through intact. |
+
+Every type also takes `space`: the space to add to. Leave it out, or pass `default`, for the default space. Approving in the desktop app leaves your current space alone.
+
+For types titled by another field (`wifi`, `recovery_code`, `certificate`, `banking`, `gov_id`, `medical`, `travel`, `cloud`, `ssh_config`, `license`), `name` is still required and appears in the preview, but the item is titled by the field in the Notes column.
+
+```json title="Call"
+{
+  "name": "add_entry",
+  "arguments": {
+    "type": "api_key",
+    "name": "Postmark server token",
+    "service": "Postmark",
+    "key": "a3f8c2d1-7e4b-4f9a-b6c5-2d8e1f0a9b37",
+    "space": "work"
+  }
+}
+```
+
+```text title="Result"
+Waiting for approval: Add api_key entry 'Postmark server token' in space 'work'
+Request tx_3f9c0a7d21be5e8c94a1d6f0 expires at 2026-10-05T14:30:00+05:30. The user approves or rejects it in the APM app (Settings > AI access). Nothing changes until they approve. Call tx_list to see whether it was approved.
+```
+
+The item is added when you approve, with the arguments of this call. If the vault refuses it then, the app shows the reason, for example `Could not apply the request: account already exists in this space`, a password policy message such as `Could not apply the request: password too short (min 16)`, or `Could not apply the request: unsupported entry type "..."`.
+
+</Command>
+
+<Command name="edit_entry" summary="Ask to change a login, authenticator item or secure note">
+
+**Permission:** `edit_entry` (also allowed by `write`) · **Opens the vault:** no · **Audit:** `MCP_TX_REQUESTED`; `MCP_ENTRY_EDITED` when you approve
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | string | yes | `password`, `totp` or `note`. The schema lists every type, but only these three can be edited. |
+| `name` | string | yes | Exact name of the item. |
+| `username` | string | no | New username (`password` type). |
+| `password` | string | no | New password (`password` type). |
+| `secret` | string | no | New 2FA key (`totp` type). |
+| `content` | string | no | New note text (`note` type). |
+| `space` | string | no | The space the item is in. Leave it out, or pass `default`, for the default space. |
+
+Fields you leave out or send empty keep their current value. The vault's password policy is not checked on edits.
+
+```json title="Call"
+{
+  "name": "edit_entry",
+  "arguments": { "type": "password", "name": "Linear", "password": "orbit-lantern-quarry-92" }
+}
+```
+
+```text title="Result"
+Waiting for approval: Edit password entry 'Linear' in space ''
+Request tx_b02e7f41c9d85a3e6f10c7d2 expires at 2026-10-05T14:30:00+05:30. The user approves or rejects it in the APM app (Settings > AI access). Nothing changes until they approve. Call tx_list to see whether it was approved.
+```
+
+The item changes when you approve. If the item isn't in that space, or the type can't be edited, the app shows `Could not apply the request: entry not found or editing not supported for this type`.
+
+</Command>
+
+<Command name="delete_entry" summary="Ask to delete a login, authenticator item or secure note">
+
+**Permission:** `delete_entry` (also allowed by `write`) · **Opens the vault:** no · **Audit:** `MCP_TX_REQUESTED`; `MCP_ENTRY_DELETED` when you approve
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | yes | Exact name of the item. |
+
+When you approve, deletes the first login with that name, or else the first authenticator item, or else the first secure note, in any space. Other item types can't be deleted over MCP. The item does not go to Trash, but approving records an lgit commit, so `pm lgit undo` can bring it back.
+
+```json title="Call"
+{ "name": "delete_entry", "arguments": { "name": "Old router" } }
+```
+
+```text title="Result"
+Waiting for approval: Delete entry 'Old router'
+Request tx_71c4e0a9f3d2b6e8a05c1d97 expires at 2026-10-05T14:30:00+05:30. The user approves or rejects it in the APM app (Settings > AI access). Nothing changes until they approve. Call tx_list to see whether it was approved.
+```
+
+The request doesn't check that the item exists. If it doesn't when you approve, the app shows `Could not apply the request: entry not found`.
+
+</Command>
+
+<Command name="manage_spaces" summary="List, create or switch spaces">
+
+**Permission:** `manage_spaces` (also allowed by `write`) · **Opens the vault:** yes · **Audit:** `MCP_SPACE_ADDED`, `MCP_SPACE_SWITCHED`
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `action` | string | yes | `list`, `add` or `switch`. |
+| `name` | string | for `add` and `switch` | The space. `default` switches to the default space. |
+
+Changes apply at once, with no preview. `switch` changes the current space for `pm` and the app as well.
+
+```json title="Call"
+{ "name": "manage_spaces", "arguments": { "action": "list" } }
+```
+
+```text title="Result"
+Current Space: work
+All Spaces: work, personal, family
+```
+
+Other results: `Space added`, `Space already exists`, `Switched to personal`, `Space not found`, `Unknown action`. On a vault where no space was ever chosen, the first line reads `Current Space: ` with nothing after it.
+
+</Command>
+
+<Command name="cloud_sync" summary="Upload the encrypted vault to Google Drive or GitHub">
+
+**Permission:** `cloud_sync` (also allowed by `write`) · **Opens the vault:** yes · **Audit:** `MCP_CLOUD_SYNC` when it updates an existing copy
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `provider` | string | yes | `gdrive` or `github`. The schema doesn't offer Dropbox. |
+
+Runs at once, with no preview, and applies your `.apmignore` rules. If the vault has never been uploaded to that provider, it uploads it and returns `Uploaded to gdrive (ID: ...)`; otherwise it updates the existing copy and returns `Sync successful`. What leaves your computer is described in [Sync security](/docs/security/sync-security).
+
+How it differs from `pm cloud sync`:
+
+- **Google Drive** always runs in APM's public Drive mode, even if you set up your own Drive. A first upload from this tool is placed in APM's shared folder and made readable by anyone who has the file ID, and the ID is returned to the agent. If you never set up Drive sync, it uses APM's built-in Drive account. The file is still encrypted with your master password.
+- **GitHub** always fails. The tool is given the stored Google Drive token instead of your GitHub token and is never told your repository, so it returns `Cloud Init Error` when no Drive token is stored, and otherwise `Sync failed: invalid repo format, expected owner/repo` (or `Upload failed: ...` if no repository is stored). Use `pm cloud sync github` instead.
+
+```json title="Call"
+{ "name": "cloud_sync", "arguments": { "provider": "gdrive" } }
+```
+
+```text title="Result"
+Sync successful
+```
+
+Errors: `Cloud Init Error`, `Upload failed: ...`, `Sync failed: ...`, `Ignore parse failed: ...`.
+
+</Command>
+
+## Admin
+
+<Command name="manage_profiles" summary="List encryption profiles or switch the vault to one">
+
+**Permission:** `manage_profiles` (also allowed by `admin`) · **Opens the vault:** yes · **Audit:** `MCP_PROFILE_CHANGED`
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `action` | string | yes | `list` or `set`. |
+| `profile` | string | for `set` | `standard`, `hardened`, `paranoid` or `legacy`. |
+
+`set` re-encrypts and saves the vault with that profile at once, with no preview. A name that isn't a known profile is saved as the profile name but encrypts with the standard parameters. See [Profiles](/docs/security/profiles) before choosing one.
+
+```json title="Call"
+{ "name": "manage_profiles", "arguments": { "action": "list" } }
+```
+
+```text title="Result"
+Current Profile: standard
+Available: hardened, legacy, paranoid, standard
+```
+
+Other results: `Profile updated`, `Unknown action`.
+
+</Command>
+
+<Command name="cloud_config" summary="Replace the credentials used for sync">
+
+**Permission:** `cloud_config` (also allowed by `admin`) · **Opens the vault:** yes · **Audit:** `MCP_CLOUD_CONFIG`
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `provider` | string | yes | `gdrive` or `github`. |
+| `token` | string | yes | For `gdrive`, the stored Google Drive token. For `github`, a GitHub access token. |
+| `repo` | string | no | For `github`, the repository to sync to. |
+
+Saves the values into the vault at once, with no preview, and returns `Cloud configuration updated`.
+
+```json title="Call"
+{ "name": "cloud_config", "arguments": { "provider": "github", "token": "github_pat_...", "repo": "maya/vault-backup" } }
+```
+
+```text title="Result"
+Cloud configuration updated
+```
+
+</Command>
+
+<Command name="get_history" summary="Read the vault's item history">
+
+**Permission:** `get_history` (also allowed by `admin`) · **Opens the vault:** yes · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `limit` | integer | no | How many entries to return. Default 20; `0` or a negative number also returns the last 20. |
+
+Returns the most recent entries, newest first: time, action (such as `ADD`, `DEL` or `GET`), item type and item name. Field values aren't included, with one exception: government IDs are recorded by their ID number.
+
+```json title="Call"
+{ "name": "get_history", "arguments": { "limit": 3 } }
+```
+
+```text title="Result"
+Vault History:
+[2026-10-05T14:02:11Z] ADD PASSWORD: Linear
+[2026-10-05T13:47:30Z] ADD APIKEY: Postmark server token
+[2026-10-04T09:15:02Z] DEL PASSWORD: Old router
+```
+
+</Command>
+
+<Command name="get_audit_logs" summary="Read recent audit log entries">
+
+**Permission:** `get_audit_logs` (also allowed by `admin`) · **Opens the vault:** no · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `limit` | integer | no | How many of the latest entries to return. Default 50. |
+
+Returns the latest entries, oldest first, one per line. Works while the vault is locked.
+
+```json title="Call"
+{ "name": "get_audit_logs", "arguments": { "limit": 3 } }
+```
+
+```text title="Result"
+[2026-10-05T21:17:05+05:30] MCP_ENTRY_ACCESSED: Token 'Claude Desktop' accessed entry 'GitHub' (Password)
+[2026-10-05T21:17:26+05:30] MCP_TX_REQUESTED: Token 'Claude Desktop' requested: Add password entry 'Figma' in space 'default'
+[2026-10-05T21:19:00+05:30] MCP_ENTRY_ADDED: Approved in the desktop app for token 'Claude Desktop': Add password entry 'Figma' in space 'default'
+```
+
+</Command>
+
+## Utility
+
+<Command name="generate_password" summary="Generate a random password">
+
+**Permission:** `generate_password` · **Opens the vault:** no · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `length` | integer | no | Number of characters, 1–256. Default 20. |
+
+Draws each character from `a-z`, `A-Z`, `0-9` and `!@#$%^&*()-_=+` with the system's secure random generator. Nothing is saved; use `add_entry` or `edit_entry` to store it.
+
+`0` means the default. Any other length outside 1–256 fails with `length must be between 1 and 256`.
+
+```json title="Call"
+{ "name": "generate_password", "arguments": { "length": 24 } }
+```
+
+```text title="Result"
+t7#Rq9!vLm2&Wx4zK8pNe3Ya
+```
+
+</Command>
+
+<Command name="tx_list" summary="List pending and recent write transactions">
+
+**Permission:** `tx_list` · **Opens the vault:** no · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `limit` | integer | no | How many to return. Default 25. |
+
+Lists transactions from every client that haven't reached their 15-minute expiry, newest first: ID, tool, token name, status (`pending`, `committed` or `aborted`) and expiry.
+
+```json title="Call"
+{ "name": "tx_list", "arguments": {} }
+```
+
+```text title="Result"
+tx_3f9c0a7d21be5e8c94a1d6f0 | add_entry | Cursor | pending | expires=2026-10-05T14:17:11Z
+```
+
+Returns `No active transactions` when there are none.
+
+</Command>
+
+<Command name="tx_abort" summary="Cancel a transaction">
+
+**Permission:** `tx_abort` · **Opens the vault:** no · **Audit:** none
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `tx_id` | string | yes | The transaction to cancel. |
+
+Marks the transaction as aborted so it can no longer be approved. It works on any client's transaction.
+
+```json title="Call"
+{ "name": "tx_abort", "arguments": { "tx_id": "tx_3f9c0a7d21be5e8c94a1d6f0" } }
+```
+
+```text title="Result"
+Transaction aborted
+```
+
+Returns `Error: transaction not found` for an unknown or expired ID.
+
+</Command>

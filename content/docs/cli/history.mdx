@@ -1,0 +1,161 @@
+---
+title: History and undo
+description: Every save of the vault is a signed snapshot. Browse them with pm lgit, undo a change, restore an older vault, and read the signed logs.
+order: 9
+sidebarTitle: History (lgit)
+group: Guides
+---
+
+Almost every time `pm` (or the desktop app) writes the vault, it also keeps a copy of the encrypted file and appends a signed entry to a log. This history is called **lgit**, because it works like a tiny Git for your vault: each entry is a commit with an ID, a hash of the vault data and a link to the previous commit. You can list it, check it, restore any snapshot and undo the last change.
+
+Snapshots are copies of the encrypted vault, so they are as safe as the vault itself and need the master password that was current when they were taken.
+
+## What gets recorded
+
+| Action | Recorded when |
+|---|---|
+| `SAVE` | The vault file is written: adding, editing or deleting items, imports, setting changes, and unlocking with your password (which re-encrypts the vault) |
+| `CHECKOUT` | `pm lgit checkout` restored a snapshot |
+| `UNDO` | `pm lgit undo` restored a snapshot |
+| `SQUASH` | `pm lgit squash` compacted the history |
+
+A save that produces exactly the same file as the previous commit is not recorded again. An import is one save, so one commit.
+
+Some writes skip the history: changing the encryption profile with `pm profile set`, changes an AI agent makes over MCP without asking you (to spaces, the encryption profile or cloud settings), and the desktop app's bookkeeping saves, such as an item's last-used time or a passkey's sign-in counter.
+
+## Browse the history
+
+```sh title="Terminal"
+pm lgit tree            # newest first; pm lgit log is the same
+pm lgit tree --limit 0  # everything (default 200)
+```
+
+```text
+Timestamp            ID             Action   Data Hash         Status
+-----------------------------------------------------------------------
+2026-10-05 14:24:25 17912102653... SAVE     f07f7340e4e76... [VERIFIED]
+2026-10-05 14:24:24 17912102641... SAVE     acbac17542b9c... [VERIFIED]
+2026-10-05 14:16:51 17912098114... SAVE     a40189d4475fe... [VERIFIED]
+```
+
+Timestamps in `pm lgit` are in UTC. The status column checks each commit's signature and its link to the commit before it. The oldest row in a limited list can show `[UNVERIFIED]` because the commit it links to is not in the list; `pm lgit verify` checks the whole chain.
+
+Show one commit by a unique start of its ID, or `head` for the latest:
+
+```sh title="Terminal"
+pm lgit show 17912102653
+```
+
+```text
+ID:           1791210265341728000-f07f7340e4e7
+Timestamp:    2026-10-05T14:24:25Z
+Action:       SAVE
+Vault Path:   /Users/alex/.apm/vault.dat
+Data Hash:    f07f7340e4e76d20b4069e32f35fa91b91e164e1111162276ffa10b88d75cad1
+Prev Hash:    9c2e41b7d05a8f63e1b74...
+Chain Hash:   553edd6fbf980ddb5592e5f4b9aa8042322e24f4773e89d0d8731f35bd345f9f
+Snapshot:     /Users/alex/Library/Application Support/apm/lgit_snapshots/1791210265341728000-f07f7340e4e7.vault
+Verification: [VERIFIED]
+```
+
+Compare the vault on disk with the latest commit:
+
+```sh title="Terminal"
+pm lgit status
+```
+
+```text
+HEAD:        1791210265341728000-f07f7340e4e7
+HEAD hash:   f07f7340e4e76d20b4069...
+Vault state: clean (matches HEAD)
+```
+
+`modified (differs from HEAD)` means the file changed without going through `pm`, for example a copy from another machine, or by a write that skips the history, or that the latest commit belongs to a different vault.
+
+## Undo the last change
+
+```sh title="Terminal"
+pm lgit undo
+```
+
+```text
+Undo completed (1 step(s)).
+```
+
+`pm lgit undo` writes the snapshot from just before the latest commit back to the vault, and records that as an `UNDO` commit. That covers the common case: undoing an import, a bulk delete or an edit you regret.
+
+<Callout type="warning" title="Undo is one step back, not a stack">
+Because an undo is itself a commit, a second undo (or `--steps 2`) reverses the first one instead of going further back. Unlocking with your password also records a commit. To go back further, or when you are not sure what the last commit is, look at `pm lgit tree` and restore the exact commit you want with `pm lgit checkout`.
+</Callout>
+
+Run `pm unlock` before undoing, so the unlock does not add a commit of its own between you and the change you want to undo.
+
+## Restore a snapshot
+
+```sh title="Terminal"
+pm lgit checkout 17912102641
+```
+
+```text
+Restored vault from lgit commit '17912102641'.
+```
+
+The argument is a unique start of a commit ID, or `head`. The current vault file is replaced with that snapshot and a `CHECKOUT` commit is recorded, so you can check out the commit before it to go back.
+
+<Callout type="danger" title="History is shared by every vault on your account">
+All vaults you use with one user account write to the same history, and each commit records which vault it came from (`Vault Path` in `pm lgit show`). `pm lgit undo` and `pm lgit checkout` write the chosen snapshot to the vault you are using now, whichever vault it came from. If you use more than one vault, check the commit's `Vault Path` before restoring it.
+</Callout>
+
+Restoring needs a session with write access; a read-only session can't check out, undo, squash or prune.
+
+## Check integrity
+
+```sh title="Terminal"
+pm lgit verify
+```
+
+```text
+Verified commits: 214/214
+LGit chain integrity is valid.
+```
+
+Each commit's hash covers its ID, time, action, vault path, data hash, previous hash and snapshot path, and is signed with HMAC-SHA256 using a random key in your config folder (`lgit_signing.key`). A commit that was edited, reordered or removed from the middle of the chain fails the check. Deleting the newest commits from the end isn't detected.
+
+## Keep history small
+
+Every commit keeps a full copy of the vault, so history grows with each save, especially if your vault holds documents or photos.
+
+```sh title="Terminal"
+pm lgit squash --keep 20    # keep the 20 newest commits, delete older snapshots
+pm lgit prune               # delete snapshot files no commit points to
+```
+
+`pm lgit squash` deletes the snapshots of every commit except the newest `--keep` (default 1), re-signs the remaining chain and records a `SQUASH` commit. You can't restore anything older afterwards. `pm lgit prune` only removes orphaned snapshot files and reports how many it removed and kept.
+
+## Signed logs
+
+`pm logs` unlocks the vault and prints three logs one after another, newest first, with a verification badge on each line:
+
+| Section | Source | What it records |
+|---|---|---|
+| Vault History | Inside the vault | Item events: `ADD`, `GET`, `EDIT`, `DEL`, `MERGE`, with type and name |
+| Audit Events | `audit.json` in your config folder | What `pm` and the app did (unlocks, imports, exports, settings, tokens and more), with details, user and host, chained and signed with `audit_signing.key` |
+| LGit Commits | `lgit.jsonl` | The history above |
+
+```sh title="Terminal"
+pm logs --limit 20     # 20 lines per section (default 200, 0 for all)
+```
+
+```text
+Audit Events
+------------
+2026-10-05 19:45:34 TRUST_VIEWED             Displayed 3 trust scores                     user=alex@macbook [VERIFIED]
+2026-10-05 19:45:33 HEALTH_CHECK             Score: 90                                    user=alex@macbook [VERIFIED]
+2026-10-05 19:45:20 DATA_IMPORTED            File: chrome.csv, Format: csv, Added: 1, ... user=alex@macbook [VERIFIED]
+```
+
+The audit log doesn't record item values, but `pm cloud get` writes the retrieval key or file ID you gave it. See [Health and audit](/docs/cli/health-and-audit) for what else it is used for, and [File locations](/docs/reference/file-locations#history-and-audit) for where these files are.
+
+## The desktop app
+
+The desktop app shows the same history in its **History** view, with undo. Deleting a vault from the app also removes that vault's commits and snapshots.

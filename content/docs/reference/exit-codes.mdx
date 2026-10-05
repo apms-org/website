@@ -1,0 +1,84 @@
+---
+title: Exit codes
+description: Which pm commands report failure through their exit status, and how to detect failure for the ones that don't.
+order: 7
+group: Configuration
+---
+
+`pm` exits with `0` or `1`, and with `130` when you press <Kbd>Ctrl</Kbd> <Kbd>C</Kbd>. Most commands print an error and still exit with `0`, so a non-zero status is reliable only for the commands listed on this page. For everything else, check the output or the result you expect. [Scripting](/docs/cli/scripting) has patterns for both.
+
+| Status | Meaning |
+|---|---|
+| `0` | Success, **or** a failure in a command that doesn't report one |
+| `1` | Failure, in the commands below, **or** you pressed <Kbd>Esc</Kbd> at a typed prompt |
+| `130` | You pressed <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> at a prompt or in a full-screen view |
+
+## Commands that exit with 1 on failure
+
+| Command | Exits with 1 when |
+|---|---|
+| `pm import` | An `--on-conflict` or `--on-duplicate` value is invalid, the vault can't be unlocked, the session is read-only (except with `--dry-run`), the file can't be read or recognised, its password is wrong, or the vault can't be saved |
+| `pm export` | The vault can't be unlocked, the format or an item type is unknown, nothing matches the selection, the output file exists and `pm` can't ask before overwriting it (there is no terminal, or you used `--json`) and you didn't pass `--force`, or the file can't be written. Declining the overwrite prompt, with <Kbd>n</Kbd>, <Kbd>↵</Kbd> or <Kbd>Esc</Kbd>, prints `Export cancelled.` and exits with `0` |
+| `pm export compare` | The vault can't be unlocked, or the file can't be read, recognised or decrypted |
+| `pm totp link`, `pm totp unlink` | The vault can't be unlocked, the session is read-only, no authenticator entry matches the name (or several do), the site isn't a valid name (`link`), or the vault can't be saved. `pm totp unlink` for a site that isn't linked exits with `0` |
+| `pm autolock` | The vault can't be unlocked, a value is invalid, you try to change it in a read-only session, or the vault can't be saved |
+| `pm extension serve` | There is no vault, the bridge can't start (usually because the port is in use), or the vault can't be unlocked |
+| `pm extension status` | Nothing is listening and no browser is linked, something other than APM is listening, the pairing token doesn't match, or the status request fails |
+| `pm extension token` | The token can't be read or created |
+| `pm extension rotate` | The vault can't be unlocked or the new token can't be written |
+| `pm extension link` | There is no vault, an `--id` or `--browser` value is invalid, no Chromium browser is found or none could be linked, `pm` can't find its own path, the link settings or token can't be written, you press <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> or input ends while it asks you to confirm a pairing code (the request is denied), or your answer can't be recorded |
+| `pm mcp serve` | The token is invalid or expired, or the server stops with an error. With no saved token at all it prints a message and exits with `0` |
+| Any command, at start | `pm` can't find its own executable path |
+
+### A vault from a newer pm
+
+These commands stop with status `1`, before changing anything, when the vault was written by a newer `pm`:
+
+`pm cloud init`, `pm cloud delete`, `pm policy load`, `pm policy clear`, `pm space create`, `pm space switch`, `pm auth email`, `pm auth alerts`, `pm auth level`, `pm auth reset`, `pm auth change`.
+
+Other commands open such a vault read-only. `pm import`, `pm totp link`, `pm totp unlink` and a change with `pm autolock` then exit with `1`, as for any read-only session; the rest refuse to write and exit with `0`. See [A vault from a newer pm](/docs/cli/vault-basics#a-vault-from-a-newer-pm).
+
+## Commands that exit with 0 on failure
+
+Everything not listed above, including:
+
+- `pm unlock` with a wrong password, and every other command whose unlock fails
+- `pm get` with no match, `pm add` when the item exists or breaks a policy
+- every `pm cloud` command except the newer-vault check, including failed uploads and downloads
+- `pm lgit`, `pm auth`, `pm policy`, `pm session`, `pm space`, `pm mcp token` and `pm inject` errors
+- `pm extension unlink`, which always exits `0`
+- unknown commands and flags: `Error: unknown command "…" for "pm"` is printed and the status is `0`
+
+```text
+$ pm nosuchcommand; echo "status=$?"
+Error: unknown command "nosuchcommand" for "pm"
+Run 'pm --help' for usage.
+status=0
+```
+
+## Esc and Ctrl+C
+
+These keys behave the same across commands. See [Keys at prompts](/docs/cli#keys-at-prompts).
+
+| You press | Where | What happens |
+|---|---|---|
+| <Kbd>Esc</Kbd> | A typed prompt, such as the master password or an item's fields | `pm` prints `Cancelled.` on standard error and exits with `1`. A master password prompt doesn't count the attempt as a failed unlock |
+| <Kbd>Esc</Kbd> | A menu or yes/no question in `pm import`, `pm export` or `pm mcp token` | `pm` prints `Import cancelled.`, `Export cancelled.` or `Token creation cancelled.`, changes nothing and exits with `0`. At the export password prompts, which are typed prompts, it prints `Export cancelled.` and exits with `1` |
+| <Kbd>Esc</Kbd> in the `pm get` search box, <Kbd>Esc</Kbd> or <Kbd>q</Kbd> in `pm totp` | The full-screen views | The view closes and `pm` exits with `0` |
+| <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Any prompt, and the full-screen views of `pm get` (including its editor) and `pm totp` | `pm` restores your terminal and exits with `130` |
+
+While it serves, or waits for you to approve a pairing request, `pm extension serve` and `pm extension link` keep their own handling of <Kbd>Ctrl</Kbd> <Kbd>C</Kbd>, described above and in [Browser extension](/docs/cli/browser-extension).
+
+## Detect failure anyway
+
+- **Check for the result, not the status.** After `pm add`, look the item up; after `pm cloud sync`, look for the success line.
+- **Capture both streams.** Most of `pm`'s own errors are printed on standard output. Errors about unknown commands or flags, and `pm inject` errors, go to standard error, so they don't end up in your `eval`.
+- **Use JSON where available.** `pm import --json` and `pm export --json` print a result you can parse, and both exit with `1` on failure.
+
+```sh title="Terminal"
+out=$(pm cloud sync gdrive 2>&1)
+case "$out" in
+  *"Vault synced to cloud."*) ;;
+  *) echo "$out" >&2; exit 1 ;;
+esac
+```

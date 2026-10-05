@@ -1,0 +1,252 @@
+---
+title: Items
+description: Add, search, view, copy, edit and delete the 25 item types from the terminal.
+order: 4
+group: Guides
+---
+
+An item is one thing you keep in the vault: a login, a one-time code, an API key, a passport, a photo. `pm add` creates items, and `pm get` finds them and opens them to view, copy, edit or delete. Both work in the current [space](/docs/cli/spaces).
+
+## Add an item
+
+```sh title="Terminal"
+pm add            # pick a category, then a type
+pm add password   # go straight to a type
+```
+
+Without an argument, `pm add` shows four categories (Identity & Personal, Developer & Infrastructure, Media & Files, Finance & Legal) and then the types in the one you pick. With an argument, it skips the menus. The argument is not case-sensitive, and spaces, hyphens and underscores are ignored, so `api-key`, `API_KEY` and `apikey` are the same. You can also give the type's number.
+
+```text
+$ pm add password
+Account Name: GitHub
+Username: octocat
+Password (leave blank to generate):
+Entry saved.
+```
+
+Leave a login's password blank and `pm` generates a 16-character one. If the active [password policy](/docs/cli/policies) sets a minimum length, a login's password must meet the policy. `pm add` doesn't check the policy for other types.
+
+### Item types
+
+| # | Type | `pm add` accepts | What it asks for |
+|---|---|---|---|
+| 1 | Login | `password`, `pass`, `login` | Account name, username, password |
+| 2 | Authenticator code | `totp`, `otp`, `2fa` | Account name, secret, an optional site to link. See [One-time codes](/docs/cli/totp) |
+| 3 | Token | `token` | Name, token, type (for example GitHub) |
+| 4 | Secure note | `note`, `securenote`, `notes` | Name, then the [note editor](#notes) |
+| 5 | API key | `apikey`, `api` | Label, service, key |
+| 6 | SSH key | `ssh`, `sshkey` | Label, private key |
+| 7 | Wi-Fi | `wifi`, `wireless` | SSID, password, security (WPA2/WPA3), router IP |
+| 8 | Recovery codes | `recovery`, `recoverycode`, `recoverycodes` | Service, codes one per line |
+| 9 | Certificate | `certificate`, `cert` | Label, issuer, expiry (`YYYY-MM-DD`), certificate data, private key |
+| 10 | Banking | `banking`, `bank` | Label, type (Card, IBAN or SWIFT), number or IBAN, CVV, expiry (`MM/YY`) |
+| 11 | Document | `document`, `doc`, `file` | Name, file path, a password for the document, tags, expiry |
+| 12 | Government ID | `governmentid`, `govid` | Type (Passport, Driver's License, Voter ID), ID number, full name, expiry |
+| 13 | Medical record | `medical`, `medicalrecord` | Label, insurance ID, prescriptions, allergies |
+| 14 | Travel | `travel`, `traveldoc` | Label, ticket number, booking code, loyalty program |
+| 15 | Contact | `contact` | Name, phone, email, address, emergency contact (y/n) |
+| 16 | Cloud credentials | `cloud`, `cloudcredentials` | Label, access key, secret key, region, account ID, role, expiration |
+| 17 | Kubernetes secret | `k8s`, `kubernetes`, `kubernetessecret` | Name, cluster URL, namespace, expiration |
+| 18 | Docker registry | `docker`, `dockerregistry` | Name, registry URL, username, token |
+| 19 | SSH config | `sshconfig` | Alias, host, user, port, key path, fingerprint, private key |
+| 20 | CI/CD secret | `cicd`, `cicdsecret`, `ci`, `cd` | Name, webhook URL, environment variables (comma-separated) |
+| 21 | Software license | `softwarelicense`, `license` | Product name, serial key, activation info, expiration |
+| 22 | Legal contract | `legal`, `legalcontract` | Name, summary, parties involved, signed date |
+| 23 | Audio | `audio` | Name, file path |
+| 24 | Video | `video` | Name, file path |
+| 25 | Photo | `photo`, `image`, `picture` | Name, file path |
+
+Most types need a unique name within a space: adding a second login called `GitHub` to the same space fails with `account already exists in this space`. Medical records, travel documents, contacts, cloud credentials, Kubernetes secrets, Docker registries, SSH configs, CI/CD secrets, software licenses and legal contracts aren't checked, so `pm add` can create two with the same name.
+
+### Multi-line values
+
+Private keys, certificates and recovery codes are pasted line by line. Press <Kbd>↵</Kbd> on an empty line to finish.
+
+```text
+$ pm add ssh
+Key Label: deploy
+Enter Private Key (end with empty line):
+-----BEGIN OPENSSH PRIVATE KEY-----
+...
+-----END OPENSSH PRIVATE KEY-----
+
+Entry saved.
+```
+
+### Notes
+
+On a terminal, a secure note opens a full-screen editor:
+
+| Key | Action |
+|---|---|
+| <Kbd>Ctrl</Kbd> <Kbd>S</Kbd> | Save and close |
+| <Kbd>Esc</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Close. With unsaved changes, press <Kbd>Esc</Kbd> again to discard |
+| <Kbd>Ctrl</Kbd> <Kbd>Z</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>Y</Kbd> | Undo / redo |
+
+When stdin is not a terminal, `pm` reads the note line by line until an empty line.
+
+### Documents and media
+
+Documents, photos, audio and video are read from a file path and stored inside the vault. A document also gets its own password, which you must type again to open it later. After storing a document, `pm` reminds you to delete the original file; it never deletes it for you.
+
+<Callout type="note" title="Logins can hold more">
+`pm add password` asks only for the name, username and password. A login can also hold a main website, other websites, notes, a 2FA key, custom fields and passkeys. Add those by [editing the login](#edit-an-item), from the desktop app, or by importing.
+</Callout>
+
+## Find items
+
+```sh title="Terminal"
+pm get            # browse everything in the current space
+pm get github     # start with a query
+pm get "aws prod" # quote a query that contains spaces
+```
+
+`pm get` uses only its first argument as the query, so quote multi-word queries. Matching is mainly on the item's name and is not case-sensitive. A login also matches on its username, its websites and its passkeys' sites, and an authenticator item on its linked sites; those matches rank below name matches. Every word of the query has to match: an exact name ranks first, then names that start with a word, names that contain it, and finally names that contain its letters in order (`gthb` finds `GitHub`).
+
+### The search screen
+
+On a terminal, `pm get` opens a full-screen list of up to 20 rows at a time, with the current space and whether the vault is read-only in the header. Each row shows the item's name and its type, such as `Login`, `Authenticator` or `Secure note`. It has two modes. Prompts that open from it, such as a document's password or a field in the editor, take the keys in [Keys at prompts](/docs/cli#keys-at-prompts).
+
+**Search mode** (where you start). The results update as you type:
+
+| Key | Action |
+|---|---|
+| Any character, or a paste | Add it to the query at the cursor |
+| <Kbd>←</Kbd> <Kbd>→</Kbd> | Move the cursor |
+| <Kbd>Home</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>A</Kbd> / <Kbd>End</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>E</Kbd> | Jump to the start or end of the query |
+| <Kbd>⌫</Kbd> / <Kbd>Delete</Kbd> | Delete the character before or after the cursor |
+| <Kbd>Ctrl</Kbd> <Kbd>U</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>W</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> | Clear the query / delete the word before the cursor / delete to the end |
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd>, <Kbd>Ctrl</Kbd> <Kbd>P</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>N</Kbd>, <Kbd>PgUp</Kbd> <Kbd>PgDn</Kbd> | Move the selection in the results without leaving the search box |
+| <Kbd>Tab</Kbd> or <Kbd>↵</Kbd> | Move to the list |
+| <Kbd>Esc</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Quit. <Kbd>Esc</Kbd> exits with status 0 and <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> with 130 |
+
+**List mode:**
+
+| Key | Action |
+|---|---|
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd>, <Kbd>j</Kbd> <Kbd>k</Kbd>, <Kbd>PgUp</Kbd> <Kbd>PgDn</Kbd>, <Kbd>Home</Kbd> <Kbd>End</Kbd> | Move the selection |
+| <Kbd>↵</Kbd> or <Kbd>v</Kbd> | View the item, with copy prompts |
+| <Kbd>Space</Kbd> | Quick look: a note's text, a photo preview, a file's details, or the card of any other item, without copy prompts |
+| <Kbd>i</Kbd> | Metadata: created, last accessed and updated (and by whom), access count, trust score and history totals |
+| <Kbd>e</Kbd> | Edit |
+| <Kbd>d</Kbd> | Delete, after a y/n confirmation. <Kbd>Esc</Kbd> answers No |
+| <Kbd>s</Kbd> | Mark or unmark the item (marked rows show `*`) |
+| <Kbd>a</Kbd> | Mark every item in the list |
+| <Kbd>c</Kbd> | Clear the marks |
+| <Kbd>Esc</Kbd> or <Kbd>Tab</Kbd> | Back to search |
+
+With items marked, <Kbd>e</Kbd> edits each marked item in turn, <Kbd>d</Kbd> deletes all of them after one confirmation, and <Kbd>i</Kbd> shows each one's metadata. Typing any other character goes back to search mode with that character added.
+
+### Viewing and copying
+
+Viewing an item shows a card: its name, its type and space, then its filled fields in the same order as the desktop app, with secrets hidden. A login also shows its live one-time code with the seconds left, the code of an authenticator item linked to it, and its passkeys. The card ends with what you can copy:
+
+```text title="Terminal"
+GitHub
+Login · space: default · 2FA on
+
+  Username        you@example.com
+  Password        ********
+  One-time code   432872  22s left
+
+Copy [1] Password  [2] Username  [3] One-time code  ·  Enter to go back:
+```
+
+Type a number and press <Kbd>↵</Kbd> to copy that value. A secret prints "Secret copied to clipboard.", and anything else prints a line such as "Copied username.". You can copy several values in turn; press <Kbd>↵</Kbd> on its own, or <Kbd>Esc</Kbd>, to go back to the list. <Kbd>Esc</Kbd> here only leaves the copy prompt; it doesn't end `pm`. Any other answer gets "Pick one of the options, or press Enter."
+
+A certificate that has expired, or expires within 30 days, shows a warning such as "This certificate expires in 12 days." A bank card's number stays masked like other secrets.
+
+- **Documents, audio, video and photos** add `[o] Open file` to the copy line. A document with a password asks for it first ("Document password: "); <Kbd>Esc</Kbd> skips opening it. `pm` writes the file to your temp folder, opens it with the default app and deletes the temp copy about five seconds later.
+- **Photos** also print a small ASCII preview under the card.
+
+Pass `--show-pass` to show secrets in the card instead of `********`:
+
+```sh title="Terminal"
+pm get github --show-pass
+```
+
+```text title="Output"
+GitHub
+Login · space: default · 2FA on
+
+  Username        you@example.com
+  Password        Harbor-Lantern-42!
+  One-time code   432872  21s left
+  Setup key       JBSWY3DPEHPK3PXP
+```
+
+<Callout type="warning" title="The clipboard is not cleared">
+`pm` copies with `pbcopy` on macOS, `xclip` on Linux and PowerShell's `Set-Clipboard` on Windows. It does not clear the clipboard afterwards, so clear it yourself after pasting a secret. On Linux, install `xclip` or nothing is copied.
+</Callout>
+
+### Without a terminal
+
+When stdin is not a terminal (in a script, or with `< /dev/null`), `pm get` prints instead of opening the search screen. One match prints the item's card, with secrets hidden unless you pass `--show-pass`, and no copy line. Several matches print a numbered list with each item's type:
+
+```text title="Output"
+$ pm get i < /dev/null
+[1] Figma                        Login
+[2] GitHub                       Login
+[3] Linear                       Login
+```
+
+No match prints "No matching entries found."
+
+See [Scripting and automation](/docs/cli/scripting).
+
+## Edit an item
+
+Choose <Kbd>e</Kbd> on an item in `pm get`. A full-screen editor lists every field of the item, its custom fields and passkeys, and its space:
+
+```text title="Terminal"
+Edit GitHub
+Login · space: default
+
+   Name                 GitHub
+   Username             you@example.com
+   Password             ********
+   Two-factor code      set
+   Website              empty
+   Other websites       empty
+   Notes                empty
+   + Add custom field
+   Space                default
+
+↑↓ move · Enter edit · s save · Esc done
+```
+
+Pick a field with the arrow keys and press <Kbd>↵</Kbd>. `pm` shows its current value (`Now: …`) and asks for the new one; <Kbd>↵</Kbd> on an empty line keeps it, `-` clears a field that may be empty, and <Kbd>Esc</Kbd> cancels that field only, leaving the rest of the edit as it was. A field with fixed choices, such as the space, opens a list: <Kbd>↑</Kbd> <Kbd>↓</Kbd> and <Kbd>↵</Kbd> to choose, <Kbd>Esc</Kbd> to cancel. The 2FA field shows only `set`, or which authenticator item the login borrows its code from. Passwords and other secrets are typed hidden, and a new password is asked for twice ("Type it again."); if the two differ, `pm` says "The two entries didn't match. Password not changed." For a 2FA field, paste the setup key or the `otpauth://` link the site shows.
+
+On a custom field or a passkey row, <Kbd>x</Kbd> removes it. **+ Add custom field** asks for a label, such as PIN or Security answer, whether to hide it like a password, and its value. Changed rows are marked, and the editor counts what you haven't saved ("2 changes not saved yet.").
+
+| Key | What it does |
+|---|---|
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd> or <Kbd>j</Kbd> <Kbd>k</Kbd> | Move between rows |
+| <Kbd>Home</Kbd> <Kbd>End</Kbd>, <Kbd>PgUp</Kbd> <Kbd>PgDn</Kbd> | Jump to the first or last row, or move ten rows |
+| <Kbd>↵</Kbd> | Edit the row |
+| <Kbd>x</Kbd> | Remove a custom field or a passkey |
+| <Kbd>s</Kbd> | Save. `pm` prints `Saved GitHub.` With nothing changed it says "Nothing to save." |
+| <Kbd>Esc</Kbd> or <Kbd>q</Kbd> | Leave. With unsaved changes, `pm` asks "Save your 2 changes to GitHub?": <Kbd>y</Kbd> saves, <Kbd>n</Kbd> discards ("Discarded your changes."), <Kbd>Esc</Kbd> keeps editing |
+| <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> | Stops `pm` at once with status 130. Unsaved changes are lost |
+
+Saving applies the same rules as the desktop app: your password policy, favorites and version history. Renaming an item to a name that already exists in the space fails. If the save fails, the editor stays open and shows why, for example `Not saved: …`. Editing needs an interactive terminal ("Editing needs an interactive terminal.") and a vault that isn't read-only ("Vault is READ-ONLY.").
+
+## Delete an item
+
+Choose <Kbd>d</Kbd> in `pm get` and answer <Kbd>y</Kbd>. <Kbd>n</Kbd>, <Kbd>↵</Kbd> and <Kbd>Esc</Kbd> all keep the item:
+
+```text
+Delete Old router (Wi-Fi)? (y/n): y
+Deleted.
+```
+
+Deleting a login also deletes its 2FA key and passkeys, and the question says so, for example `Delete GitHub (Login)? This also deletes its 2FA key and 1 passkey. (y/n):`.
+
+`pm` has no trash: a deleted item is gone from the vault. The [history](/docs/cli/history) still has the vault as it was before, so `pm lgit undo` brings it back. The desktop app keeps its own trash for items deleted there.
+
+## Related
+
+- [One-time codes](/docs/cli/totp) and [passkeys](/docs/cli/passkeys)
+- [Password generator](/docs/cli/generator)
+- [Inject secrets into your shell](/docs/cli/inject)
+- [Command reference: items](/docs/cli/commands-items)

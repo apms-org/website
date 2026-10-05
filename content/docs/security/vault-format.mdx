@@ -1,0 +1,197 @@
+---
+title: Vault format
+description: The byte layout of vault.dat, what each field holds, and which parts are readable without your password.
+order: 7
+group: Internals
+---
+
+`vault.dat` is a single binary file in format version 4. It starts with a short header in the clear, followed by the sealed data key, the encrypted body and an HMAC signature. Any copy of `pm` can read the header and knows how to derive the keys, because the profile travels inside the file.
+
+## Byte layout
+
+Fields appear in this order with no padding. Lengths are big-endian.
+
+| # | Field | Size | Contents |
+|---|---|---|---|
+| 1 | Magic | 8 bytes | ASCII `APMVAULT` |
+| 2 | Version | 1 byte | `4` |
+| 3 | Profile length | 2 bytes | Length of field 4 |
+| 4 | Profile | variable | JSON with the key derivation and cipher settings. See [Profile block](#profile-block). |
+| 5 | Recovery length | 2 bytes | Length of field 6 |
+| 6 | Recovery block | variable | JSON with recovery and alert settings, in the clear. See [Recovery block](#recovery-block). |
+| 7 | Salt | `SaltLen` bytes, 16 or 32 on built-in profiles | Random. New on every save. |
+| 8 | Validator | 32 bytes | Bytes 64 to 95 of the Argon2id output |
+| 9 | Nonce | `NonceLen` bytes, 12 or 24 | Random nonce for the body. New on every save. |
+| 10 | Key slot | 48 bytes | The 32-byte data key sealed with the encryption key, plus a 16-byte tag. Its nonce is derived from SHA-256 of the salt, so it is not stored. |
+| 11 | Body | variable | The vault as JSON, sealed with the data key, ending in a 16-byte tag |
+| 12 | Signature | 32 bytes | HMAC-SHA256, keyed with the auth key, over fields 1 to 11 |
+
+How the keys are derived and used is on [Encryption](/docs/security/encryption). In the two JSON blocks, binary values such as hashes, salts and slots are base64 strings.
+
+The first bytes of a real vault on the Hardened profile:
+
+```text title="xxd -l 64 vault.dat"
+00000000: 4150 4d56 4155 4c54 0400 7b7b 224e 616d  APMVAULT..{{"Nam
+00000010: 6522 3a22 6861 7264 656e 6564 222c 224b  e":"hardened","K
+00000020: 4446 223a 2261 7267 6f6e 3269 6422 2c22  DF":"argon2id","
+00000030: 4369 7068 6572 223a 2261 6573 2d67 636d  Cipher":"aes-gcm
+```
+
+`04` is the version, and `00 7b` says the profile JSON that follows is 123 bytes long.
+
+```text title="vault.dat"
+┌──────────┬───┬────┬─────────────┬────┬────────────────┬──────┬───────────┬───────┬──────────┬──────────────┬──────┐
+│ APMVAULT │ 4 │ len│ profile JSON│ len│ recovery JSON  │ salt │ validator │ nonce │ key slot │ body ...     │ HMAC │
+└──────────┴───┴────┴─────────────┴────┴────────────────┴──────┴───────────┴───────┴──────────┴──────────────┴──────┘
+ 8 bytes    1   2    variable      2    variable         16/32  32          12/24   48         variable       32
+ ◄──────────────────────────── in the clear ──────────────────────────────────────►◄── encrypted ──────────►
+ ◄──────────────────────────────────────── covered by the HMAC ───────────────────────────────────────────►
+```
+
+## Profile block
+
+The profile is plain JSON. It tells `pm` how to derive the keys and which cipher opens the body. It holds no secrets.
+
+```json title="Profile block (Standard)"
+{"Name":"standard","KDF":"argon2id","Cipher":"aes-gcm","Time":3,"Memory":65536,"Parallelism":2,"SaltLen":16,"NonceLen":12}
+```
+
+| Key | Meaning |
+|---|---|
+| `Name` | Profile name: `standard`, `hardened`, `paranoid`, `legacy`, or the name you gave a custom profile in `pm` (the desktop app always writes `custom`) |
+| `KDF` | Always derived with Argon2id. The field is informational. |
+| `Cipher` | `aes-gcm` or `xchacha20-poly1305`. A missing value means `aes-gcm`. |
+| `Time` | Argon2id passes |
+| `Memory` | Argon2id memory in KiB (`65536` is 64 MiB) |
+| `Parallelism` | Argon2id threads |
+| `SaltLen` | Length of field 7 in bytes |
+| `NonceLen` | Length of field 9 in bytes |
+
+## Recovery block
+
+The recovery block lives outside the encrypted body so recovery can start before anyone knows the master password. It is covered by the HMAC, but recovery reads it without the password, so it cannot be checked during recovery. The secret that actually opens the vault during recovery is your recovery key.
+
+Fields are omitted when they are not set, with one exception: `recovery_token_expiry` is always written, as `0001-01-01T00:00:00Z` when unused. A vault with no recovery set up carries just that field. One with three one-time recovery codes and nothing else carries:
+
+```json title="Recovery block"
+{"recovery_token_expiry":"0001-01-01T00:00:00Z","recovery_code_hashes":["CHEvkQEuhrX8RstrDM5JuyCqyURxU7vLm1Tbuvpsw0Q=","HEeewnL3qzrZQv5uYoroqs6xm+2YUnAoXSokd7N44aQ=","YpnGQZTQheOwVCeApRM+40NBIXsn5CdZZg96pnx53uw="],"recovery_code_used":[false,false,false]}
+```
+
+| Key | What it holds |
+|---|---|
+| `email_hash` | SHA-256 of your lowercased recovery email. Not salted. |
+| `email_hint` | The first letter of the address, `•••`, and the domain, for example `m•••@example.com` |
+| `key_hash` | HMAC-SHA256, keyed with the recovery salt, of the key derived from your recovery key. Used to check a recovery key. |
+| `dek_slot` | The recovery slot: a 12-byte nonce and the data key sealed with AES-256-GCM under the key derived from your recovery key |
+| `salt` | The recovery salt |
+| `obfuscated_key` | Your recovery key, XOR-masked with a constant that ships in `pm`. See the warning below. |
+| `recovery_code_hashes`, `recovery_code_used` | SHA-256 of each one-time recovery code, and which ones have been used |
+| `recovery_share_threshold`, `recovery_share_count`, `recovery_share_hashes` | How many trustee shares are needed, how many exist, and SHA-256 of each share |
+| `recovery_passkey_enabled`, `recovery_passkey_user_id`, `recovery_passkey_cred` | The recovery passkey's WebAuthn user ID and public credential |
+| `recovery_token_hash`, `recovery_token_expiry` | Reserved. Current versions do not set them. |
+| `alerts_enabled`, `security_level`, `alert_email` | Security alert settings. `alert_email` is the full address in plain text. |
+
+<Callout type="danger" title="obfuscated_key is not encryption">
+When you create a recovery key, the save that follows writes the key into `obfuscated_key`, masked with a fixed value that is public in APM's source code. Anyone who has a copy of that version of the file can unmask it and open the vault with it, without your master password. The field disappears from `vault.dat` the next time the vault is saved after a fresh unlock. Copies made in between keep it: lgit snapshots, backups, and any cloud upload. [Recovery](/docs/security/recovery#after-you-create-a-recovery-key) explains how to clean those up.
+</Callout>
+
+## Encrypted body
+
+The body is the whole vault as JSON. Everything you store is in here:
+
+| Group | Includes |
+|---|---|
+| Items | Logins (with URLs, passkeys, custom fields and TOTP secrets), authenticator codes, notes, API keys, SSH keys and hosts, Wi-Fi, cards and accounts, IDs, medical and travel records, contacts, cloud, Kubernetes, Docker and CI/CD secrets, certificates, licenses, contracts, recovery codes, documents, photos, audio and video |
+| History | Per-item history, Trash and favorites |
+| Organization | Spaces, the current space and the active password policy |
+| Settings | Desktop app settings, including the [auto-lock policy](/docs/security/sessions-and-locking#auto-lock) and clipboard timeout |
+| Sync | Google Drive, Dropbox and GitHub tokens, the repository name and the retrieval key |
+| Recovery | Your full recovery email, a copy of the data key, and copies of the recovery key hash, recovery slot and salt, code, trustee and passkey fields above. `email_hint` and `obfuscated_key` are not copied here. |
+| Format revision | `format_revision`, the data revision the vault was last written with |
+
+### Keys in the body
+
+For tool authors, these are the top-level keys of the body JSON. Keys with nothing in them are often left out, and lists can be `null`.
+
+| Keys | What they hold |
+|---|---|
+| `entries` | Logins, each with its URLs, notes, one-time code secret, custom fields and passkeys |
+| `totp_entries`, `totp_order`, `totp_domain_links` | Authenticator items, their order, and the sites linked to each |
+| `tokens`, `secure_notes`, `api_keys`, `ssh_keys`, `wifi_credentials`, `recovery_codes` | Tokens, notes, API keys, SSH keys, Wi-Fi networks and recovery-code items |
+| `certificates`, `banking_items`, `documents`, `audio_files`, `video_files`, `photo_files` | Certificates, cards and accounts, and files, with their contents |
+| `gov_ids`, `medical_records`, `travel_docs`, `contacts` | Identity, medical, travel and contact records |
+| `cloud_credentials_items`, `k8s_secrets`, `docker_registries`, `ssh_configs`, `cicd_secrets`, `software_licenses`, `legal_contracts` | Cloud, Kubernetes, Docker, SSH host, CI/CD, license and contract items |
+| `spaces`, `current_space`, `active_policy` | Spaces, the current space and the active password policy |
+| `desktop` | The desktop app's state: vault name, favorites, Trash, item versions, settings (including auto-lock), space colors, sync status and the MCP switch |
+| `history` | A hash-chained, signed log of changes to items |
+| `secret_telemetry` | Per-item trust data: when it was created, changed, last read and rotated, how often it was read, and by whom |
+| `profile`, `security_level` | The profile name and the alert level |
+| `retrieval_key`, `cloud_file_id`, `cloud_credentials`, `cloud_token`, `drive_sync_mode`, `drive_key_metadata_consent`, `github_token`, `github_repo`, `dropbox_token`, `dropbox_sync_mode`, `dropbox_key_metadata_consent`, `dropbox_file_id`, `last_cloud_provider` | Sync settings and tokens |
+| `recovery_email`, `recovery_hash`, `recovery_slot`, `recovery_salt`, `recovery_code_hashes`, `recovery_code_used`, `recovery_share_threshold`, `recovery_share_count`, `recovery_share_hashes`, `recovery_passkey_enabled`, `recovery_passkey_user_id`, `recovery_passkey_cred`, `recovery_token_hash`, `recovery_token_expiry` | Recovery settings, copied to the header on every save |
+| `dek` | The data key itself |
+| `alert_email`, `alerts_enabled`, `anomaly_detection_enabled` | Security alert settings |
+| `failed_attempts`, `emergency_mode`, `decoy_mode`, `decoy_session_count`, `autocomplete_window_disabled`, `salt` | Older fields kept for compatibility |
+| `format_revision` | The data revision, described below |
+
+A few item types write their space under `"Space"` with a capital S instead of `"space"`: travel documents, Docker registries, SSH hosts and software licenses.
+
+### Format revision
+
+The header version (`4`) describes the layout. The `format_revision` inside the body describes the data. When a newer `pm` adds data an older one would drop, it raises the revision. An older `pm` then opens that vault read-only and refuses to save it, with `This vault was updated by a newer version of pm. Update pm to edit it.` Update `pm` and the desktop app together to avoid this.
+
+## Older formats
+
+`pm` opens every earlier format and rewrites it as version 4 the next time it saves.
+
+| Version | Layout |
+|---|---|
+| No header | A 16-byte salt, then AES-256-GCM output with its nonce in front. The key comes from Argon2id with 1 pass, 256 MiB and 4 threads. |
+| 1 | `APMVAULT`, version byte, then fixed settings: Argon2id with 3 passes, 128 MiB and 4 threads. No data key. |
+| 2 | Adds a profile name (1-byte length, then the name) |
+| 3 | Adds the profile JSON (2-byte length). No recovery block, no data key. |
+| 4 | Current. Adds the recovery block and the key slot. |
+
+Some early experimental builds wrote version 4 fields a few bytes off. Once the password and HMAC check out, `pm` searches a small window for the key slot and body, opens the vault, and rewrites it with the correct layout.
+
+## Inspect a vault
+
+`pm cinfo` reads the header and prints the settings without asking for your password:
+
+```sh title="Terminal"
+pm cinfo
+```
+
+```text
+APM Crypto Configuration
+========================
+Format:    APMVAULT v4
+Profile:   standard
+KDF:       Argon2id
+  Time:    3
+  Memory:  64 KB
+  Threads: 2
+Cipher:    AES-256-GCM
+  Nonce:   12 bytes
+  Salt:    16 bytes
+Integrity: HMAC-SHA256 (Encrypt-then-MAC)
+```
+
+<Callout type="note">
+The `Memory` line is in MiB even though it says KB. `pm profile current` shows the same value labelled correctly.
+</Callout>
+
+To see the two cleartext blocks yourself, this Python 3 script prints them from any copy of the file. It reads only the header and never needs your password:
+
+```sh title="Terminal"
+python3 - ~/.apm/vault.dat <<'EOF'
+import sys
+d = open(sys.argv[1], "rb").read()
+assert d[:8] == b"APMVAULT" and d[8] == 4, "not a version 4 vault"
+o = 9
+for name in ("profile", "recovery block"):
+    n = int.from_bytes(d[o:o + 2], "big")
+    print(name + ":", d[o + 2:o + 2 + n].decode())
+    o += 2 + n
+EOF
+```
+

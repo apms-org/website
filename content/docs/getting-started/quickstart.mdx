@@ -1,0 +1,201 @@
+---
+title: Quickstart
+description: Create a vault, add a login, use it from the terminal and fill it in Chrome, in about ten minutes.
+order: 2
+group: Set up
+---
+
+This walks you through APM end to end: you create a vault in the desktop app, save a login, read it from the terminal with `pm`, and fill it on a website with APM for Chrome. Every step uses the same vault file. If you would rather not use the app, see [Prefer the terminal](#prefer-the-terminal).
+
+## What you need
+
+- A Mac, Windows PC or Linux machine. See [Before you start](/docs/getting-started/installation#before-you-start).
+- A Chromium browser, version 116 or later, and Node.js 20.19 or a later 20.x release, or 22.12 or newer, for the browser steps.
+- A master password you will remember. Nobody can reset it for you.
+
+<Steps>
+
+### Install the desktop app
+
+Download APM for your system from the desktop app's [GitHub Releases](https://github.com/apms-org/gui/releases), unpack it and open it. See [Install APM](/docs/getting-started/installation#the-desktop-app) for each platform.
+
+### Create your vault
+
+On **Welcome to APM**, choose **Create a new vault**. Setup takes a few short steps:
+
+1. **Create your master password.** This is the one password you remember; it encrypts everything else. APM cannot reset it, so pick one you will not forget. It must meet every rule in the table below.
+2. **Choose how hard your key is to crack.** Pick a security profile. APM recommends one for your computer. See [Security profiles](/docs/security/profiles).
+3. **Organize with spaces.** Optionally add spaces such as Work or Family. Every vault has a Default space.
+4. **Unlocking.** Turn on Touch ID (on a Mac with Touch ID), and choose how long an unlock lasts and when APM locks while idle.
+5. **Review and create.** Check your choices and choose **Create vault**.
+
+Two optional steps follow: **Set up recovery**, a way back in if you forget your master password, and **Sync, if you want it**, to keep an encrypted copy on Google Drive, GitHub or Dropbox. You can skip both and set them up later. When **Your vault is ready** appears, choose **Open vault**.
+
+The master password needs all of these. The app ticks each one off as you type and asks you to type the password twice, and `pm` checks the same rules:
+
+| Rule | Example that passes |
+|------|---------------------|
+| At least 8 characters | `Harbor-Lantern-42` |
+| An uppercase letter | `H`, `L` |
+| A lowercase letter | `arbor` |
+| A number | `42` |
+| A symbol from `!@#$%^&*()-_=+` | `-` |
+
+Other symbols, such as `?` or `.`, are allowed but do not count toward the symbol rule.
+
+The recommended profile depends on your computer: `paranoid` with 16 GB of memory and 8 cores or more, `hardened` with 8 GB and 4 cores or more, and `standard` otherwise. You can change it later.
+
+### Add a login
+
+Choose **New item** (<Kbd>⌘</Kbd><Kbd>N</Kbd> on a Mac, <Kbd>Ctrl</Kbd><Kbd>N</Kbd> on Windows and Linux), then **Login**. Fill in:
+
+- **Name**, such as GitHub.
+- **Username** and **Password**. The password field can suggest a strong one.
+- **Website**, such as `github.com`. This is how APM for Chrome knows where to offer the login.
+
+Choose **Save login** (<Kbd>⌘</Kbd><Kbd>↵</Kbd> on a Mac).
+
+### Use it from the terminal
+
+On a Mac, install the `pm` command from the app: **Settings**, **Developer**, **Install pm**. On Windows and Linux, get `pm` from [GitHub Releases](https://github.com/apms-org/cli/releases/latest) (see [Install APM](/docs/getting-started/installation#pm)). Then open a new terminal.
+
+```sh title="Terminal"
+pm unlock
+```
+
+Unlocking in the desktop app also starts a `pm` session, so while the app is unlocked `pm` does not ask for your password. Otherwise it asks once:
+
+```text title="Output"
+Master Password (attempt 1/3):
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+```
+
+`pm unlock` prints the line twice: once when the password is accepted, and once when the session starts. The limits come from your vault's auto-lock policy. On Windows the line has no "on sleep", because a terminal session there cannot tell that the computer slept.
+
+```sh title="Terminal"
+pm get github
+```
+
+`pm get` opens an interactive search with `github` already typed. Pick the login to see its fields, and copy its password, username or one-time code from there. See [Find items](/docs/cli/items#find-items) for the keys. A few more to try:
+
+```sh title="Terminal"
+pm totp github   # copy a one-time code, if the login has one
+pm gen           # generate a password
+pm lock          # end the session
+```
+
+`pm lock` answers "Vault locked." See [pm commands](/docs/cli/commands) for everything else.
+
+### Connect Chrome
+
+Build and load APM for Chrome:
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/extension.git
+cd extension
+npm install
+npm run build
+```
+
+Open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked** and select the `dist` folder. Pin **APM** to the toolbar and click it.
+
+The popup shows a 6-character code, and the app asks whether to connect your browser, for example "Connect Chrome 129 on macOS to APM?", with the same code. Check that they match and choose **Connect** in the app. See [Pairing](/docs/extension/pairing).
+
+### Fill a login
+
+Go to `github.com` and open its sign-in page. Click the username field: a menu opens under it with your GitHub login. Choose it, and APM fills the username and password.
+
+You can also press <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>F</Kbd> to fill the best login for the page. When you sign in somewhere new, APM offers to save the login for you.
+
+</Steps>
+
+## Prefer the terminal
+
+You can do the whole quickstart without the desktop app. `pm setup` creates the vault and walks through the same choices:
+
+```sh title="Terminal"
+pm setup
+```
+
+```text title="Output"
+APM Setup
+Unified setup flow: project configuration, vault initialization, profiles, spaces, and cloud sync.
+
+[1/6] Environment and project checks
+System: darwin/arm64, CPU cores: 10, RAM: 16384 MB
+Project directories ready:
+- Vault: /Users/you/.apm/vault.dat
+- Policies: /Users/you/.apm/policies
+
+[2/6] Vault initialization and unlock
+No vault detected. Creating a new vault.
+Create Master Password:
+System recommended profile: paranoid (10 CPU cores and 16384 MB RAM detected)
+Use 'paranoid'? (Y/n): y
+Assigned profile: paranoid
+Encryption method [aes-gcm]:
+Vault created at /Users/you/.apm/vault.dat.
+
+[3/6] Security profile tuning
+Current profile: paranoid
+Recommended for this system: paranoid (10 CPU cores and 16384 MB RAM detected)
+Would you like to switch profile now? (y/n) [n]: n
+
+[4/6] Spaces configuration
+Current spaces: default
+Add spaces now? Enter comma-separated names (or leave blank): Work, Family
+Set active space (default, Work, Family) [default]:
+
+[5/6] Cloud sync setup
+Configure cloud sync now? (y/n) [n]: n
+
+[6/6] Finalize and save configuration
+Setup completed successfully.
+Assigned profile: paranoid
+Active space: default
+```
+
+The password is not shown as you type, and <Kbd>Esc</Kbd> at a typed prompt cancels the command (see [Keys at prompts](/docs/cli#keys-at-prompts)). If it breaks a rule, `pm` says which one and asks again, for example "Invalid password: password must be at least 8 characters long". Press <Kbd>↵</Kbd> at **Encryption method** to keep AES-256-GCM, or type `xchacha20-poly1305`. `pm setup --non-interactive` asks only for the master password, and takes the recommended profile and the defaults for everything else.
+
+Then add a login:
+
+```sh title="Terminal"
+pm add login
+```
+
+```text title="Output"
+Master Password (attempt 1/3):
+Vault unlocked. It locks after 15 minutes idle, 1 hour at most and on sleep.
+Account Name: GitHub
+Username: you@example.com
+Password (leave blank to generate):
+Entry saved.
+```
+
+`pm setup` does not leave the vault unlocked, so the first command after it asks for the master password and starts a session; the commands after that don't ask again until the session ends. Leave the password blank and `pm` generates a 16-character one and prints "Generated password created and saved." before "Entry saved."
+
+<Callout type="note" title="Logins added with pm add have no website">
+`pm add login` asks for a name, a username and a password only. APM for Chrome offers a login only on the websites saved in it, so add the site before you expect it in the browser: open the popup on the site and choose **Use a saved login on** followed by the site, or set **Website** in the desktop app. See [Use a login on another site](/docs/extension/autofill#use-a-login-on-another-site).
+</Callout>
+
+To use the browser without the app, build the extension as above, then run `pm extension link` once and confirm the code in the terminal. See [Use the extension without the app](/docs/extension/pairing#use-the-extension-without-the-app).
+
+## If something goes wrong
+
+| What you see | What to do |
+|--------------|------------|
+| Your shell says it cannot find `pm` | `pm` is not on your `PATH` yet. Open a new terminal after installing, or check the folder you put it in |
+| "Vault not found. Run 'pm setup'." | `pm` is looking in a different place from the app. Run `pm info` to see which vault it opens, and set `APM_VAULT_PATH` (the app's **Settings**, **Developer** shows the line to copy) |
+| "Invalid password: …" during `pm setup` | The master password breaks one of the rules above. Choose one that meets all five |
+| The popup says "APM isn't connected" | Open the desktop app, or run `pm extension link` once. See [Pairing](/docs/extension/pairing) |
+| No menu under the username field | Reload the tab: pages that were open before you installed the extension don't have it yet. Also check that the login's **Website** matches the site. See [Troubleshooting](/docs/extension/troubleshooting) |
+
+## Where to go next
+
+<Cards>
+  <Card title="Concepts" href="/docs/getting-started/concepts" icon="book-open">Sessions, spaces, history, profiles and sync.</Card>
+  <Card title="Autofill" href="/docs/extension/autofill" icon="mouse-pointer-click">Codes, password suggestions and matching rules.</Card>
+  <Card title="Use the extension without the app" href="/docs/extension/pairing#use-the-extension-without-the-app" icon="plug">Let the browser start pm when the app is closed.</Card>
+  <Card title="Connect an AI tool" href="/docs/agents/setup" icon="bot">Give Claude, Cursor or VS Code a scoped token.</Card>
+</Cards>

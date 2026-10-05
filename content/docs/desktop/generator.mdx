@@ -1,0 +1,123 @@
+---
+title: Password generator
+description: Generate random passwords, passphrases and PINs, from the generator window or right inside a password field.
+order: 7
+group: Using the app
+---
+
+The password generator makes random passwords, passphrases and PINs. It runs locally with the system's secure random source. Nothing is saved until you use a value.
+
+## Open the generator
+
+- Press <Kbd>⌘</Kbd><Kbd>G</Kbd> (<Kbd>Ctrl</Kbd><Kbd>G</Kbd> on Windows and Linux), choose **View → Password Generator...**, or **Generate password** in the command menu. This opens the **Password generator** window: "Generated locally with the system's secure random source. Nothing is saved until you use it."
+- While creating or editing a login, Wi-Fi network or document, click **Generate** inside a password field. A compact generator opens next to the field, below it when there is room and above it otherwise.
+
+The generator is only there while the vault is unlocked. The window and the generator in a field share the same settings.
+
+## Choose a kind
+
+Pick **Random**, **Passphrase** or **PIN** at the top. Every change makes a new value right away.
+
+### Random
+
+| Option | Range or default |
+|---|---|
+| **Length** | 8 to 64 characters, 20 by default |
+| **A-Z** | Uppercase letters |
+| **a-z** | Lowercase letters |
+| **0-9** | Digits |
+| **!@#$** | Symbols: `!@#$%^&*()-_=+[]{};:,.?/~` |
+| **Avoid look-alikes** | Leaves out I, l, 1, O, 0, o, the pipe, the backtick and quote marks |
+
+Every character set you tick appears at least once. If you untick all four, APM uses lowercase letters.
+
+**Avoid look-alikes** is described in the app as "Leaves out I, l, 1, O, 0 and quote marks". It also leaves out the lowercase `o`. The symbol set never has quote marks, the pipe or the backtick, so in practice the option removes `I`, `l`, `1`, `O`, `0` and `o`.
+
+### Passphrase
+
+| Option | Range or default |
+|---|---|
+| **Words** | 3 to 10 words, 5 by default |
+| **Separator** | **Hyphen**, **Period**, **Underscore** or **Space**. Hyphen by default |
+| **Capitalize** | Starts each word with a capital. On by default |
+| **Add a number** | Adds one digit, 0 to 9, to the end of one word chosen at random. On by default |
+
+Words come from a built-in list of 355 short, common English words, 3 to 7 letters long. With the defaults, a passphrase looks like `Maple-River7-Comet-Tulip-Harbor`.
+
+### PIN
+
+**Digits** sets the length, from 4 to 12 (6 by default).
+
+APM remembers your choices on this computer for next time.
+
+## Read the strength meter
+
+Under the value, a meter rates the password from weak to strong, shows its estimated entropy in bits and says how long an offline attack would take, for example "cracked in 2 days offline" or "outlasts the universe offline". The estimate assumes ten billion guesses per second.
+
+The meter has five ratings:
+
+| Rating | Estimated entropy |
+|---|---|
+| **Very weak** | Under 28 bits |
+| **Weak** | 28 to 39 bits |
+| **Fair** | 40 to 59 bits |
+| **Good** | 60 to 79 bits |
+| **Strong** | 80 bits or more |
+
+The time is half the number of possible values, divided by ten billion: on average, an attacker finds the password halfway through. A time under a second reads "cracked instantly offline".
+
+The same meter appears under password fields when you create or edit an item, and in [Watchtower](/docs/desktop/watchtower), which flags login and Wi-Fi passwords of 8 characters or more that rate **Weak** or worse as easy to guess.
+
+Digits and symbols in the generated value are colored so look-alike characters are easier to tell apart.
+
+### How APM estimates entropy
+
+APM looks at which kinds of character the value uses: lowercase letters count for 26 possibilities, uppercase for 26, digits for 10, and anything else for 24. Each character adds the logarithm of that total. It then lowers the estimate when:
+
+- the value contains a common password such as `password`, `qwerty` or `letmein`;
+- a character repeats three times in a row;
+- it contains what looks like a year from 1900 to 2099;
+- it is one capitalized word followed by digits, and maybe one of `!@#$%`, like `Summer2024!`.
+
+A value made only of digits counts about 3.3 bits per digit.
+
+Words joined by hyphens, like a generated passphrase, are counted differently: about 8.5 bits per word (the list has 355 words) and 3 more for the number. This is a fair estimate for a generated passphrase, and much lower than the character count suggests.
+
+What the defaults usually rate:
+
+| Kind | Rating | Meter |
+|---|---|---|
+| Random, 20 characters, all four sets | **Strong** | 129 bits, outlasts the universe offline |
+| Random, 12 characters, all four sets | **Good** | 77 bits, cracked in 239 thousand years offline |
+| Random, 8 characters, all four sets | **Fair** | 51 bits, cracked in 1 day offline |
+| Passphrase, 5 words, hyphens, a number | **Fair** | 46 bits, cracked in 58 minutes offline |
+| Passphrase, 3 words, hyphens, a number | **Weak** | 29 bits, cracked instantly offline |
+| PIN, 6 digits | **Very weak** | 20 bits, cracked instantly offline |
+| PIN, 12 digits | **Fair** | 40 bits, cracked in 54 seconds offline |
+
+<Callout type="note" title="Passphrases can rate higher than they are">
+The word count only applies to words joined by hyphens. With a period, underscore or space between the words, or when the number lands on the first word, APM rates the passphrase like a random string of the same length, which for five words is well over 100 bits. The words are just as guessable either way, so judge a passphrase by its word count: each word adds about 8.5 bits.
+</Callout>
+
+## Use the value
+
+In the **Password generator** window:
+
+- **Generate another** (the circular arrow) makes a new value.
+- **Copy** copies it. The toast says **Copied password**, and the clipboard clears on your usual timer.
+- **Copy and keep** copies it and adds it to **This session**, a list of the last eight values you kept, newest first, with how long ago you kept each one. Each has its own copy button. The list is held in memory only and disappears when you quit.
+
+A value copied again from **This session** is cleared from the clipboard after 30 seconds, whatever your **Clear clipboard** setting.
+
+In the compact generator inside a field:
+
+- **Use password** puts the value into the field and closes the generator.
+- Press <Kbd>R</Kbd> to generate another value, as long as the cursor is not in a text field. <Kbd>Esc</Kbd> closes it, and so does a click anywhere outside it.
+
+The window's **Generate another** button also shows <Kbd>R</Kbd>, but the key only works in the compact generator.
+
+Using or keeping a value writes a `PASSWORD_GENERATED` entry to the audit log, with the length or kind but never the value: for example "20 characters", "6-digit PIN" or "5-word passphrase". **Copy** alone writes nothing.
+
+<Callout type="note" title="pm gen">
+The CLI's `pm gen` makes random passwords of a given length. Passphrases and PINs are only in the app.
+</Callout>

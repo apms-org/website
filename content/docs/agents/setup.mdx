@@ -1,0 +1,347 @@
+---
+title: Set up a client
+description: Create an MCP token, then add APM to Claude Desktop, Claude Code, Cursor, VS Code or Cline.
+order: 1
+sidebarTitle: Setup
+group: Set up
+---
+
+Setting up an AI client takes three things: an unlocked vault, a token for that client, and one entry in the client's MCP config that runs `pm mcp serve --token <token>`. Create one token per client so you can revoke them one at a time.
+
+## Before you start
+
+- `pm` is installed and you have a vault. If not, see [Vault basics](/docs/cli/vault-basics).
+- You know which tools the client needs. Start small: you can always create a second token with more. [Scopes and approval](/docs/agents/scopes-and-approval) lists what each tool exposes.
+
+<Steps>
+
+### Unlock the vault
+
+The MCP server reads the vault through your existing session. Unlock with `pm` or by unlocking the desktop app; both start the same session.
+
+```sh title="Terminal"
+pm unlock
+```
+
+The session follows your auto-lock policy (by default 15 minutes idle, 1 hour at most, and on sleep). See [Sessions and locking](/docs/security/sessions-and-locking).
+
+### Create a token
+
+Run the interactive setup:
+
+```sh title="Terminal"
+pm mcp token
+```
+
+It asks three questions:
+
+| Prompt | What to enter |
+|--------|---------------|
+| `Token name:` | The client's name, such as `Claude Desktop`. It shows up in `pm mcp list`, in pending requests and in the audit log. |
+| `Expiry in minutes (0 for never) [0]:` | How long the token works. `0`, the default, means it never expires. `10080` is one week. |
+| `Permissions (space to select, enter to confirm):` | The tools this client may call. You must pick at least one. |
+
+The prompts look like this. The permissions are a list of check boxes, one per tool. It shows as many as fit on your screen. On a short window it scrolls and counts your place, as below:
+
+```text title="Terminal"
+APM MCP Server Setup
+Token name: Claude Desktop
+Expiry in minutes (0 for never) [0]: 10080
+Permissions (space to select, enter to confirm):
+> [ ] list_vault
+  [ ] get_entry
+  [ ] search_vault
+  [ ] decrypt_entry
+  [ ] get_totp
+  [ ] add_entry
+  [ ] delete_entry
+  [ ] edit_entry
+  1-8 of 17 | space: toggle, a: all, enter: confirm, esc: cancel
+```
+
+| Key | What it does |
+|---|---|
+| <Kbd>↑</Kbd> <Kbd>↓</Kbd> or <Kbd>j</Kbd> <Kbd>k</Kbd> | Move to another tool. <Kbd>Home</Kbd> <Kbd>End</Kbd> and <Kbd>PgUp</Kbd> <Kbd>PgDn</Kbd> jump further |
+| <Kbd>Space</Kbd> | Select or clear the tool under the cursor |
+| <Kbd>a</Kbd> | Select every tool. When all are selected, it clears them |
+| <Kbd>↵</Kbd> | Confirm. The list collapses to one line naming what you picked |
+| <Kbd>Esc</Kbd> | Cancel. `pm` prints `Token creation cancelled.` and creates no token. <Kbd>Esc</Kbd> at the name or expiry prompt does the same |
+
+With nothing selected when you confirm, `pm` stops with "You must select at least one permission." and creates no token. Expiry must be a whole number, 0 or more; anything else is refused at the prompt with "expiry must be a whole number" or "expiry must be 0 or greater".
+
+Then it prints the token and a ready-made config:
+
+```text title="Output"
+MCP Token generated successfully!
+Token: apm_mcp_5d0c9a...
+
+Add the following configuration to your MCP settings:
+{
+  "mcpServers": {
+    "apm": {
+      "args": [
+        "mcp",
+        "serve",
+        "--token",
+        "apm_mcp_5d0c9a..."
+      ],
+      "command": "/usr/local/bin/pm",
+      "env": {}
+    }
+  }
+}
+
+Note: The MCP server requires an active APM session. Run 'pm unlock' to start a session before using the agent.
+```
+
+`command` is the full path of the `pm` you ran. On Windows the printed config runs `cmd` with `/c` and the path to `pm.exe` in `args`. Paste it as printed.
+
+**In the desktop app**, open **Settings → AI access**, turn on **MCP server**, and choose **New token**. Name the assistant, pick an expiry (1 hour, 1 day, 7 days, 30 days, 90 days or never; 30 days is preselected) and pick tools one by one or from a preset: **Browse only**, **Read secrets**, **Assistant** or **Everything**. The app shows the token and its config once. See [AI access](/docs/desktop/ai-access).
+
+### Add APM to your client
+
+Paste the config into the client, as shown in the tabs below, and restart the client.
+
+</Steps>
+
+## Client config
+
+Every client below starts `pm mcp serve` over stdio. Replace `apm_mcp_your_token` with your token.
+
+<Tabs items={["Claude Desktop", "Claude Code", "Cursor", "VS Code", "Cline"]}>
+<Tab>
+
+Claude Desktop reads `claude_desktop_config.json`. Open it from **Settings → Developer → Edit Config**, or directly:
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "apm_mcp_your_token"]
+    }
+  }
+}
+```
+
+On Windows, use what `pm mcp token` printed, for example:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "cmd",
+      "args": ["/c", "C:\\path\\to\\pm.exe", "mcp", "serve", "--token", "apm_mcp_your_token"]
+    }
+  }
+}
+```
+
+Quit Claude Desktop completely and open it again. APM's tools then show up in Claude's list of tools.
+
+</Tab>
+<Tab>
+
+Add the server with the Claude Code CLI. `--scope user` makes it available in every project:
+
+```sh title="Terminal"
+claude mcp add --scope user apm -- pm mcp serve --token apm_mcp_your_token
+```
+
+Check it with `claude mcp list`, or run `/mcp` inside Claude Code to see its status and tools.
+
+<Callout type="warning">
+Don't use `--scope project`. It writes the server, token included, into `.mcp.json` in the repository, where it can be committed and shared.
+</Callout>
+
+</Tab>
+<Tab>
+
+Cursor reads `~/.cursor/mcp.json` for all projects, or `.cursor/mcp.json` inside one project. Use the global file so the token stays out of your repositories.
+
+```json title="~/.cursor/mcp.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "apm_mcp_your_token"]
+    }
+  }
+}
+```
+
+Open Cursor's settings and check that the `apm` server is enabled and lists its tools.
+
+</Tab>
+<Tab>
+
+VS Code uses a different shape: the top-level key is `servers`, not `mcpServers`, and each server has a `type`. Open your user config with **MCP: Open User Configuration** from the Command Palette, or use `.vscode/mcp.json` in a workspace.
+
+An `inputs` entry makes VS Code ask for the token when it starts the server, so the token isn't written into the file:
+
+```json title="mcp.json"
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "apm-token",
+      "description": "APM MCP token",
+      "password": true
+    }
+  ],
+  "servers": {
+    "apm": {
+      "type": "stdio",
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "${input:apm-token}"]
+    }
+  }
+}
+```
+
+Start the server from the file's inline actions or with **MCP: List Servers**, then use the tools from Copilot Chat in agent mode.
+
+</Tab>
+<Tab>
+
+In Cline, open the **MCP Servers** view and choose **Configure MCP Servers**. That opens `cline_mcp_settings.json`. Add APM under `mcpServers`:
+
+```json title="cline_mcp_settings.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "apm_mcp_your_token"],
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+Keep `autoApprove` empty, or limited to read-only tools such as `list_vault`. Cline then asks you before each other APM call. Adds, edits and deletes wait for your approval in the APM app either way, but `manage_spaces`, `manage_profiles`, `cloud_config` and `cloud_sync` apply at once, so keep them out of `autoApprove`. See [Writes: you approve in the app](/docs/agents/scopes-and-approval#writes-you-approve-in-the-app).
+
+</Tab>
+</Tabs>
+
+### Other clients
+
+Any MCP client that can launch a stdio server with a command and arguments works. Most use the same `mcpServers` shape as Claude Desktop; Windsurf, for example, reads it from `~/.codeium/windsurf/mcp_config.json`.
+
+<Callout type="tip" title="Use the full path to pm">
+Desktop apps often start with a shorter `PATH` than your terminal, so a bare `pm` may not be found. Use the full path that `pm mcp token` printed as `command`. On macOS that is usually `/usr/local/bin/pm`; `which pm` (or `where pm` on Windows) shows it.
+</Callout>
+
+## Check that it works
+
+With the vault unlocked, ask the assistant something that needs a tool you granted, such as "Which logins do I have in APM?" for `list_vault`. Most clients show the tool call and ask before running it.
+
+If the client reports the server failed, run the same command yourself:
+
+```sh title="Terminal"
+pm mcp serve --token apm_mcp_your_token
+```
+
+A working server prints nothing and waits for input; press <Kbd>Ctrl</Kbd><Kbd>C</Kbd> to stop it. With a wrong token it exits with status 1 and prints:
+
+```text title="Output"
+DEBUG: Token mismatch. Wanted: apm_mcp_bad, have tokens: map[apm_mcp_c948…:{Claude Desktop apm_mcp_c948… [list_vault get_entry …] …}]
+MCP Server Error: invalid or revoked MCP token
+```
+
+The first line goes to standard output and lists every token saved on this computer, in full. The second goes to standard error. An expired token ends with `MCP Server Error: token expired` instead. See [Troubleshooting](/docs/agents/troubleshooting).
+
+`pm mcp serve` is hidden from `pm mcp --help`, since clients start it rather than you.
+
+## Passing settings through env
+
+`pm mcp serve` reads the same environment variables as every other `pm` command. Clients that support an `env` block let you set them per server:
+
+```json title="claude_desktop_config.json"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve", "--token", "apm_mcp_your_token"],
+      "env": {
+        "APM_VAULT_PATH": "/Users/you/vaults/work.dat",
+        "APM_SESSION_ID": "work"
+      }
+    }
+  }
+}
+```
+
+| Variable | Why you'd set it for the server |
+|----------|---------------------------------|
+| `APM_VAULT_PATH` | Your vault is not at the default `~/.apm/vault.dat`. |
+| `APM_SESSION_ID` | You unlock with `APM_SESSION_ID` set in your shell. The server must use the same value, or it won't find your session. |
+| `APM_EPHEMERAL_ID`, `APM_EPHEMERAL_AGENT` | You give the agent a short-lived session instead of your own. See [the recipe](/docs/agents/recipes#give-an-agent-a-short-lived-session). |
+
+The full list is in [Environment variables](/docs/reference/environment-variables).
+
+## Let pm edit config files for you
+
+`pm mcp token --auto` creates the token as usual, then looks for these files and, if one exists, writes the `apm` server into its `mcpServers` object:
+
+| OS | Files it checks |
+|----|-----------------|
+| Windows | `%APPDATA%\Claude\mcp_config.json`, `%APPDATA%\Cursor\mcp.json`, `%APPDATA%\Code\User\mcp.json`, and Cline's `cline_mcp_settings.json` under Cursor's and VS Code's `globalStorage\saoudrizwan.claude-dev\settings` |
+| macOS | `~/Library/Application Support/Claude/mcp_config.json` and Cline's `cline_mcp_settings.json` under Cursor's `globalStorage/saoudrizwan.claude-dev/settings` |
+| Linux | `~/.config/Claude/mcp_config.json` |
+
+It only edits files that already exist, and prints `Automatically updated config: <path>` for each one. Claude Desktop's `claude_desktop_config.json` and Cursor's `~/.cursor/mcp.json` are not on the list, and VS Code expects `servers` rather than `mcpServers`, so check the result and fall back to the manual config above.
+
+## Print the server entry
+
+`pm mcp config` prints the server entry for this computer, without a token, with `command` set to the path of the `pm` you ran:
+
+```json title="pm mcp config output"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "/usr/local/bin/pm",
+      "args": ["mcp", "serve"],
+      "env": {}
+    }
+  }
+}
+```
+
+On Windows the entry runs `pm` through `cmd`: `"command": "cmd"` and `"args": ["/c", "<path to pm>", "mcp", "serve"]`. It then tells you to run `pm mcp token` to create a token for the assistant and add `--token <token>` to `args`.
+
+When no token exists yet, `pm mcp serve` without `--token` prints `No MCP token found. Triggering automated setup...`. On Windows it then opens a PowerShell window running `pm mcp token --auto`; on macOS and Linux it prints `Auto-setup currently only supported on Windows.` Either way it ends with `Please complete the setup in the new window and then restart your agent.` and exits with status 0.
+
+Always pass `--token`. When it is missing and tokens exist, `pm mcp serve` uses one of your saved tokens, and which one is not defined.
+
+## Manage tokens
+
+List every saved token, including expired ones:
+
+```sh title="Terminal"
+pm mcp list
+```
+
+```text title="Output"
+NAME                 CREATED                   USES       EXPIRES
+-------------------------------------------------------------------------------------
+Claude Desktop       2026-10-05 09:12          14         2026-10-12 09:12
+Cursor               2026-09-28 17:40          31         Never
+```
+
+`USES` counts how many times a server started with that token, not individual tool calls. Tokens are listed in no fixed order. With none saved, it prints `No active MCP tokens.`
+
+Revoke a token by its name or by the token itself:
+
+```sh title="Terminal"
+pm mcp revoke "Claude Desktop"
+```
+
+It answers `Token 'Claude Desktop' revoked successfully.`, or `Token 'Claude Desktop' not found.` when no token has that name; both exit with status 0. If two tokens share a name, one of them is revoked; run the command again for the other. Revoking writes `MCP_TOKEN_REVOKED` to the audit log.
+
+Revoking takes effect the next time the client starts the server. To cut a running client off at once, also run `pm lock`. In the desktop app, use **Revoke** next to the token in **Settings → AI access**. All `pm mcp` commands are in the [command reference](/docs/cli/commands).

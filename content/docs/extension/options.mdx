@@ -1,0 +1,167 @@
+---
+title: Extension settings
+description: Every option on the APM for Chrome settings page, section by section, with its default.
+order: 7
+sidebarTitle: Settings
+group: Using it
+---
+
+The settings page opens in a browser tab. Open it from the popup with **More**, **Extension settings**, or right-click the APM toolbar icon and choose **Options**. Its sidebar has seven sections. The **Connection** entry carries a badge: **Live**, **Locked**, **Offline** or **Not paired**.
+
+Settings are saved as soon as you change them, and apply to every open tab. They are stored in this browser only; each browser you pair has its own.
+
+The page refreshes the connection state every 4 seconds while it is open. In a narrow window (720 pixels or less), a **Section** list replaces the sidebar. Each section has its own address, so you can bookmark one: add `#connection`, `#autofill`, `#passkeys`, `#security`, `#shortcuts`, `#sites` or `#about` to the page's address, as in `chrome-extension://ioooalainhfihaebgpbmngoaojmfdlac/options.html#sites`. `#welcome` shows the welcome panel again.
+
+## Welcome
+
+The first time the extension is installed, the settings page opens with **Welcome to APM for Chrome**. It lists three steps and ticks each off as you finish it:
+
+1. Open the APM app, or run `pm extension link` once (with a button to copy the command).
+2. Check the pairing code, then choose **Connect** in the app or answer `y` in the terminal.
+3. Pin APM to the toolbar from the puzzle icon, and unlock your vault.
+
+Once paired, the panel reads **APM is ready in Chrome**. Choose **Done** or **Hide** to close it.
+
+## Connection
+
+How the extension reaches APM. A diagram at the top shows the chain: **Chrome** to **APM** (or **pm** when the app is closed) to **vault.dat**, and whether each link is live.
+
+| Node | What it can say |
+|------|-----------------|
+| **APM** or **pm** | **Unlocked**, **Locked**, **No vault yet** or **Not paired** when it answers, **Not running** when nothing does |
+| **vault.dat** | The number of items while unlocked, otherwise **Encrypted** |
+
+The first link is labelled **paired** or **not paired**, and the second **decrypts**; each lights up while it is live.
+
+**Before pairing**, the **Pair this browser** group shows the same pairing flow as the popup: **Connect**, the code, and **Use a pairing token instead**. See [Pairing](/docs/extension/pairing).
+
+When pairing finishes here, a notice says "Connected to APM", or "Connected with the new token" after **Use a token**.
+
+**After pairing**:
+
+| Row | What it shows |
+|-----|---------------|
+| **APM app** or **pm** | Which one is answering and its version, with a **Connected** or **Not connected** badge |
+| **Pairing** | When this browser paired and the name it paired as, such as "Chrome 129 on macOS". **Use a token** opens a field to paste a new pairing token |
+
+**Without the app**:
+
+| Row | What it shows |
+|-----|---------------|
+| **Browser starts pm** | **Linked** when the browser can start `pm` on its own, **Not linked** when it tried and could not. Below it, the `pm extension link` command with a copy button |
+
+`pm` only answers this extension, and only after you confirm the code once. It holds the key while the vault is unlocked and locks on the vault's auto-lock settings. `pm extension unlink` undoes the link.
+
+**Bridge**:
+
+| Row | What it does |
+|-----|--------------|
+| **Address** | Where the extension looks for APM: `127.0.0.1:41417`. Choose the pencil to change the port, then **Save**; a notice says "Looking for APM on port 41533". Change it only if you start APM with `APM_BRIDGE_PORT`. The field takes up to five digits. Leave it empty, or enter a port outside 1024 to 65535, and the extension goes back to 41417. Changing the port cancels a pairing request that is waiting |
+| **Extension ID** | `ioooalainhfihaebgpbmngoaojmfdlac`, pinned by the build so it is the same on every computer |
+
+The bridge is loopback only; nothing outside this computer can reach it.
+
+**Danger zone** (when paired):
+
+| Row | What it does |
+|-----|--------------|
+| **Forget this browser** | Removes the pairing token from this browser after you confirm. Your vault is not touched. The extension stops filling until it pairs again: on its own when the app is running, or by running `pm extension link` and confirming the code. It also empties the extension's cache of website logos. A notice says "Forgot this browser", "APM pairs again next time it is running." |
+
+## Autofill
+
+How APM helps on sign-in and sign-up forms. See [Autofill](/docs/extension/autofill) and [Saving and updating](/docs/extension/saving-and-updating).
+
+### On the page
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Show the APM menu on login fields** | On | Opens the menu when you focus a username, password or one-time code field. Off, the menu opens only from the field icon or the right-click menu |
+| **Show the APM icon inside fields** | On | A small APM bird at the right edge of fields APM can fill |
+| **Suggest strong passwords on sign-up forms** | On | Offers a generated password on new password fields, using the generator settings from the toolbar popup |
+| **Copy the one-time code after a login** | On | When the login you fill has a code, APM copies it so the next page can take it |
+
+### Saving
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Offer to save new logins** | On | Shows the save prompt after you sign in with a login APM does not have |
+| **Offer to update changed passwords** | On | Shows the update prompt when you sign in with a new password. The old password stays in the item's history |
+| **Save new logins to** | Default | The space new logins go to. You can change it in each prompt. Unlock APM to see your spaces |
+
+### Matching
+
+| Setting | Default | Options |
+|---------|---------|---------|
+| **Match websites by** | **Base domain** | **Base domain** treats `app.harbor.dev` and `harbor.dev` as the same site. **Exact host** keeps them apart. **Starts with URL** matches pages whose address starts with the saved one |
+
+See [How APM matches logins to a site](/docs/extension/autofill#how-apm-matches-logins-to-a-site) for the exact rules.
+
+## Passkeys
+
+APM answers passkey requests inside the page, so the browser's own passkey sheet does not open for sites APM handles. See [Passkeys](/docs/extension/passkeys).
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Use APM for passkeys** | On | Create and sign in with passkeys stored in your vault. While the vault is unlocked, the description shows how many you have |
+| **Offer passkeys in the login menu** | On | When a site supports passkey autofill, its passkeys appear under your logins in the field menu. Needs **Use APM for passkeys** |
+
+Two notes follow. **When Chrome takes over**: sites that accept only RS256 keys go to the browser's own flow, and you can always choose **Use this browser instead** in the APM sheet. **Private keys stay in APM**: the extension never sees a private key, and it checks that each request comes from the site it names.
+
+## Security
+
+These follow your APM settings where they overlap.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Clear the clipboard after** | 30s | Set in APM, not here. Applies to passwords, keys and codes copied from the extension. Shows "Unlock to see" while locked, and **Never** when APM is set never to clear it |
+| **Lock with APM** | Always | The extension locks the moment APM locks. This cannot be turned off |
+| **Lock APM when Chrome closes** | Off | Locks the vault when the last browser window closes |
+| **Never fill on http:// pages** | On | Unencrypted pages can be read on the network. `localhost` is always allowed |
+| **Fill inside frames from other sites** | Off | A frame from another site could be hidden over the real form, so filling there is off unless you turn it on |
+
+<Callout type="note">
+**Lock APM when Chrome closes** locks APM itself, the same as **Lock vault** in the popup: the desktop app, your `pm` session and other paired browsers lock too.
+</Callout>
+
+## Shortcuts
+
+The browser owns extension shortcuts. This section lists the current ones; change or add them on the browser's shortcuts page with **Change shortcuts in Chrome** (`chrome://extensions/shortcuts`).
+
+| Command | Default |
+|---------|---------|
+| Open APM | <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>A</Kbd> |
+| Fill the best login for this page | <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>F</Kbd> |
+| Generate and fill a password | <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>G</Kbd> |
+| Copy the one-time code for this page | Not set |
+| Lock vault | <Kbd>Alt</Kbd><Kbd>Shift</Kbd><Kbd>L</Kbd> |
+
+On macOS the page shows them with Mac symbols, such as <Kbd>⌥</Kbd><Kbd>⇧</Kbd><Kbd>A</Kbd>.
+
+It also lists the keys inside the field menu (<Kbd>↑</Kbd> <Kbd>↓</Kbd> to move between logins, <Kbd>↵</Kbd> to fill the highlighted one, <Kbd>Esc</Kbd> to close) and the right-click menu (right-click any text field and choose **APM**).
+
+## Excluded sites
+
+APM stays quiet on these sites and every subdomain under them.
+
+To add one, type a site such as `example.com` (a full address works too; APM keeps only the host), pick a rule and choose **Add**. APM lowercases what you type and drops the scheme, a leading `*.` or `www.`, the path and the port, so `https://www.example.com:8443/login` becomes `example.com`. It accepts a domain with at least one dot, or `localhost`. Anything else gets "Enter a site like example.com." Adding a site that is already listed replaces its rule.
+
+| Rule | Effect |
+|------|--------|
+| **Never fill** | No field menu, field icon, badge, filling or passkeys. Save prompts still appear |
+| **Never save** | No save or update prompts. Filling still works |
+| **Never fill or save** | Both |
+
+Each listed site has a rule menu to change it and a remove button. Removing a site shows "APM is back on" the site.
+
+Sites also land here when you choose **Pause APM on** a site in the popup (rule **Never fill or save**) or **Never for** a site in a save prompt (rule **Never save**). Both add the site's whole domain.
+
+## About
+
+| Row | What it shows |
+|-----|---------------|
+| **Extension** | The extension's version |
+| **APM app** | The version of APM it is connected to, or "Not connected" |
+| **This browser** | The name the extension pairs as, such as "Chrome 129 on macOS" |
+| **Vault encryption** | "XChaCha20-Poly1305 · Argon2id". This is a fixed label: a vault can also use AES-256-GCM. Run `pm cinfo` to see the cipher your vault uses |
+
+Below is a **Permissions** list explaining what each browser permission is for. [Privacy and permissions](/docs/extension/privacy-and-permissions) covers the same ground in more detail.

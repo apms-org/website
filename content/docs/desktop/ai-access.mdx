@@ -1,0 +1,188 @@
+---
+title: AI access
+description: Let AI assistants use your vault through MCP with their own scoped tokens, and approve every change they ask to make.
+order: 16
+group: Connections
+---
+
+AI assistants such as Claude Desktop, Cursor, VS Code and Cline can use your vault through MCP (the Model Context Protocol). Each assistant gets its own token with only the tools you allow. When it asks to add, edit or delete an item, the request waits for your approval in the app.
+
+Assistants start the MCP server themselves with `pm mcp serve` over stdio. Nothing listens on the network.
+
+Open **Settings → AI access**. The sidebar shows **N AI requests waiting for approval** when an assistant is waiting for you; click it to jump to the page.
+
+## Turn on the MCP server
+
+Turn on **MCP server** at the top of the page. When it is off, tokens are kept, and **New token** and the **Set up** buttons are disabled. The setting is saved in the vault and written to the audit log as `MCP_ENABLED` or `MCP_DISABLED`. You can't change it while the vault is open read-only.
+
+The switch only controls this page. When it is off, the description reads "Off. You can't create tokens or set up assistants here. Tokens you already made keep working until you revoke them." An assistant with a valid token can still start `pm mcp serve`, and its requests still show up in the app. To cut an assistant off, revoke its token.
+
+## Set up an assistant
+
+<Steps>
+
+### Choose the assistant
+
+In the **Assistants** card, choose **Set up** next to **Claude Desktop**, **Cursor**, **VS Code** or **Cline**. Each row shows the config file that assistant reads:
+
+| Assistant | Config file |
+|---|---|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Cursor | `~/.cursor/mcp.json` |
+| VS Code | `~/Library/Application Support/Code/User/mcp.json` |
+| Cline | `~/.cline/mcp_settings.json` |
+
+The app shows these macOS paths on every platform. For any other MCP client, choose **New token** in the **Access tokens** card instead.
+
+### Pick tools and an expiry
+
+The **New access token** dialog ("One token per assistant, so you can revoke them separately.") asks for:
+
+- **Assistant**: a name for the token, filled in from the row you chose. It is how the token appears in requests, toasts and the audit log.
+- **Expires**: **In 1 hour**, **In 1 day**, **In 7 days**, **In 30 days** (the default), **In 90 days** or **Never**.
+- **Tools**: start from a preset, then tick groups or single tools. The footer counts them, for example **3 of 17 tools**.
+
+**Create token** stays off until the token has a name and at least one tool.
+
+### Copy the token and config
+
+Choose **Create token**. The dialog turns into **Token created**, "Copy it now. It is not shown again." Copy the **Token**, and copy the **Config** block into the assistant's config file; for the four assistants above its label names the file, such as **Config · paste into ~/.cursor/mcp.json**. Then restart the assistant, as the dialog reminds you: "Restart Cursor after editing its config. Write requests show up here for approval."
+
+The **Config** block runs the app's own copy of `pm` by its full path (on Windows, through `cmd /c`), so the assistant does not need `pm` on its `PATH`. On a Mac it looks like this:
+
+```json title="Config"
+{
+  "mcpServers": {
+    "apm": {
+      "args": [
+        "mcp",
+        "serve",
+        "--token",
+        "apm_mcp_3f9c0a7d21b84e5c96a1d0e27b5f4c18a2d6e9b0c3f71a54"
+      ],
+      "command": "/Applications/APM.app/Contents/Resources/bin/pm",
+      "env": {}
+    }
+  }
+}
+```
+
+</Steps>
+
+A token is `apm_mcp_` followed by 48 hexadecimal characters. APM keeps every token in `mcp_auth.json` in your APM config folder, and writes `MCP_TOKEN_CREATED` to the audit log when you make one.
+
+The manual setup for any MCP client looks like this:
+
+```json title="MCP config"
+{
+  "mcpServers": {
+    "apm": {
+      "command": "pm",
+      "args": ["mcp", "serve", "--token", "<your token>"]
+    }
+  }
+}
+```
+
+This block runs plain `pm`, so the assistant needs `pm` on its `PATH`. On macOS, install it from **Settings → Developer**. See [The app and pm](/docs/desktop/terminal#the-pm-command). For each client's details, see [AI agents setup](/docs/agents/setup).
+
+## Tools and presets
+
+Tools come in five groups, each with a risk level:
+
+| Group | Risk | Tools | What they allow |
+|---|---|---|---|
+| **Read** | low | `list_vault`, `search_vault` | See names and structure. The app says "never secrets", but in APM 12.0.0 `search_vault` returns each matching item in full, secrets included. |
+| **Secrets** | high | `get_entry`, `decrypt_entry`, `get_totp` | Read secret values and one-time codes |
+| **Write** | high | `add_entry`, `edit_entry`, `delete_entry`, `manage_spaces`, `cloud_sync` | Changes. Only `add_entry`, `edit_entry` and `delete_entry` wait for approval. `manage_spaces` and `cloud_sync` act right away. |
+| **Admin** | medium | `manage_profiles`, `cloud_config`, `get_history`, `get_audit_logs` | Profiles, cloud settings, history and audit logs |
+| **Utility** | low | `generate_password`, `tx_list`, `tx_abort` | Password generation and pending requests |
+
+The presets under **Start from**:
+
+| Preset | Tools |
+|---|---|
+| **Browse only** | Read, plus `generate_password` (the default) |
+| **Read secrets** | Read, Secrets and `generate_password` |
+| **Assistant** | Read, Secrets, `add_entry`, `edit_entry`, `delete_entry` and every Utility tool |
+| **Everything** | All 17 tools |
+
+<Callout type="warning" title="Secrets access">
+When a token can read secret values, the dialog warns you: **This assistant can read secret values**. Only give secrets access to assistants you run locally. The dialog says every read is written to the audit log, but in APM 12.0.0 only `get_entry` is. `decrypt_entry`, `get_totp` and `search_vault` leave no record.
+</Callout>
+
+See the [MCP tool reference](/docs/agents/tools) for what each tool does.
+
+## Approve changes
+
+When an assistant asks to add, edit or delete an item, `pm` saves the request, logs `MCP_TX_REQUESTED` and answers the assistant:
+
+```text title="What the assistant receives"
+Waiting for approval: Add password entry 'GitHub' in space 'default'
+Request tx_3f9c0a7d21b84e5c96a1d0e2 expires at 2026-10-05T14:17:02+05:30. The user approves or rejects it in the APM app (Settings > AI access). Nothing changes until they approve. Call tx_list to see whether it was approved.
+```
+
+Within a few seconds the app shows a toast for 7 seconds: **Claude Desktop is asking to add an item**, **… to change an item** or **… to delete an item**, with the summary under it and a **Review** button. The request also shows at the top of **Settings → AI access** under **N waiting for you**, next to "Requests expire after 15 minutes".
+
+Each request shows:
+
+- The assistant's name and what it wants to do, such as "wants to **add** an item · 2m" (**now** for the first minute, then minutes, hours, and a weekday such as **Tue** after a day).
+- The tool (`add_entry`, `edit_entry` or `delete_entry`) and a summary, such as "Edit password entry 'GitHub' in space 'default'" or "Delete entry 'GitHub'".
+- The fields it wants to write. Passwords, secrets, keys, card security codes, ID numbers and other secret values arrive already hidden as dots.
+- How long is left, such as **14m left** or **45s left**, with a bar that shrinks. Requests expire after 15 minutes.
+
+Choose **Approve** to make the change, or **Reject** to tell the assistant no. Delete requests are highlighted in red, with a red **Approve** button. Nothing changes until you approve: the assistant can't approve its own request, and calling the tool again only adds another request.
+
+| You choose | What happens |
+|---|---|
+| **Approve** | The change is saved, with an lgit commit noted "Approved Claude Desktop: Add password entry 'GitHub' in space 'default'", so you can undo it from **History** or with `pm lgit undo`. The audit log gets `MCP_ENTRY_ADDED`, `MCP_ENTRY_EDITED` or `MCP_ENTRY_DELETED`. You see **Approved** with the summary |
+| **Reject** | Nothing is saved. The audit log gets `MCP_TX_ABORTED`. You see **Rejected**, "Claude Desktop was told no." |
+
+If the change can't be made, for example the item no longer exists, the app shows **Could not apply the request:** and the reason, and nothing is saved. Other messages you can see after choosing **Approve**:
+
+| Message | Meaning |
+|---|---|
+| "That request expired or no longer exists." | It passed its 15 minutes, or was already removed |
+| "That request is already committed." or "… already aborted." | It was answered already, or the assistant withdrew it with `tx_abort` |
+| "This session is read-only." | The vault is open read-only. Unlock with full access to approve |
+
+Items an assistant adds carry an **Added by AI** badge, and their details say they were created by an AI client.
+
+Requests appear while the vault is unlocked in the app. An assistant can ask while the vault is locked; its request shows up in the list once you unlock, if it hasn't expired, but without a toast. **Past requests** lists up to eight recent requests you approved or rejected. Every request leaves the list 15 minutes after the assistant made it, so one that expires without an answer simply disappears.
+
+The assistant learns the outcome by calling `tx_list`, which prints one line per request, such as `tx_3f9c0a7d21b84e5c96a1d0e2 | add_entry | Claude Desktop | committed | expires=2026-10-05T14:17:02+05:30`, or "No active transactions".
+
+## Manage tokens
+
+The **Access tokens** card ("Revoking a token cuts that assistant off on its next call.") lists the newest token first. Each one shows:
+
+- Its name and the first 12 characters of the token, such as `apm_mcp_3f9c…`.
+- The tool groups it can use, with how many tools from each, such as **Read 2** and **Secrets 3**.
+- A count shown as **calls**, when it was last used (**used 3h**, or **never used**), and when it expires (**29 days left**, **5h 12m left**, **no expiry**, or **expired 2h**). The count and the last-used time go up each time an assistant starts the server with the token, not on every tool call. Expired tokens are marked **Expired**.
+
+With no tokens the card says "No tokens. Create one per assistant."
+
+**Revoke** deletes the token. APM asks "Revoke Claude Desktop?" and says "It can't connect again. If it is connected now, it keeps access until it restarts. Requests it already sent still wait for you to approve or reject." The token is only checked when the server starts, so restart the assistant to cut it off at once, and reject its pending requests yourself. The **Access tokens** card says the same: "A revoked token can't start pm mcp serve again. An assistant that is already connected keeps access until it restarts." Choose **Revoke token**, and you see **Revoked Claude Desktop**.
+
+## In the terminal
+
+`pm mcp serve`, `pm mcp token` and `pm mcp config` do the same from the terminal. Each card shows its command when **Settings → Appearance → Show pm commands** is on. `pm mcp config` prints the entry to paste, for the `pm` you ran it with:
+
+```text title="Output"
+Copy this to your MCP settings:
+{
+  "mcpServers": {
+    "apm": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "/usr/local/bin/pm",
+      "env": {}
+    }
+  }
+}
+Run `pm mcp token` to create a token for this assistant, then add `--token <token>` to args.
+```
+
+See [AI agents](/docs/agents/setup) and the [CLI reference](/docs/cli/commands).

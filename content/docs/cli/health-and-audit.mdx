@@ -1,0 +1,144 @@
+---
+title: Health and maintenance
+description: Score your vault's security, see per-item trust scores, clean up broken entries, and know what pm records about its own activity.
+order: 15
+sidebarTitle: Health and audit
+group: Guides
+---
+
+Four commands help you keep a vault in shape: `pm health` scores it, `pm trust` ranks individual secrets by risk, `pm cleanup` fixes structural problems, and `pm logs` shows what happened. This page covers the first three and the logs `pm` keeps; [History and undo](/docs/cli/history) covers `pm logs` and vault snapshots in detail.
+
+## Health score
+
+```sh title="Terminal"
+pm health
+pm health --detailed     # also list the 10 riskiest secrets
+```
+
+```text
+APM SECURITY HEALTH DASHBOARD
+=============================
+OVERALL SCORE: 90/100
+
+- Encryption profile: paranoid (+20)
+- Alerts disabled: no (-10)
+
+Top Secret Risks
+----------------
+ 1. [LOW] APIKEY/OpenAI (space=default) score=100
+ 2. [LOW] PASSWORD/GitHub (space=default) score=100
+```
+
+The score starts at 100 and is capped between 0 and 100:
+
+| Check | Effect |
+|---|---|
+| Profile `legacy` | −20 |
+| Profile `hardened` or `paranoid` | Listed as `+20` in the report, but not added: the score never goes above 100 |
+| Security alerts off | −10 |
+| Security alerts on | Listed as `+10`; it only makes up for the `legacy` deduction, because the score can't go above 100 |
+| Each login whose password is shorter than 8 characters (an empty password counts) | −5 |
+| Each secret with a trust score below 55 (high risk) | −2 |
+| Each secret with a trust score below 35 (critical risk) | another −3 |
+
+The desktop app's **Watchtower** view looks for reused, weak and aging secrets with its own checks. See [Desktop app](/docs/desktop).
+
+## Trust scores
+
+`pm` keeps a little telemetry about each secret inside the vault: when it was created and last changed, when it was last accessed and by whom, how often, and whether it was marked exposed. `pm trust` turns that into a score per secret:
+
+```sh title="Terminal"
+pm trust
+```
+
+```text
+Secret Trust Scores
+===================
+[MEDIUM] PASSWORD     AWS root                     space=default      score= 70 | rotation older than 180 days; elevated access frequency
+[LOW] APIKEY       OpenAI                       space=default      score=100
+```
+
+Each score starts at 100:
+
+| Factor | Effect |
+|---|---|
+| Marked as exposed | −45 |
+| Last rotated more than 365 / 180 / 90 days ago | −35 / −20 / −10 |
+| Accessed more than 200 / 75 times | −20 / −10 |
+| Privilege `critical`, `root` or `admin` / `elevated` | −15 / −8 |
+
+| Score | Risk |
+|---|---|
+| 80 and above | low |
+| 55 to 79 | medium |
+| 35 to 54 | high |
+| below 35 | critical |
+
+Secrets only get a score once they have telemetry, which starts when they are added, viewed or changed with this version of APM. The **i** key in `pm get` shows one item's telemetry and trust score. Accesses made by AI agents over MCP are recorded with the actor `AI`.
+
+## Clean up
+
+```sh title="Terminal"
+pm cleanup --dry-run     # report only
+pm cleanup               # report, then ask before fixing
+pm cleanup -y            # fix without asking
+```
+
+```text
+  Vault Cleanup Report
+  ====================
+
+  [entries] Password entry #7 has an empty account name
+  [totp_entries] TOTP entry 'Old VPN' has an empty secret
+  [config] Autocomplete window protection is not enabled (recommended)
+
+  Found 3 issue(s), 2 auto-fixable
+```
+
+| Check | Fixed automatically |
+|---|---|
+| Logins, authenticator codes, notes, tokens or API keys with an empty name | Yes, removed |
+| Authenticator codes with an empty secret | Yes, removed |
+| Logins and authenticator codes in a space that no longer exists | Yes, moved to `default` |
+| Cloud tokens left over with no provider configured | Yes, cleared |
+| A spaces list that holds only an empty name | Yes |
+| A stale failed-attempts counter stored in the vault | Yes, reset |
+| Logins with neither a username nor a password | No, you decide |
+| Authenticator codes with an unusually short secret | No |
+| Two authenticator codes with the same name in one space | No, reported only |
+
+Most vaults also show `Autocomplete window protection is not enabled (recommended)`. It refers to a setting from older versions of APM and needs no action.
+
+A read-only session can't run `pm cleanup`. Fixes are one save, so `pm lgit undo` reverts them.
+
+## What pm records
+
+`pm` keeps three records of its own activity. None of them holds item values, though `pm cloud get` writes the retrieval key or file ID you used into the audit log.
+
+| Record | File | What's in it |
+|---|---|---|
+| Audit log | `audit.json` in your APM config folder | One line per action (`VAULT_UNLOCKED`, `DATA_IMPORTED`, `TOTP_COPIED`, `INJECT_START`…), with details, your user name and host, hash-chained and signed with `audit_signing.key` |
+| Access log | `apm_audit.log` in pm's state folder, `~/.apm` by default | Unlock attempts (`ATTEMPT`, `UNLOCK`, `FAIL`) with a device hash |
+| Vault history | Inside the vault | Item events with type and name |
+
+Read the audit log and vault history with `pm logs`. See [File locations](/docs/reference/file-locations#history-and-audit) for where these files are, and `APM_STATE_DIR` in [Environment variables](/docs/reference/environment-variables) to move the state folder.
+
+## Security alerts
+
+```sh title="Terminal"
+pm auth alerts             # on or off?
+pm auth alerts --enable
+pm auth alerts --disable
+pm auth level              # current level
+pm auth level 3
+```
+
+With alerts on and an alert address set (in the desktop app under **Settings → Alerts**), `pm` records an alert for events at or below your level:
+
+| Level | Alerts on |
+|---|---|
+| 1 | Critical events: failed unlocks, unusual activity, successful recovery |
+| 2 | Also settings changes: master password, alert settings, security level, recovery reset |
+| 3 | Also item changes: adds, edits (removing a passkey with `pm get` counts as one), deletes, exports |
+
+`pm` writes these alerts as lines in a file named `email.log` in the folder you run it from (the desktop app writes them next to the vault). They are not sent by email in this version. Having alerts off costs 10 points in `pm health`. See also [Settings → Alerts](/docs/desktop/settings#alerts).

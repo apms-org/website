@@ -1,0 +1,59 @@
+---
+title: What is APM?
+description: APM is the open source password manager that keeps every secret in one encrypted file on your computer, and opens it from the desktop app, the terminal, Chrome and your AI tools.
+order: 0
+sidebarTitle: Overview
+---
+
+APM is the open source password manager. Every password, passkey, one-time code and API key lives in one encrypted file on your computer, and you open it from the desktop app, the terminal, Chrome or your AI tools. There is no account to create.
+
+APM is free, with no paid tier and no trial, and its source code is public on GitHub. `pm` is licensed under GPL-3.0. The desktop app and `pm` run on macOS, Windows and Linux.
+
+## One encrypted file
+
+Your vault is a single file, `vault.dat`, kept in `~/.apm/` by default. It holds 25 kinds of items, from logins (with their passkeys) and one-time codes to SSH keys, cloud credentials, cards, IDs and files. Copy it, back it up or sync it: sync only ever moves the encrypted file.
+
+Your master password never leaves your computer and is never written into the vault. Argon2id turns it into the keys that encrypt and sign the file, so without it, or a recovery method you set up, nobody can open the vault, including the people who make APM. See [Encryption](/docs/security/encryption).
+
+## Four ways in
+
+Every surface opens the same vault file, with the same history and audit log. Use one, or all four.
+
+<Cards>
+  <Card title="Desktop app" href="/docs/desktop" icon="monitor">A calm app for every secret you keep. Touch ID on the Mac, search with ⌘K, history with undo.</Card>
+  <Card title="pm, the command line" href="/docs/cli" icon="terminal">The whole vault in your shell. Fuzzy search, one-time codes, scoped sessions for scripts.</Card>
+  <Card title="APM for Chrome" href="/docs/extension" icon="puzzle">Fills logins, codes and passkeys in Chrome, Edge, Brave, Arc, Vivaldi and Chromium.</Card>
+  <Card title="AI tools over MCP" href="/docs/agents" icon="bot">Claude Desktop, Cursor, VS Code and others get a scoped token, not your vault.</Card>
+</Cards>
+
+`pm` is the engine under all of them. The desktop app runs it as its backend. APM for Chrome asks the app, or `pm` when the app is closed, for what a page needs, and never opens the vault file itself. AI tools reach the vault through `pm mcp serve`, with a token you create for each one.
+
+See [How the pieces connect](/docs/getting-started/concepts#how-the-pieces-connect) for a diagram.
+
+## What it runs on
+
+| Part | Runs on |
+|------|---------|
+| Desktop app | macOS (Apple silicon and Intel), Windows x64, Linux x64 |
+| `pm` | macOS, Windows and Linux, on `amd64` and `arm64` |
+| APM for Chrome | Chrome, Edge, Brave, Arc, Vivaldi and Chromium, version 116 or later |
+| MCP server | Any MCP client that can start a program, such as Claude Desktop, Cursor, VS Code or Cline |
+
+The desktop app and `pm` share one version number, 12. APM for Chrome has its own, 1.0.0.
+
+## What APM is not
+
+- **Not a service.** There is no APM account and no subscription. Sync, when you turn it on, uploads only the encrypted file: to your own GitHub, Google Drive or Dropbox, or to APM's shared storage on Google Drive or Dropbox, which `pm cloud init` picks unless you choose your own account.
+- **Not on your phone.** There is no mobile app.
+- **Not in every browser.** APM for Chrome runs in Chromium browsers only. There is no Firefox or Safari version.
+- **Not a shared vault by default.** A vault belongs to whoever knows its master password. For a vault shared by a team, with roles and approvals, see [Team edition](/docs/cli/team-edition).
+
+## Start here
+
+<Cards>
+  <Card title="Install" href="/docs/getting-started/installation" icon="download">Get the desktop app, pm, the extension and the MCP server.</Card>
+  <Card title="Quickstart" href="/docs/getting-started/quickstart" icon="rocket">Create a vault, add a login, use it in the terminal and fill it in Chrome.</Card>
+  <Card title="Concepts" href="/docs/getting-started/concepts" icon="book-open">The vault file, unlocking, spaces, history, profiles and sync.</Card>
+  <Card title="Choose your surface" href="/docs/getting-started/choose-your-surface" icon="layers">Which parts of APM to set up for how you work.</Card>
+  <Card title="Get help" href="/docs/getting-started/getting-help" icon="life-buoy">Built-in help, setup checks and what to put in a bug report.</Card>
+</Cards>

@@ -1,0 +1,188 @@
+---
+title: Frequently asked questions
+description: Short answers about the vault, pm, sync, the extension and moving from older versions of APM, plus where to get help.
+order: 8
+sidebarTitle: FAQ
+group: Help
+---
+
+Short answers, each with a link to the full explanation. If your question isn't here, see [Getting help](#getting-help).
+
+## The vault
+
+### Where is my vault?
+
+`~/.apm/vault.dat`, unless you chose another file. `pm` uses `--vault` first, then `APM_VAULT_PATH`, then a `vault.dat` next to the `pm` executable, then `~/.apm/vault.dat`. `pm info` prints the path in use, and the desktop app shows it in **Settings** → **General** → **Vault file**. See [File locations](/docs/reference/file-locations#the-vault-folder).
+
+Older documentation said the vault was `vault.dat` in the current folder. That is no longer the case.
+
+### I forgot my master password. Can I get back in?
+
+Only if you set up recovery beforehand: a recovery email and key (`pm auth email`), optionally with recovery codes, a recovery passkey or trustee shares. Then the desktop app's **Forgot master password**, `pm auth quorum-recover` or `pm auth recover` sets a new master password. `pm auth recover` usually stops with "Recovery record found but key is missing": it needs a copy of the key that `pm` drops the next time it saves the vault after an unlock. Without recovery, nobody can open the vault, including the APM developers. See [Recovery](/docs/cli/recovery).
+
+### Why does the vault open read-only, or show no items, after failed attempts?
+
+After six wrong passwords in a row, the password no longer opens the vault: `pm` shows a read-only decoy and the app asks you to use recovery. After nine, `pm` refuses. Recovering the vault resets the count. See [Failed attempts](/docs/cli/sessions#failed-attempts).
+
+### What does "This vault was updated by a newer version of pm" mean?
+
+A newer `pm` (or the desktop app) saved the vault, and your `pm` is older. It can still read the vault but won't change it. Run `pm update`. See [A vault from a newer pm](/docs/cli/vault-basics#a-vault-from-a-newer-pm).
+
+### Can I undo a delete?
+
+In the desktop app, deleted items go to the Trash. In `pm`, a delete is immediate, but [`pm lgit undo`](/docs/cli/history#undo-the-last-change) restores the vault as it was before the last change. History is shared by all vaults on the computer, so check `pm lgit show` before undoing.
+
+### Can I use more than one vault?
+
+Yes. Pass `--vault <file>` or set `APM_VAULT_PATH` for each command or shell. Each vault has its own master password, items and settings, but they share one history and one audit log in your APM config folder.
+
+### How do I back up the vault?
+
+Copy `vault.dat`. It is encrypted and holds every item and setting. `pm export` and [cloud sync](/docs/cli/cloud-sync) are other options. See [Back up and move](/docs/reference/file-locations#back-up-and-move).
+
+## pm
+
+### Do I need the desktop app to use pm?
+
+No. `pm` is a complete password manager on its own. The app runs `pm` as its engine, and both use the same vault and session: unlocking the app also unlocks `pm`, and locking the app locks it.
+
+### Does pm clear the clipboard after copying?
+
+No. `pm get` and `pm totp` copy and leave the value on the clipboard until something replaces it. The desktop app and the browser extension clear it after 30 seconds by default (**Settings** → **Security** → **Clear clipboard**). On Linux, `pm` copies with `xclip`; install it, or `pm` reports a copy that didn't happen.
+
+### Does pm gen copy the password?
+
+No, it only prints it. Pipe it to `pbcopy`, `xclip -selection clipboard` or `clip` if you want it copied.
+
+### Is there shell completion?
+
+No. `pm` doesn't generate completion scripts, and `pm completion` doesn't exist.
+
+### Why does pm say it can't hide what I type in Git Bash?
+
+An older Git Bash runs without a pseudo console, so `pm` can't turn off echo and refuses to ask for a password rather than show it. Run `winpty pm ...`, use Windows Terminal, or reinstall Git for Windows with **Enable experimental support for pseudo consoles** checked. See [Keys at prompts](/docs/cli#keys-at-prompts).
+
+### Why did a command fail but exit with status 0?
+
+Most `pm` commands print errors without setting a failure status. [Exit codes](/docs/reference/exit-codes) lists the commands that do exit with `1`, and how to detect failure in the others.
+
+### How do I update pm?
+
+Run `pm update`. If you installed `pm` from the desktop app, update the app instead; its `pm` link follows. See [Installation](/docs/cli/installation).
+
+### Can I install with the old install.sh or install.ps1 script?
+
+No. `install.sh` in the repository is out of date: it looks for release files under old names and installs the command as `apm`. `install.ps1` stops straight away with a message telling you to build on Windows yourself. Use a release archive, the desktop app, or build from source as described in [Installation](/docs/cli/installation).
+
+### Which Go version do I need to build pm?
+
+Go 1.25 or newer, as set in `go.mod`. Older guides said 1.21 or 1.22.
+
+## Coming from older versions
+
+### What happened to plugins?
+
+Removed in 12.0, together with the plugin marketplace and every `pm plugins` command. There is no replacement. The full list of removed and renamed commands is in the [command reference](/docs/cli/commands#removed-and-renamed-commands).
+
+### What happened to Windows autofill and pm autocomplete?
+
+Removed. The background autofill daemon, its <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>L</Kbd> hotkey and the fill sequences are gone. Use the [browser extension](/docs/extension) to fill logins. To link an authenticator code to a site for the extension, use `pm totp link <entry> <domain>`.
+
+### Where is pm audit?
+
+It is now `pm logs`, which shows the vault's item history, the signed audit log and the history commits. See [Signed logs](/docs/cli/history#signed-logs).
+
+### Why does my .apmignore rule for SSH keys match nothing?
+
+Probably because it says `ssh_key`. Type names use hyphens now: `ssh-key`, `api-key`, `gov-id`, `cloud-credentials`, `recovery-codes`, `software-license`. Names with underscores match nothing. Matching is also case-insensitive, and the `.apmignore` in the current folder is used before the one next to the vault. See [.apmignore](/docs/reference/apmignore#item-types).
+
+### Why won't my old policy file load?
+
+Most likely its `classification` block uses the old format, with plain values such as `aws_root: critical`. That makes the whole file unreadable, and APM skips it without a message. Remove the block or give each label `max_access_level` and `mfa_required` keys. Also load the policy by its `name`, not by folder: `pm policy load team-standard`. See [Policy files](/docs/reference/policies).
+
+### My old pm import json or pm export csv commands don't work.
+
+`pm import <file>` now detects the format itself, and `pm export` takes `--format apm|cxf|bitwarden|csv|txt`. `--decrypt` is now `--password`, and `--no-password` is now `--without-password`. See [Import and export](/docs/cli/import-export).
+
+## Sync and the cloud
+
+### Why is my Google Drive vault "public"?
+
+In `APM_PUBLIC` mode, the encrypted vault is uploaded to a Drive folder APM shares between users and is readable by anyone who has its file ID. That is what lets you restore it with only a retrieval key. Its contents are protected only by your master password and encryption. For a copy only you can reach, use self-hosted Drive, Dropbox or GitHub. See [Cloud sync](/docs/cli/cloud-sync#providers-and-modes) and [Sync security](/docs/security/sync-security).
+
+### Does APM merge changes from two computers?
+
+`pm cloud diff` compares the cloud copy with your vault item by item and lets you merge all or some changes. `pm cloud sync` itself uploads your whole vault, replacing the cloud copy. See [Compare and merge](/docs/cli/cloud-sync#compare-and-merge).
+
+### What does APM send over the network?
+
+Only what you set up: uploads and downloads for cloud sync, recovery and verification emails for `pm auth email` and `pm auth recover`, website logos fetched from each site itself (turn off with **Show website icons** or `APM_ICONS_OFFLINE`), and the release check of `pm update`. The browser extension talks to the app or `pm` on your own computer only.
+
+## The browser extension
+
+### Does the extension need the desktop app?
+
+No. It works with whichever is available: the desktop app, `pm extension serve` running in a terminal, or `pm` started by the browser itself after `pm extension link`. See [Browser extension](/docs/cli/browser-extension) and [Pairing](/docs/extension/pairing).
+
+### The extension says it can't reach APM.
+
+Run `pm extension status`. It shows which browsers are linked, what the extension is using right now, and whether the pairing token matches the running bridge. If you use a non-default port, set the same port in the extension. See the [extension troubleshooting](/docs/extension/troubleshooting).
+
+## Getting help
+
+<Steps>
+
+### Check the built-in help
+
+Every command has its own help, with its flags and defaults:
+
+```sh title="Terminal"
+pm --help
+pm cloud --help
+pm export --help
+```
+
+### Collect your version details
+
+```sh title="Terminal"
+pm --version
+pm info
+```
+
+`pm --version` prints just the version number. `pm info` prints the install folder, the vault path, the version and build, and checks that the vault is reachable:
+
+```text
+APM Stable v12.0.0 Release
+────────────────────────────
+
+User:       alex@apm
+Installed:  /usr/local/bin
+Vault:      /Users/alex/.apm/vault.dat
+
+Version:    v12.0.0 Stable Release
+Build:       (07/30/2026 (MM/DD/YYYY))
+
+Repo:       github.com/apms-org/apm
+Support:    aaravmaloo06@gmail.com
+
+Status:
+  ✔ Vault accessible
+  ✔ Config valid
+  ✔ All systems ok.
+```
+
+### Report the problem
+
+Open an issue at [github.com/apms-org/cli](https://github.com/apms-org/cli/issues) with:
+
+- the output of `pm --version` and `pm info`, and the desktop app's version if you use it
+- your operating system and version
+- the command you ran and the full message, with any secrets removed
+
+Never include your vault file, master password, recovery key, tokens or `pm get --show-pass` output.
+
+</Steps>
+
+<Callout type="danger" title="Security problems">
+Don't open a public issue for a vulnerability. Follow [Reporting a vulnerability](/docs/security/reporting) to report it privately.
+</Callout>

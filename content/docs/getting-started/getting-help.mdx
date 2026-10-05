@@ -1,0 +1,180 @@
+---
+title: Get help
+description: Built-in help in pm, the desktop app and the extension, the commands that show what is wrong, and what to put in a bug report.
+order: 5
+sidebarTitle: Get help
+group: Learn
+---
+
+Every part of APM can tell you its version and what it is connected to. Start with the built-in help, check your setup with the commands below, and if you still need a hand, open an issue with the details listed here.
+
+## Built-in help
+
+### pm
+
+`pm --help` lists every command with a one-line summary:
+
+```sh title="Terminal"
+pm --help
+```
+
+```text title="Output"
+A simple password manager CLI
+
+Usage:
+  pm [command]
+
+Available Commands:
+  add         Add a new entry to the vault interactively
+  auth        Manage authentication and recovery
+  autolock    Show or change when the vault locks itself
+  cinfo       Show cryptographic parameters
+  cleanup     Scan and clean up vault issues (deprecated fields, empty entries, expired items)
+  cloud       Sync and retrieve vaults from cloud (Google Drive, GitHub, Dropbox)
+  compromise  EMERGENCY: Permanently delete the vault
+  export      Export to APM, Credential Exchange, Bitwarden, CSV or text, passkeys included
+  extension   Connect the APM browser extension to your vault without the desktop app
+  gen         Generate a random secure password
+  get         Search and manage vault entries interactively
+  health      Security health dashboard
+  import      Import from APM, 1Password, Bitwarden, KeePass, Credential Exchange or CSV, passkeys included
+  info        Show information about your current version of APM
+  inject      Inject vault entries into the current shell session
+  lgit        Vault log history controls
+  loaded      Show loaded policies and .apmignore state
+  lock        Immediately lock the vault (kill active session)
+  logs        View signed and verified vault logs
+  mcp         Configure or start the APM MCP server
+  mode        Manage modes
+  policy      Manage vault policies
+  profile     View and tune encryption profiles
+  session     Manage ephemeral, context-bound secret sessions
+  setup       Complete APM setup wizard (vault, profile, spaces, cloud)
+  space       Manage custom spaces (formerly profiles)
+  totp        Show or copy TOTP codes
+  trust       View trust scores for individual secrets
+  unlock      Unlock the vault for the current shell session
+  update      Check for updates and self-update
+
+Flags:
+  -h, --help           help for pm
+  -v, --vault string   Vault file path (default "/Users/you/.apm/vault.dat")
+      --version        version for pm
+
+Use "pm [command] --help" for more information about a command.
+```
+
+The `--vault` default shows which vault `pm` opens. Add `--help` to any command, or to a command group, for its flags and examples:
+
+```sh title="Terminal"
+pm extension link --help
+```
+
+```text title="Output"
+Registers pm with each Chromium browser on this computer (Chrome, Edge, Brave, Arc, Vivaldi, Chromium) so the APM extension can start it, then waits for the extension to connect.
+
+If the extension is not paired yet, it shows a code. Check that the same code appears here and answer y. You only do this once per browser.
+
+Usage:
+  pm extension link [flags]
+
+Examples:
+  pm extension link
+  pm extension link --browser chrome
+  pm extension link --no-wait
+
+Flags:
+      --browser strings   Only link these browsers (chrome, chrome-beta, chrome-canary, chromium, edge, brave, vivaldi, arc)
+  -h, --help              help for link
+      --id strings        Also allow this extension ID, for a development build
+      --no-wait           Register and exit without waiting for the browser
+
+Global Flags:
+  -v, --vault string   Vault file path (default "/Users/you/.apm/vault.dat")
+```
+
+There is no `pm help` command and no shell completion. Both answer with an error, and a mistyped command gets a suggestion when one is close:
+
+```text title="Output"
+Error: unknown command "bogus" for "pm"
+
+Did you mean this?
+	logs
+
+Run 'pm --help' for usage.
+```
+
+`pm` still exits with status 0 after an unknown command, so check its output, not just the exit status, in scripts.
+
+The full reference is in [pm commands](/docs/cli/commands).
+
+### The desktop app
+
+- **Help**, **APM Documentation** opens the documentation in your browser.
+- **Help**, **Keyboard Shortcuts** (<Kbd>⌘</Kbd><Kbd>/</Kbd> on a Mac, <Kbd>Ctrl</Kbd><Kbd>/</Kbd> on Windows and Linux) lists every shortcut.
+- **Help**, **Report an Issue** opens the issue tracker.
+- **Settings**, **About** shows the app's version and the vault format.
+
+See [Desktop app troubleshooting](/docs/desktop/troubleshooting) for fixes to common problems.
+
+### APM for Chrome
+
+Open the extension's settings (in the popup, **More**, **Extension settings**). **About** shows the extension's version, the APM version it is connected to, and the name this browser pairs as, such as "Chrome 129 on macOS". **Connection** shows whether the app or `pm` is answering. See [Extension troubleshooting](/docs/extension/troubleshooting).
+
+## Check your setup
+
+None of these commands changes what is in your vault.
+
+| Command | What it tells you |
+|---------|-------------------|
+| `pm --version` | The bare version, such as `12.0.0` |
+| `pm info` | The version, the folder `pm` runs from, the vault it opens, and whether that vault is there. See [Check it](/docs/getting-started/installation#check-it) |
+| `pm cinfo` | The vault's format, security profile, key derivation settings and cipher, read from the file header without your password |
+| `pm autolock` | When the vault locks itself. It asks for your master password if no session is open |
+| `pm extension status` | Which browsers can start `pm` when the app is closed and for which vault, whether the desktop app or `pm extension serve` is answering the browser extension, and whether your pairing token matches |
+
+`pm cinfo` looks like this:
+
+```text title="Output"
+APM Crypto Configuration
+========================
+Format:    APMVAULT v4
+Profile:   paranoid
+KDF:       Argon2id
+  Time:    6
+  Memory:  512 KB
+  Threads: 4
+Cipher:    AES-256-GCM
+  Nonce:   24 bytes
+  Salt:    32 bytes
+Integrity: HMAC-SHA256 (Encrypt-then-MAC)
+```
+
+The **Memory** figure is in MiB, despite the `KB` label: `paranoid` uses 512 MiB. See [Security profiles](/docs/security/profiles).
+
+## What to put in a bug report
+
+Include:
+
+- **Versions.** `pm --version`, the app's version from **Settings**, **About**, and the extension's version from its settings page, **About**, if they are involved. The app and `pm` should match.
+- **Your system and browser.** The operating system, and for the extension the browser and its version (the **This browser** row in the extension's **About**).
+- **How you installed APM.** A release download, the app's **Install pm**, or a build from source.
+- **The exact message** you saw, copied rather than retyped.
+- **Steps to reproduce**, ideally starting from a new, throwaway vault.
+- **For extension problems**, the output of `pm extension status`.
+
+`pm info` output is useful too, but it shows your home folder's name and your folder paths. Edit them out if you prefer.
+
+<Callout type="danger" title="Never share secrets in a report">
+Never include your master password, a recovery key or code, `vault.dat`, the pairing token from `pm extension token --show`, an MCP token, or anything else from APM's data folder. Reproduce the problem with a test vault and a test password instead.
+</Callout>
+
+## Where to send it
+
+| Part of APM | Issue tracker |
+|-------------|---------------|
+| `pm`, the vault format, sync and the MCP server | [apms-org/cli](https://github.com/apms-org/cli/issues) |
+| The desktop app | [apms-org/gui](https://github.com/apms-org/gui/issues) |
+| APM for Chrome | [apms-org/extension](https://github.com/apms-org/extension/issues) |
+
+`pm info` also prints a support address. For a security problem, do not open a public issue: follow [Report a vulnerability](/docs/security/reporting) instead.

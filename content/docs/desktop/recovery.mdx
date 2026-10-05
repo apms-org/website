@@ -1,0 +1,148 @@
+---
+title: Recovery
+description: Set up ways back into your vault if you forget your master password, from a recovery email and key to trustee shares.
+order: 13
+group: Keep it safe
+---
+
+APM cannot reset your master password. Recovery methods are how you get back in if you forget it. Each one unlocks a separately encrypted copy of the vault key.
+
+Set them up in **Settings → Recovery**. To use them, see [Forgot your master password](/docs/desktop/lock-and-unlock#forgot-your-master-password).
+
+## Coverage
+
+The bar at the top counts how many of the five methods are ready:
+
+| Methods ready | Bar | What it says |
+|---|---|---|
+| None | Red | **No way back in**: "If you forget your password, this vault cannot be opened by anyone." |
+| 1 or 2 | Amber | **1 of 5 methods ready**: "Add another method so a single loss cannot lock you out." |
+| 3 or more | Green | **3 of 5 methods ready**: "Losing any one device or person will not lock you out." |
+
+## How the methods fit together
+
+A reset always needs proof of the recovery email. Then:
+
+- **Recovery email and key**: the code sent to your email, plus your recovery key.
+- **Second factor**: if you also set up one-time codes or a recovery passkey, recovery with the key asks for one of them too.
+- **Trustee shares**: instead of the recovery key, enough trustees combine their shares.
+
+| Method | Badge when set up | Button | What the row says when set up |
+|---|---|---|---|
+| **Recovery email and key** | **Ready** | **Set up** or **Change** | The masked address, such as "y•••@example.com" |
+| **Recovery key** | **Ready** | **Create key** or **Replace key** | When it was created |
+| **One-time codes** | **Ready**, or **Running low** at 3 or fewer | **Generate** or **New set** | "7 of 10 unused" and when they were made |
+| **Recovery passkey** | **Ready** | **Set up** or **Remove** | "Registered. Your browser asks for it during recovery." |
+| **Trustee shares** | **Ready** | **Set up** or **Split again** | "Any 2 of 3 trustees can restore access" |
+
+A method that is not set up shows **Not set up**. The **Recovery key** button needs a recovery email first ("Add a recovery email first"), and **Trustee shares** needs a recovery key ("Create a recovery key first"). In a read-only session every button is disabled.
+
+Each change is saved as a commit in [History](/docs/desktop/history), with notes such as "Recovery email set", "Recovery key created", "One-time recovery codes generated", "Recovery passkey registered" and "Trustee shares created".
+
+## Recovery email and key
+
+<Steps>
+
+### Enter your email
+
+Choose **Set up**, enter the **Email** and choose **Send code**.
+
+### Verify it
+
+APM sends a 6-digit code, in an email titled, for example, "154976 - APM Email Verification". Type it and choose **Verify**. The code expires 15 minutes after it is sent. **Send a new code** sends another, and **Back** lets you fix the address.
+
+A wrong or expired code shows "That code does not match. It expires 15 minutes after sending." After five wrong codes, APM wants a new one: choose **Send a new code**.
+
+### Store your recovery key
+
+Verifying the email creates a recovery key and shows it once, in four groups of four, such as `Q2E3-W5C2-XDTB-5722`. **Copy** it (APM clears the clipboard after 60 seconds) or **Save as .txt**, store it somewhere offline, tick **I stored it somewhere safe** and choose **Done**. You cannot close the dialog until you tick the box.
+
+</Steps>
+
+**Save as .txt** saves `apm-recovery-key.txt`:
+
+```text title="apm-recovery-key.txt"
+APM recovery key
+Personal
+Created 2026-10-05T15:35:02.000Z
+
+Q2E3-W5C2-XDTB-5722
+```
+
+APM also sends a notice to that address, titled "SECURITY ALERT: APM Vault Recovery Configured". It says the key was not sent by email.
+
+The dialog describes the address as "Used only for recovery codes and the alerts you turn on." APM uses it for recovery codes and that notice. Alerts go to the address in [Settings → Alerts](/docs/desktop/settings#alerts), and in APM 12.0.0 they are written to a log file, not emailed. Only a masked hint of the recovery address is shown on the recovery screen.
+
+<Callout type="warning">
+Changing the recovery email creates a new recovery key. The old key stops working, and trustee shares made from it are reset. If you had shares, the dialog says **Trustee shares were reset**.
+</Callout>
+
+## Recovery key
+
+**Replace key** asks **Replace recovery key?**, then creates a new recovery key and shows it once. The current key stops working as soon as the new one exists, and trustee shares are reset. Store the new one offline, for example on a printed page in a safe.
+
+A recovery key is four groups of four characters. The first two groups alternate a letter and a digit, the third is letters and the fourth is digits. Letters skip I and O, and digits are 2 to 9, so the key has no characters that are easy to misread.
+
+## One-time codes
+
+Single-use codes that stand in as the second factor during recovery.
+
+Choose **Generate**, pick **6 codes**, **10 codes** (the default) or **16 codes**, then **Generate N codes**. The codes appear once in a numbered grid, each like `9BA923-4B6A`. **Copy all** (cleared from the clipboard after 60 seconds) or **Save as .txt**, and cross them off as you use them.
+
+```text title="apm-recovery-codes.txt"
+APM one-time recovery codes
+Personal
+
+ 1. 9BA923-4B6A
+ 2. E273F9-03D5
+ 3. A02A06-83AC
+ 4. 05C8C9-8875
+ 5. C8B5F5-936C
+ 6. 0863B2-E437
+
+Each code works once.
+```
+
+**New set** replaces every current code; the dialog warns "Your 10 current codes stop working." The row shows how many are unused and warns **Running low** at three or fewer.
+
+## Recovery passkey
+
+A passkey in your browser, protected by Touch ID, iCloud Keychain or a security key, that proves it is you during recovery.
+
+Choose **Set up**, then **Continue in browser**. APM opens a local page in your default browser, at `http://localhost` with a random port, which creates the passkey. The dialog waits with "Finish in your browser. This window updates when it is done." and confirms with **Passkey registered**. If you do not finish within 2 minutes, it stops with "Passkey registration failed: passkey ceremony timed out".
+
+The passkey is for the site `localhost`, with the user name `apm-recovery` and the display name "APM Recovery", so look for that in your browser or password manager.
+
+**Remove** asks **Remove the recovery passkey?** and deletes it. Other methods keep working.
+
+This passkey only works for vault recovery. The passkey itself stays in your browser or security key, and it does not sign in to websites. See [Passkeys](/docs/desktop/passkeys) for website passkeys.
+
+## Trustee shares
+
+Shamir secret sharing splits your recovery key between people you trust. Any group of them that meets the threshold can restore access, and fewer learn nothing.
+
+<Steps>
+
+### Choose the numbers
+
+Set **Trustees** (2 to 8, 3 to start) and **Needed to recover** (2 up to the number of trustees, 2 to start). The picture shows, for example, **2 of 3**.
+
+### Give your recovery key
+
+If APM asks, enter your recovery key. The shares encode it, so APM needs it once. A key that does not belong to this vault shows "That recovery key does not match this vault."
+
+### Hand out the shares
+
+Choose **Create N shares**. Each share starts like `QSHARE-1-01F6B8504…` and has a field for the trustee's name and a copy button (cleared from the clipboard after 60 seconds). The names are only for you while the dialog is open: APM does not save them. Give one share to each person, in private.
+
+</Steps>
+
+**Split again** makes a new set. Replacing the recovery key, or changing the recovery email, resets the shares.
+
+## Remove all recovery data
+
+The **Remove all recovery data** card deletes every method at once: email, key, codes, passkey and shares. Choose **Remove recovery data**, type `REMOVE` and choose **Remove everything**. After this, only your master password opens the vault. The button is disabled when no method is set up.
+
+## In the terminal
+
+Each method row shows its `pm auth` command, for example `pm auth email`, `pm auth codes generate`, `pm auth passkey register` and `pm auth quorum-setup`. See [how recovery works](/docs/security/recovery) and the [CLI reference](/docs/cli/commands).

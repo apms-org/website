@@ -1,0 +1,249 @@
+---
+title: Install the desktop app
+description: Download a release build for macOS, Windows or Linux, or build the app from source.
+order: 1
+sidebarTitle: Install
+group: Get started
+---
+
+Each APM release publishes the desktop app for macOS (Apple silicon and Intel), Windows (x64) and Linux (x64). The app and `pm` share one version number, and every build carries its own copy of `pm` with that same version. You do not need to install the CLI first.
+
+## Download a release build
+
+Release builds are attached to each tagged release of the desktop app on GitHub ([apms-org/gui releases](https://github.com/apms-org/gui/releases)). Pick the file for your platform:
+
+| Platform | File | What is inside |
+|---|---|---|
+| macOS, Apple silicon | `APM-vX.Y.Z-darwin_arm64.zip` | `APM.app` |
+| macOS, Intel | `APM-vX.Y.Z-darwin_amd64.zip` | `APM.app` |
+| Windows, x64 | `APM-vX.Y.Z-windows_amd64.zip` | The app's files, with `APM.exe` at the top |
+| Linux, x64 | `APM-vX.Y.Z-linux_amd64.tar.gz` | A `linux-unpacked` folder with the `apm-desktop` program |
+
+The builds are plain app folders. There is no installer.
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab>
+
+<Steps>
+
+### Unzip the download
+
+Double-click the `.zip`. You get `APM.app`.
+
+### Move it to Applications
+
+Drag `APM.app` into your **Applications** folder.
+
+### Open it
+
+Open APM from Applications or Launchpad. The release builds are not notarized by Apple, so macOS may refuse to open the app the first time. If it does, open **System Settings → Privacy & Security**, scroll to the message about APM and choose **Open Anyway**. You only need to do this once.
+
+</Steps>
+
+The macOS build includes the native module that draws the Touch ID prompt inside the lock screen. See [Lock and unlock](/docs/desktop/lock-and-unlock#touch-id).
+
+</Tab>
+<Tab>
+
+<Steps>
+
+### Extract the download
+
+Right-click `APM-vX.Y.Z-windows_amd64.zip` and choose **Extract All**. Put the folder somewhere permanent, for example `%LOCALAPPDATA%\Programs\APM`.
+
+### Run APM.exe
+
+Open `APM.exe` in that folder. The build is not code-signed, so Windows SmartScreen may show **Windows protected your PC**. Choose **More info**, then **Run anyway**.
+
+### Pin it
+
+Right-click APM in the taskbar and pin it, or create a shortcut to `APM.exe` on the Start menu.
+
+</Steps>
+
+Touch ID and the **Install pm** button in Settings are macOS only. On Windows, read <Kbd>⌘</Kbd> as <Kbd>Ctrl</Kbd> and <Kbd>⌥</Kbd> as <Kbd>Alt</Kbd> in every shortcut.
+
+</Tab>
+<Tab>
+
+<Steps>
+
+### Extract the download
+
+```sh title="Terminal"
+mkdir -p ~/.local/opt
+tar -xzf APM-vX.Y.Z-linux_amd64.tar.gz -C ~/.local/opt
+```
+
+This creates a `linux-unpacked` folder.
+
+### Run the app
+
+```sh title="Terminal"
+~/.local/opt/linux-unpacked/apm-desktop
+```
+
+### Add it to your launcher (optional)
+
+Create a `.desktop` file that points at `apm-desktop`, or add an alias in your shell profile.
+
+</Steps>
+
+Touch ID and the **Install pm** button in Settings are macOS only. On Linux, read <Kbd>⌘</Kbd> as <Kbd>Ctrl</Kbd> and <Kbd>⌥</Kbd> as <Kbd>Alt</Kbd> in every shortcut.
+
+</Tab>
+</Tabs>
+
+After the app opens, continue with [First run](/docs/desktop/first-run).
+
+## Which pm the app runs
+
+The packaged app runs only the `pm` bundled inside it:
+
+- macOS: `APM.app/Contents/Resources/bin/pm`
+- Windows and Linux: `resources/bin/pm` (`pm.exe` on Windows) inside the app folder
+
+It never picks up an older `pm` from your `PATH`. Only the `APM_PM_PATH` variable overrides it, and that is meant for development. **Settings → Developer → Command line → Engine** shows which `pm` is running and where it came from:
+
+| Engine row | Where that pm came from |
+|---|---|
+| **Inside APM.app** | The copy bundled with the app (every platform uses this label) |
+| **From APM_PM_PATH** | The `APM_PM_PATH` variable |
+| **Development build** | `bin/pm` in a source checkout |
+| **From your PATH** | A `pm` on your `PATH`, in an unpackaged source build only |
+| **Missing** | None was found |
+
+If the bundled file is missing, the app opens on **APM could not start** with **The APM backend is not running.** and a **Restart APM** button. Restarting does not help, because the file is still missing. Download the release again.
+
+## Add pm to your terminal (macOS)
+
+The packaged macOS app can install the `pm` command for your terminal, the way VS Code installs `code`. It creates a symlink at `/usr/local/bin/pm` that points at the copy inside `APM.app`, so updating the app updates the CLI too.
+
+<Steps>
+
+### Open the Developer settings
+
+Open **Settings** (<Kbd>⌘</Kbd><Kbd>,</Kbd>) and choose **Developer**.
+
+### Install pm
+
+In the **Command line** card, the **pm command** row checks which `pm` your terminal runs. If there is none, choose **Install pm**. macOS asks for an administrator password when `/usr/local/bin` is not writable.
+
+### Open a new terminal window
+
+Run `pm --version`. It prints the same version as the app.
+
+</Steps>
+
+When it works, you see **Installed the pm command** and **Open a new terminal window and run pm.** If you cancel the administrator prompt, nothing changes and no message appears.
+
+The row adapts to what it finds. It can offer **Update pm**, ask you to upgrade a Homebrew copy, or say **Up to date**. See [The app and pm](/docs/desktop/terminal#the-pm-command) for every state and error.
+
+## Build from source
+
+You need Node 20.19 or 22.12 or newer, Go 1.25 or newer, and git. On macOS, the Xcode command line tools are needed to build the inline Touch ID module.
+
+<Steps>
+
+### Clone the app
+
+```sh title="Terminal"
+git clone https://github.com/apms-org/gui.git apm-desktop
+cd apm-desktop
+npm install
+```
+
+### Build and start it
+
+```sh title="Terminal"
+npm run dev
+```
+
+`npm run dev` builds `pm` into `bin/pm`, builds the Touch ID module when it can, bundles the window into `dist/`, then opens the app.
+
+</Steps>
+
+The individual steps, if you want them:
+
+| Command | What it does |
+|---|---|
+| `npm run build:backend` | Builds `pm` into `bin/pm` |
+| `npm run build:native` | Builds the inline Touch ID module (macOS only) |
+| `npm run build` | Bundles the renderer into `dist/` |
+| `npm run build:watch` | Rebuilds the renderer on every change |
+| `npm start` | Opens the app with what is already built |
+| `npm test` | Runs the shell tests |
+| `npm run dist` | Builds a release app for this machine into `release/` |
+| `npm run web` | Serves the app on `http://127.0.0.1:4417` for a browser, with a throwaway vault |
+
+### Where the dev build gets pm
+
+`npm run build:backend` compiles `pm` from the first source it finds:
+
+1. `APM_SRC=<path>` or `--src <path>`.
+2. A `CLI` folder next to the app folder, as it is (uncommitted changes included).
+3. Otherwise it clones the CLI from `APM_CLI_REPO` (default `https://github.com/apms-org/apm.git`) at `APM_CLI_REF` (default `master`) into `.cache/cli`.
+
+Without Go, a dev build keeps an existing `bin/pm`, `APM_PM_PATH`, or a `pm` on your `PATH`, and tells you which one the app will use. An unpackaged app (`npm start`) looks for `pm` in that same order: `APM_PM_PATH`, then `bin/pm`, then your `PATH`.
+
+`npm run dist` makes a release build for this computer's processor into `release/`, for example `release/arm64/APM.app` on a Mac with Apple silicon. On a Mac, `npm run dist -- --all` builds both `arm64` and `amd64`, and `--arch x64` picks one. It builds `pm` from the CLI tag that matches the app's version (`vX.Y.Z`) and never from `master`. A `CLI` folder next to the app is used only when it is exactly at that tag with no uncommitted changes. If the tag is not published yet, it stops.
+
+### If the build stops
+
+| Message | What to do |
+|---|---|
+| "Go is not installed. Install Go 1.25 or newer from https://go.dev/dl, or set APM_PM_PATH to a pm binary that has the desktop command." | Install Go, or point `APM_PM_PATH` at a `pm` you already have |
+| "Go is not installed, so the backend was not rebuilt. The app will use /Users/you/apm-desktop/bin/pm." | Not an error. The dev build keeps the `pm` it names |
+| "Built bin/pm from /Users/you/src/apm, but it has no desktop command." | That CLI source is older than the desktop app. Use a newer checkout, or set `APM_CLI_REF` to a branch or tag that has it |
+| "warning: pm --version reports 11.2.0 but the app is 12.0.0." | A dev build still runs. A release build stops here instead: build `pm` from the matching tag, or change the version in `package.json` |
+| "Tag v12.0.0 is not on apms-org/apm yet. Tag and push the CLI first, or pass --src for a local build." | Release builds only. Publish the CLI tag first, or build from a local copy with `--src` |
+| "node_api.h was not found next to /usr/local/bin/node." | Install Node from nodejs.org or Homebrew, or set `APM_NODE_INCLUDE` to a folder that has `node_api.h` |
+| "Could not run xcrun clang++: …" | Install the Xcode command line tools with `xcode-select --install` |
+
+`npm run dev` builds the Touch ID module with `--optional`, so a failure there only prints **Continuing without inline Touch ID. The lock screen will use the system dialog.** and the app still opens.
+
+### Run the app in a browser
+
+`npm run web` serves the window at `http://127.0.0.1:4417`, with an engine on a throwaway vault in a new temporary folder. It prints where everything is:
+
+```text title="Output"
+APM web bridge on http://127.0.0.1:4417
+vault /var/folders/x1/abc123/T/apm-web-bridge-Qx7Lp2/vault.dat
+sandbox /var/folders/x1/abc123/T/apm-web-bridge-Qx7Lp2 (isolated HOME and TMPDIR)
+pm /Users/you/apm-desktop/bin/pm (dev)
+```
+
+Pass options after `--`, for example `npm run web -- --port 4500`:
+
+| Option | Default | What it sets |
+|---|---|---|
+| `--port` | `PORT`, or 4417 | The port on `127.0.0.1` |
+| `--dir` | `APM_WEB_BRIDGE_DIR`, or a new temporary folder | The folder that holds the vault and a private home and temp folder |
+| `--vault` | `APM_VAULT_PATH`, or `vault.dat` in that folder | The vault file |
+| `--inherit-home` | off | Use your real home and temp folders instead of private ones |
+
+<Callout type="note" title="Without the Touch ID module">
+If the inline Touch ID module is not built, the lock screen still offers Touch ID. macOS shows its own system dialog, named APM, instead of the glyph inside the button.
+</Callout>
+
+## Update the app
+
+The app does not update itself. **Settings → General → Updates** shows the version you run and your platform, such as **APM 12.0.0** and **macOS · Apple silicon**. **See releases** opens `github.com/apms-org/gui/releases` in your browser. Nothing about your vault is sent. Desktop builds are published on [apms-org/gui releases](https://github.com/apms-org/gui/releases).
+
+Quit APM, then download the newer build and replace the old one. Your vault and settings are not inside the app folder, so they stay where they are. If you installed the `pm` command, it follows the app automatically because it is a link to the app's copy.
+
+<Callout type="warning" title="Newer vaults open read-only">
+A vault that a newer `pm` has written opens read-only in an older app, with the notice **This vault was updated by a newer pm. Update APM to edit it.** Keep the app and every `pm` you use on the same version.
+</Callout>
+
+## Uninstall
+
+1. Quit APM.
+2. Delete `APM.app` (or the app folder on Windows and Linux).
+3. If you installed the `pm` command, remove the link: `sudo rm /usr/local/bin/pm`. Check first with `ls -l /usr/local/bin/pm` that it points into `APM.app`.
+
+Uninstalling does not touch your vault or the app's own folder. To remove the rest:
+
+- The app's settings: delete the `APM Desktop` folder (on macOS, `~/Library/Application Support/APM Desktop`). See [Where your data lives](/docs/desktop#the-apps-own-folder).
+- The vault itself: use **Settings → Maintenance → Destroy vault** before you uninstall, or delete the file yourself. See [Settings](/docs/desktop/settings#maintenance).
+- Everything `pm` keeps as well, if you use APM nowhere else: see [Remove everything](/docs/reference/file-locations#remove-everything).

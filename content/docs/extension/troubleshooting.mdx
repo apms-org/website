@@ -1,0 +1,216 @@
+---
+title: Troubleshooting
+description: Fixes for the extension not connecting, not filling, not offering to save, and passkey problems.
+order: 9
+group: Help
+---
+
+Most problems come down to one of three things: the extension cannot reach APM, the vault is locked, or a setting or site rule keeps APM quiet on a page. Start with the checks below.
+
+## Check the connection first
+
+One command shows how the extension reaches APM: which browsers can start `pm`, whether the desktop app or `pm extension serve` is answering, and whether your pairing token matches.
+
+```sh title="Terminal"
+pm extension status
+```
+
+With the desktop app open and unlocked, it prints:
+
+```text title="Output"
+Google Chrome:   linked
+Brave:           not linked
+Linked vault:    /Users/you/.apm/vault.dat
+Linked on:       Oct 5, 2026 14:02
+Right now:       the extension uses the APM app
+Listening:       127.0.0.1:41417
+Version:         12.0.0 (bridge API 2)
+Vault:           unlocked, 214 items
+Token:           3f9c1a (fingerprint)
+```
+
+A row appears for each supported browser found on this computer, or "No Chromium browser found." when there is none. The **Linked vault** and **Linked on** lines appear once you have run `pm extension link`. The **Listening**, **Version** and **Vault** lines appear only when APM answers on the port. Pass `--port` to check another port; without it, `pm extension status` uses `APM_BRIDGE_PORT` or 41417.
+
+The **Right now** line says which route the extension uses:
+
+| Right now | Meaning |
+|-----------|---------|
+| `the extension uses the APM app` | The desktop app is serving the bridge |
+| `the extension uses 'pm extension serve'` | A terminal is running `pm extension serve` |
+| `the APM app is closed, so the browser starts pm` | Nothing answers on the port, but a browser is linked, so it starts `pm` when the extension needs it |
+| `nothing is listening on 127.0.0.1:41417 and no browser is linked` | The extension has no way to reach APM. The command ends with "Run 'pm extension link' to use the extension without the APM app." |
+| `something other than APM is listening on 127.0.0.1:41417` | Another program has the port. The command stops here |
+
+The **Vault** and **Token** lines can also read:
+
+| Line | Meaning |
+|------|---------|
+| `Vault:           unlocked, read-only, 214 items` | The vault is open read-only, so the extension cannot save or update logins |
+| `Vault:           locked` | The bridge is running but the vault is locked. Unlock it from the popup or the app |
+| `Token:           none yet. Run 'pm extension token' to create one.` | Your APM config folder has no `bridge_token`. Every bridge creates one when it starts, so the bridge that answered keeps its token somewhere else, for example because it runs as a different user, or the file was deleted after it started |
+| `Token:           3f9c1a does not match the running bridge. It may use a different config directory.` | The bridge that answered uses another `bridge_token`, for example because it runs as a different user |
+| `Token:           3f9c1a (the status request failed: …)` | The bridge answered the first request but not the second |
+
+`pm extension status` exits with status 1 when nothing listens and no browser is linked, when another program holds the port, when the token does not match, and when the status request fails. Otherwise it exits with 0, so you can use it in scripts.
+
+In the extension itself, the settings page's **Connection** section shows the same picture.
+
+## The popup says "APM isn't connected"
+
+The extension is paired, but nothing answered on the bridge and `pm` is not linked (or did not start).
+
+- Open the desktop app, or run `pm extension serve` in a terminal.
+- To work without the app, run `pm extension link` once. See [Pairing](/docs/extension/pairing#use-the-extension-without-the-app).
+- If you set `APM_BRIDGE_PORT`, give the extension the same port: settings, **Connection**, **Bridge**, **Address**.
+- If the desktop app's **Settings**, **Browser extension** says "Not running. Another app may be using port 41417", quit the other program (or a stray `pm extension serve`) and restart APM.
+
+## The popup says "pm is linked but did not answer"
+
+The browser tried to start `pm` and it failed. The popup shows the browser's error.
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| "Specified native messaging host not found." | `pm` is not registered with this browser | Run `pm extension link`. If the browser was not detected, name it: `pm extension link --browser brave` |
+| "Access to the specified native messaging host is forbidden." | The extension's ID is not in the registration, usually a development build with its own key | Run `pm extension link --id` followed by the ID from the browser's extensions page |
+| "Native host has exited." | `pm` started and quit at once, often because the file it points to moved | Run `pm extension status`. If it says "linked to a pm that no longer exists", run `pm extension link` again with the `pm` you use now |
+
+Link from an installed `pm`, not from `go run` or a temporary build: `pm extension link` warns when it runs from a temporary folder, because the browser loses that file.
+
+If `pm` starts but opens the wrong vault, it is using the path saved when you linked. Run `pm extension link` again after moving your vault.
+
+## The extension asks to connect again
+
+The pairing token changed or was removed. That happens when someone runs `pm extension rotate`, rotates the token in the desktop app, or chooses **Forget this browser**. Confirm the new code, and the extension is paired again.
+
+## No pairing code appears in APM
+
+- **Desktop app**: the request shows as a dialog, and under **Settings**, **Browser extension**. It lasts 2 minutes. Choose **Connect** in the popup to send a new one.
+- **`pm extension serve`**: it must run in an interactive terminal. When its input is not a terminal it denies requests and prints why.
+- **Without the app**: `pm extension link` must be running in a terminal to show the request. Run it again, then click the APM icon.
+- After a denial the extension waits 10 minutes before asking on its own; choosing **Connect** asks at once. APM accepts at most 5 requests a minute.
+
+## The field menu does not appear
+
+- **Nothing to offer.** On focus the menu opens only when this site has a login, a code or a passkey for that field. Click the APM icon in the field, or right-click the field and choose **APM**, to open it anyway; it then says why it cannot help.
+- **Turned off.** Check **Show the APM menu on login fields** and **Suggest strong passwords on sign-up forms** in the settings.
+- **Paused or excluded.** The popup's **This site** tab says "APM is paused on this site". Choose **Resume**, or edit **Excluded sites**.
+- **Not a secure page, or a frame from another site.** See [Where APM does not fill](/docs/extension/autofill#where-apm-does-not-fill).
+- **You pressed Esc** in that field. Click the field or its APM icon to bring the menu back.
+- **The page was open before the extension was installed or updated.** Reload the tab; the browser only adds the extension to pages that load after it.
+- **The field is not recognized.** Right-click it and choose **APM**, **Fill a login**, or copy the username and password from the popup.
+
+## A login is missing for a site, or the wrong one shows
+
+APM offers a login only on the websites saved in it. Open the login in the popup and check its **Websites**. To add the current site, open the popup there and choose **Use a saved login on** followed by the site.
+
+If a login shows on too many sites, or too few, change **Match websites by** in the settings. **Exact host** keeps subdomains apart; **Base domain** joins them. See [How APM matches logins](/docs/extension/autofill#how-apm-matches-logins-to-a-site).
+
+## Filling does nothing
+
+| Message | What to do |
+|---------|------------|
+| "APM could not reach this page. Reload it and try again." | Reload the tab |
+| "There is no login form on this page." or "APM could not find a login form on this page." | Click into the username or password field first, then fill from the menu. Some sites build forms APM does not recognize; copy the values from the popup instead |
+| "This form is inside a frame from another site. Filling there is off in settings." | Turn on **Fill inside frames from other sites** only if you trust the page |
+| "example.com is not encrypted. APM does not fill on http:// pages." | Use the `https://` address, or turn off **Never fill on http:// pages** |
+| "That login no longer exists." | It was deleted in another app. Reopen the popup |
+
+## No one-time code is offered
+
+- The login has no code. Add its two-factor key in the desktop app, or link an Authenticator item to the site with `pm totp link <entry> <domain>`.
+- The code page is on a different site from the login's websites, and more than 3 minutes have passed since you filled the login. Copy the code from the popup's **Codes** tab instead.
+- **Copy the one-time code after a login** is off, so nothing was copied.
+
+## No save or update prompt
+
+APM stays quiet when the vault is locked, the form had no password or (for a new login) no username, the site is excluded from saving, both saving settings are off, or you just filled the same login unchanged. The prompt also appears about a second after you submit, so it can be missed when the next page is slow to load. Save the login from the popup with **New login**. See [Saving and updating](/docs/extension/saving-and-updating#when-apm-offers).
+
+## The browser's passkey sheet opens instead of APM's
+
+APM steps aside on purpose in some cases: passkeys turned off, the site paused, the extension not connected, a site that only accepts RS256 keys, no passkey for the site in your vault, or a locked vault on a site where APM never created a passkey in this browser. See [When the browser takes over](/docs/extension/passkeys#when-the-browser-takes-over).
+
+If creating a passkey fails with "APM already has a passkey for" your account, the site already has one from your vault. Sign in with it.
+
+## Unlocking from the browser fails
+
+| Message | Meaning |
+|---------|---------|
+| "Incorrect password. N attempts left before recovery is required." | Check the password and keyboard layout |
+| "Too many attempts. Try again in N seconds." | Wait, then try again |
+| "This vault is locked after repeated failed attempts. Use recovery in the APM app." | Recover the vault in the desktop app |
+| "This APM session is read-only." | Shown when you save or update from the browser while the vault is unlocked read-only, for example after `pm mode readonly`. Lock, then unlock with full access |
+| "This vault was updated by a newer pm. Update APM to edit it." | The vault was written by a newer `pm`. Update the app and `pm` |
+| "Touch ID was cancelled or did not match." | You closed the Touch ID prompt, or the fingerprint did not match. Try again, or type your password |
+| "Touch ID is not set up for APM." | Touch ID was turned off for APM after the popup or sheet opened. Set it up again in the desktop app, or with `pm auth touchid setup`, or type your password |
+| "Touch ID is not available on this Mac." | APM cannot use Touch ID on this Mac. Type your password |
+| "Incorrect password." right after **Unlock with Touch ID** in the popup, or "Touch ID has an outdated master password. Unlock with your password, then set Touch ID up again." in a passkey sheet | The master password kept for Touch ID no longer opens the vault, for example because it was changed on another computer. Unlock with your password, then set Touch ID up again |
+
+Wrong passwords typed in the app or the browser count toward one limit until the next successful unlock. Every third wrong password in a row brings a 30-second pause. After six, the app and the browser refuse to unlock until you recover the vault. See [Failed attempts](/docs/security/sessions-and-locking#failed-attempts) and [Recovery](/docs/security/recovery).
+
+## Copying fails
+
+"Chrome did not allow the copy. Try again." means the browser refused clipboard access for a moment. Try again. If the clipboard is not cleared after the timeout, you probably copied something else since: APM clears it only if it still holds what APM copied.
+
+## "The extension restarted" or "APM stopped listening"
+
+The browser stops the extension's background worker when it is idle, and an open menu or prompt can lose its connection. Close it and try again, or reload the tab.
+
+| Message | Where | What to do |
+|---------|-------|------------|
+| "The extension restarted. Try again." | Popup or settings page | Try again. If you just reloaded the extension, close and reopen the popup |
+| "The extension restarted. Reload the page." | Popup or settings page, when the extension was replaced underneath it | Reload the page |
+| "APM stopped listening. Close this and try again." | Field menu, prompt or passkey sheet | Close it, then click the field again |
+| "No answer from the extension." | Popup or settings page | The background did not reply. Reopen the popup |
+| **APM could not start**, with one of the messages above or "The extension could not start." | Popup, when it cannot load | Choose **Try again**. If it keeps happening, reload the extension on `chrome://extensions` |
+
+## Website logos are missing
+
+The popup and menus show a site's logo only after APM has fetched it.
+
+- APM fetches logos only while the vault is unlocked, and not at all when **Show website icons** is off in the desktop app's **Settings**, **Appearance**, or when `APM_ICONS_OFFLINE` is set.
+- APM tries a site again 3 days after it failed to get a logo. The extension asks APM again about a site with no logo after 6 hours.
+- **Clear icon cache** in the desktop app empties APM's copy. **Forget this browser** in the extension's settings empties the extension's copy, and unpairs it.
+
+## Shortcuts do nothing
+
+Another extension or the system may own the same keys. Set new ones at `chrome://extensions/shortcuts`. **Copy the one-time code for this page** has no default key at all.
+
+## The vault locks unexpectedly
+
+The vault follows one auto-lock policy everywhere: by default after 15 minutes idle, after 1 hour at most, and when the computer sleeps. Check it with `pm autolock`, or in the desktop app's **Settings**, **Sessions**. Locking in the app or from the browser, including **Lock APM when Chrome closes**, locks the vault everywhere and ends any `pm` session in a terminal. `pm lock` in a terminal is narrower: it ends only the terminal session, and the app and the browser stay unlocked.
+
+## Platform notes
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tab>
+
+`pm extension link` writes one manifest per browser, in the browser's folder under `~/Library/Application Support`, and can link Chrome, Chrome Beta, Chrome Canary, Chromium, Edge, Brave, Vivaldi and Arc.
+
+**Unlock with Touch ID** shows in the popup and in passkey sheets only when this Mac has Touch ID and it is set up for APM. Otherwise a locked passkey sheet offers **Unlock in the toolbar**, which opens the popup.
+
+</Tab>
+<Tab>
+
+`pm extension link` writes the manifest to `%AppData%\apm\native-messaging\dev.apm.bridge.json` and registers it with `reg add` under `HKEY_CURRENT_USER`. If that fails, it prints "Google Chrome: could not register with Google Chrome: …" followed by the error from `reg`. It can link Chrome, Chromium, Edge, Brave and Vivaldi; Chrome Beta, Chrome Canary and Arc cannot be linked on Windows.
+
+There is no Touch ID here, so you always type your master password. A `pm unlock` session in a terminal does not end when the computer sleeps, though the app and the `pm` the browser starts still lock on sleep.
+
+</Tab>
+<Tab>
+
+`pm extension link` looks for each browser's folder in `~/.config`, or `$XDG_CONFIG_HOME` when that is set, and writes the manifest there. A browser that keeps its profile somewhere else is not found; `--browser` links it anyway, at the usual path. Arc cannot be linked on Linux.
+
+There is no Touch ID here, so you always type your master password.
+
+</Tab>
+</Tabs>
+
+## Still stuck
+
+Collect these, then [open an issue](https://github.com/apms-org/extension/issues) (or one for [`pm`](https://github.com/apms-org/cli/issues) or [the app](https://github.com/apms-org/gui/issues), if the problem is there):
+
+- The versions on the extension settings page's **About** section: the extension, the APM it is connected to, and **This browser**.
+- The output of `pm --version` and `pm extension status`.
+- The exact message, and what you did just before it.
+
+Never paste your pairing token, your master password or your vault file into an issue. See [Get help](/docs/getting-started/getting-help).
